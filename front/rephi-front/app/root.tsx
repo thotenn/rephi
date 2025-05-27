@@ -6,10 +6,16 @@ import {
   Scripts,
   ScrollRestoration,
 } from "@remix-run/react";
+import type { LinksFunction } from "@remix-run/node";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import PhoenixSocket from "~/modules/api/socket";
 import { useAuthStore } from "~/stores/auth.store";
+import stylesheet from "~/tailwind.css?url";
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: stylesheet },
+];
 
 const queryClient = new QueryClient();
 
