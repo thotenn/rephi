@@ -20,6 +20,12 @@ if System.get_env("PHX_SERVER") do
   config :rephi, RephiWeb.Endpoint, server: true
 end
 
+# Guardian configuration from environment
+if guardian_secret = System.get_env("GUARDIAN_SECRET_KEY") do
+  config :rephi, RephiWeb.Auth.Guardian,
+    secret_key: guardian_secret
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

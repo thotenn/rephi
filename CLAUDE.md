@@ -6,6 +6,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Rephi is a Phoenix/Elixir backend with a Remix React frontend, featuring JWT authentication and real-time WebSocket communication.
 
+## Environment Setup
+
+1. **Copy environment file**:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Update `.env` with your configuration**:
+   - Database credentials
+   - Secret keys (generate with `mix phx.gen.secret`)
+   - Port and host settings
+   - Other environment-specific values
+
+3. **Environment variables are loaded automatically** in dev/test environments from the `.env` file.
+
 ## Common Development Commands
 
 ### Backend (Phoenix/Elixir)

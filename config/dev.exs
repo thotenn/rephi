@@ -2,13 +2,13 @@ import Config
 
 # Configure your database
 config :rephi, Rephi.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "rephi_dev",
+  username: System.get_env("DB_USERNAME", "postgres"),
+  password: System.get_env("DB_PASSWORD", "postgres"),
+  hostname: System.get_env("DB_HOSTNAME", "localhost"),
+  database: System.get_env("DB_NAME", "rephi_dev"),
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+  pool_size: String.to_integer(System.get_env("DB_POOL_SIZE", "10"))
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
@@ -19,11 +19,11 @@ config :rephi, Rephi.Repo,
 # Binding to loopback ipv4 address prevents access from other machines.
 config :rephi, RephiWeb.Endpoint,
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: 4000],
-  check_origin: false,
-  code_reloader: true,
-  debug_errors: true,
-  secret_key_base: "dGdaq64Jh97Vi7pXO6Vyz5OvUM7s1e17//sZuXaMgdgvpsqt6CDkqDLuAppk4nEK",
+  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT", "4000"))],
+  check_origin: System.get_env("CHECK_ORIGIN", "false") == "true",
+  code_reloader: System.get_env("CODE_RELOADER", "true") == "true",
+  debug_errors: System.get_env("DEBUG_ERRORS", "true") == "true",
+  secret_key_base: System.get_env("SECRET_KEY_BASE", "dGdaq64Jh97Vi7pXO6Vyz5OvUM7s1e17//sZuXaMgdgvpsqt6CDkqDLuAppk4nEK"),
   watchers: []
 
 # ## SSL Support
@@ -50,7 +50,7 @@ config :rephi, RephiWeb.Endpoint,
 # different ports.
 
 # Enable dev routes for dashboard and mailbox
-config :rephi, dev_routes: true
+config :rephi, dev_routes: System.get_env("DEV_ROUTES", "true") == "true"
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :console, format: "[$level] $message\n"

@@ -13,7 +13,7 @@ config :rephi,
 
 # Configures the endpoint
 config :rephi, RephiWeb.Endpoint,
-  url: [host: "localhost"],
+  url: [host: System.get_env("PHX_HOST") || "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
     formats: [json: RephiWeb.ErrorJSON],
@@ -41,7 +41,7 @@ config :phoenix, :json_library, Jason
 
 config :rephi, RephiWeb.Auth.Guardian,
   issuer: "rephi",
-  secret_key: "d3mVezqyv5GuKhoKELh30QdnY3P0u46Y6pIP8DaWVElPvBeahq61pHcey6n4wjhq" # Use mix guardian.gen.secret
+  secret_key: System.get_env("GUARDIAN_SECRET_KEY") || "d3mVezqyv5GuKhoKELh30QdnY3P0u46Y6pIP8DaWVElPvBeahq61pHcey6n4wjhq" # Use mix guardian.gen.secret
 
 # Phoenix Swagger configuration
 config :rephi, :phoenix_swagger,
@@ -52,6 +52,22 @@ config :rephi, :phoenix_swagger,
     ]
   },
   json_library: Jason
+
+# Load environment variables from .env file in dev/test
+if config_env() in [:dev, :test] do
+  import Config
+
+  if File.exists?(".env") do
+    for line <- File.stream!(".env"),
+        line = String.trim(line),
+        line != "",
+        not String.starts_with?(line, "#"),
+        [key | rest] = String.split(line, "=", parts: 2),
+        value = Enum.join(rest, "=") do
+      System.put_env(String.trim(key), String.trim(value))
+    end
+  end
+end
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
