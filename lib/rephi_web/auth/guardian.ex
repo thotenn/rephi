@@ -1,5 +1,5 @@
 defmodule RephiWeb.Auth.Guardian do
-  use Guardian, otp_app: :erp_commerce
+  use Guardian, otp_app: :rephi
 
   alias Rephi.Accounts
 

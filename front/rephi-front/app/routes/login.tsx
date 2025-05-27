@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
 import api from "~/modules/api/api";
+import { apisUrl } from "~/env";
 import { useAuthStore } from "~/stores/auth.store";
 import type { AuthResponse, LoginCredentials } from "~/types/auth.types";
 
@@ -31,7 +32,7 @@ export default function Login() {
     setError(null);
 
     try {
-      const response = await api.post<AuthResponse>("/auth/login", data);
+      const response = await api.post<AuthResponse>(apisUrl.auth.login, data);
       setAuth(response.data.user, response.data.token);
       navigate("/home");
     } catch (err) {

@@ -6,6 +6,7 @@ import { useState } from "react";
 import api from "~/modules/api/api";
 import { useAuthStore } from "~/stores/auth.store";
 import type { AuthResponse } from "~/types/auth.types";
+import { apisUrl } from "~/env";
 
 type RegisterFormData = {
   email: string;
@@ -41,7 +42,7 @@ export default function Register() {
     setError(null);
 
     try {
-      const response = await api.post<AuthResponse>("/auth/register", data);
+      const response = await api.post<AuthResponse>(apisUrl.auth.register, data);
       setAuth(response.data.user, response.data.token);
       navigate("/home");
     } catch (err) {

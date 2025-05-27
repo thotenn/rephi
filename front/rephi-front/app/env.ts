@@ -4,4 +4,10 @@ export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'ws://localhost:400
 export const apisUrl = {
     default: API_URL,
     socket: SOCKET_URL,
+
+    auth: {
+        register: `/users/register`,
+        login: `/users/login`,
+        me: `/me`,
+    }
 }
