@@ -25,8 +25,17 @@ defmodule RephiWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
-  def connect(_params, socket, _connect_info) do
-    {:ok, socket}
+  def connect(%{"token" => token}, socket, _connect_info) do
+    case RephiWeb.Auth.Guardian.resource_from_token(token) do
+      {:ok, user, _claims} ->
+        {:ok, assign(socket, :user_id, user.id)}
+      {:error, _reason} ->
+        :error
+    end
+  end
+
+  def connect(_params, _socket, _connect_info) do
+    :error
   end
 
   # Socket IDs are topics that allow you to identify all sockets for a given user:
@@ -40,5 +49,5 @@ defmodule RephiWeb.UserSocket do
   #
   # Returning `nil` makes this socket anonymous.
   @impl true
-  def id(_socket), do: nil
+  def id(socket), do: "user_socket:#{socket.assigns.user_id}"
 end
