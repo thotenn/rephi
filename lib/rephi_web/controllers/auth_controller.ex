@@ -81,6 +81,13 @@ defmodule RephiWeb.AuthController do
     end
   end
 
+  # Catch-all for missing parameters
+  def login(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Email and password are required"})
+  end
+
   swagger_path :me do
     get("/api/me")
     summary("Get current user")
