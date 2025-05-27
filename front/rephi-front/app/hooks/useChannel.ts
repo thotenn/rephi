@@ -1,23 +1,40 @@
 import { useEffect, useState } from 'react';
 import { Channel } from 'phoenix';
-import socket from '~/modules/api/socket';
+import PhoenixSocket from '~/modules/api/socket';
 
-export function useChannel(channelName: string) {
+export function useChannel(channelName: string, params = {}) {
   const [channel, setChannel] = useState<Channel | null>(null);
+  const [connected, setConnected] = useState(false);
   
   useEffect(() => {
-    const ch = socket.channel(channelName, {});
+    const socket = PhoenixSocket.getSocket();
+    
+    if (!socket) {
+      console.error('Socket not connected');
+      return;
+    }
+
+    const ch = socket.channel(channelName, params);
     
     ch.join()
-      .receive("ok", () => console.log(`Joined ${channelName}`))
-      .receive("error", () => console.log(`Failed to join ${channelName}`));
+      .receive("ok", () => {
+        console.log(`Joined ${channelName}`);
+        setConnected(true);
+      })
+      .receive("error", ({ reason }) => {
+        console.error(`Failed to join ${channelName}:`, reason);
+        setConnected(false);
+      });
     
     setChannel(ch);
     
     return () => {
-      ch.leave();
+      if (ch) {
+        ch.leave();
+        setConnected(false);
+      }
     };
-  }, [channelName]);
+  }, [channelName, params]);
   
-  return channel;
+  return { channel, connected };
 }

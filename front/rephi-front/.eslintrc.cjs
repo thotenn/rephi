@@ -23,6 +23,15 @@ module.exports = {
 
   // Base config
   extends: ["eslint:recommended"],
+  
+  // Add global settings for import resolver
+  settings: {
+    "import/resolver": {
+      typescript: {
+        project: "./tsconfig.json",
+      },
+    },
+  },
 
   overrides: [
     // React
@@ -63,6 +72,7 @@ module.exports = {
           },
           typescript: {
             alwaysTryTypes: true,
+            project: "./tsconfig.json",
           },
         },
       },
