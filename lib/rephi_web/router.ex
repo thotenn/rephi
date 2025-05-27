@@ -1,5 +1,6 @@
 defmodule RephiWeb.Router do
   use RephiWeb, :router
+  use PhoenixSwagger
 
   pipeline :api do
     plug :accepts, ["json"]
@@ -21,6 +22,37 @@ defmodule RephiWeb.Router do
     pipe_through :authenticated
 
     get "/me", AuthController, :me
+  end
+
+  scope "/api/swagger" do
+    forward "/", PhoenixSwagger.Plug.SwaggerUI,
+      otp_app: :rephi,
+      swagger_file: "swagger.json"
+  end
+
+  scope "/api/swagger" do
+    pipe_through :api
+    get "/swagger.json", RephiWeb.SwaggerController, :index
+  end
+
+  def swagger_info do
+    %{
+      info: %{
+        version: "1.0",
+        title: "Rephi API",
+        description: "Phoenix/Elixir backend with JWT authentication and real-time WebSocket communication"
+      },
+      securityDefinitions: %{
+        Bearer: %{
+          type: "apiKey",
+          name: "Authorization",
+          in: "header",
+          description: "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
+        }
+      },
+      consumes: ["application/json"],
+      produces: ["application/json"]
+    }
   end
 
 

@@ -43,6 +43,16 @@ config :rephi, RephiWeb.Auth.Guardian,
   issuer: "rephi",
   secret_key: "d3mVezqyv5GuKhoKELh30QdnY3P0u46Y6pIP8DaWVElPvBeahq61pHcey6n4wjhq" # Use mix guardian.gen.secret
 
+# Phoenix Swagger configuration
+config :rephi, :phoenix_swagger,
+  swagger_files: %{
+    "priv/static/swagger.json" => [
+      router: RephiWeb.Router,
+      endpoint: RephiWeb.Endpoint
+    ]
+  },
+  json_library: Jason
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
