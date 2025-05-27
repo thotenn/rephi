@@ -1,0 +1,9 @@
+node_modules
+
+/.cache
+/build
+.env
+
+package-lock.json
+# Ignore the output of the build process
+/dist

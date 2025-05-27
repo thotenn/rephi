@@ -26,3 +26,5 @@ erl_crash.dump
 rephi-*.tar
 
 mix.lock
+
+.claude/
