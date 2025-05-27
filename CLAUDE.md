@@ -154,6 +154,90 @@ end
 mix phx.swagger.generate
 ```
 
+## Testing Requirements for New Endpoints
+
+**IMPORTANT**: For every new endpoint created, you MUST also create corresponding test files in the `/test` directory. This ensures code quality and prevents regressions.
+
+### Creating Tests for New Endpoints
+
+1. **Create a test file** in `test/rephi_web/controllers/`:
+```elixir
+defmodule RephiWeb.YourControllerTest do
+  use RephiWeb.ConnCase
+  
+  # Import auth helpers if needed
+  import Rephi.AuthTestHelpers
+  
+  describe "your_action/2" do
+    test "successful case", %{conn: conn} do
+      # Test implementation
+    end
+    
+    test "error case", %{conn: conn} do
+      # Test implementation
+    end
+  end
+end
+```
+
+2. **Test all scenarios**:
+   - ✅ Success cases with valid data
+   - ❌ Error cases with invalid data
+   - 🔐 Authentication/authorization scenarios
+   - 🚫 Missing or malformed parameters
+   - 📝 Validation errors
+
+3. **Use test helpers** from `test/support/auth_test_helpers.ex`:
+   - `create_user/1` - Create test users
+   - `create_user_with_token/1` - Create authenticated users
+   - `authenticate_conn/2` - Add auth headers
+   - `valid_user_attrs/1` - Generate valid test data
+
+4. **Run tests** to ensure they pass:
+```bash
+mix test                           # Run all tests
+mix test test/path/to/test.exs    # Run specific test file
+```
+
+### Test File Structure Example
+
+```elixir
+# For a new endpoint POST /api/items
+# Create: test/rephi_web/controllers/item_controller_test.exs
+
+defmodule RephiWeb.ItemControllerTest do
+  use RephiWeb.ConnCase
+
+  @valid_attrs %{"name" => "Test Item", "description" => "Test Description"}
+  @invalid_attrs %{"name" => nil}
+
+  describe "create/2" do
+    setup %{conn: conn} do
+      # Authenticate if endpoint requires it
+      conn = authenticate_user(conn)
+      {:ok, conn: conn}
+    end
+
+    test "creates item with valid data", %{conn: conn} do
+      conn = post(conn, ~p"/api/items", @valid_attrs)
+      assert %{"id" => id, "name" => "Test Item"} = json_response(conn, 201)
+    end
+
+    test "returns errors with invalid data", %{conn: conn} do
+      conn = post(conn, ~p"/api/items", @invalid_attrs)
+      assert %{"errors" => errors} = json_response(conn, 422)
+    end
+  end
+end
+```
+
+### Integration Tests
+
+For complex flows, create integration tests in `test/rephi_web/integration/`:
+- Test complete user journeys
+- Verify multiple endpoints work together
+- Ensure data consistency across operations
+
 ### Current API Documentation
 
 - **Authentication Endpoints** (`/api/users/*`): User registration, login, and profile

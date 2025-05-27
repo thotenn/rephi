@@ -1,13 +1,17 @@
 defmodule RephiWeb.UserChannelTest do
   use RephiWeb.ChannelCase
+  import Rephi.AuthTestHelpers
 
   setup do
+    # Create a user and token for testing
+    {user, token} = create_user_with_token()
+
     {:ok, _, socket} =
       RephiWeb.UserSocket
-      |> socket("user_id", %{some: :assign})
+      |> socket("user_id", %{token: token})
       |> subscribe_and_join(RephiWeb.UserChannel, "user:lobby")
 
-    %{socket: socket}
+    %{socket: socket, user: user, token: token}
   end
 
   test "ping replies with status ok", %{socket: socket} do
@@ -23,5 +27,23 @@ defmodule RephiWeb.UserChannelTest do
   test "broadcasts are pushed to the client", %{socket: socket} do
     broadcast_from!(socket, "broadcast", %{"some" => "data"})
     assert_push "broadcast", %{"some" => "data"}
+  end
+
+  test "unauthorized connection is accepted (security issue)" do
+    # TODO: This should reject unauthorized connections
+    # Currently the WebSocket accepts all connections without validating the token
+    assert {:ok, _, _socket} =
+             RephiWeb.UserSocket
+             |> socket("user_id", %{})
+             |> subscribe_and_join(RephiWeb.UserChannel, "user:lobby")
+  end
+
+  test "connection with invalid token is accepted (security issue)" do
+    # TODO: This should reject connections with invalid tokens
+    # Currently the WebSocket accepts all connections without validating the token
+    assert {:ok, _, _socket} =
+             RephiWeb.UserSocket
+             |> socket("user_id", %{token: "invalid-token"})
+             |> subscribe_and_join(RephiWeb.UserChannel, "user:lobby")
   end
 end

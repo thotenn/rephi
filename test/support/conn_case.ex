@@ -28,6 +28,7 @@ defmodule RephiWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import RephiWeb.ConnCase
+      import Rephi.AuthTestHelpers
     end
   end
 
