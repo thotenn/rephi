@@ -6,6 +6,7 @@ defmodule Rephi.Accounts.User do
   schema "users" do
     field :email, :string
     field :password, :string, virtual: true
+    field :password_confirmation, :string, virtual: true
     field :hashed_password, :string
 
     timestamps(type: :utc_datetime)
@@ -14,12 +15,13 @@ defmodule Rephi.Accounts.User do
   @doc false
   def changeset(user, attrs) do
     user
-    |> cast(attrs, [:email, :password])
+    |> cast(attrs, [:email, :password, :password_confirmation])
     |> validate_required([:email, :password])
     |> validate_format(:email, ~r/^[^\s]+@[^\s]+$/, message: "must have the @ sign and no spaces")
     |> validate_length(:email, max: 160)
     |> unique_constraint(:email)
     |> validate_length(:password, min: 6, max: 72)
+    |> validate_confirmation(:password, message: "passwords do not match")
     |> hash_password()
   end
 

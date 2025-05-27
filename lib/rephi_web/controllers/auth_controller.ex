@@ -4,7 +4,7 @@ defmodule RephiWeb.AuthController do
   alias Rephi.Accounts
   alias RephiWeb.Auth.Guardian
 
-  def register(conn, %{"user" => user_params}) do
+  def register(conn, user_params) do
     case Accounts.create_user(user_params) do
       {:ok, user} ->
         {:ok, token, _claims} = Guardian.encode_and_sign(user)
