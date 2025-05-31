@@ -32,7 +32,7 @@ defmodule Rephi.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:bandit, "~> 1.5"},
+      {:bandit, "~> 1.7.0"},
       {:bcrypt_elixir, "~> 3.0"},
       {:cors_plug, "~> 3.0"},
       {:dns_cluster, "~> 0.1.1"},
@@ -44,7 +44,7 @@ defmodule Rephi.MixProject do
       {:phoenix, "~> 1.7.20"},
       {:phoenix_ecto, "~> 4.5"},
       {:postgrex, ">= 0.0.0"},
-      {:phoenix_live_dashboard, "~> 0.8.3"},
+      {:phoenix_live_dashboard, "~> 0.8.4"},
       {:swoosh, "~> 1.5"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
