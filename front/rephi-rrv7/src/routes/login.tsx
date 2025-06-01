@@ -43,12 +43,13 @@ export default function Login() {
             </Link>
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {loginMutation.isError && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-800">
-                {loginMutation.error?.message || "An error occurred during login"}
+                {loginMutation.error?.message ||
+                  "An error occurred during login"}
               </div>
             </div>
           )}
@@ -67,7 +68,9 @@ export default function Login() {
                 placeholder="Email address"
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.email.message}
+                </p>
               )}
             </div>
             <div>
@@ -83,7 +86,9 @@ export default function Login() {
                 placeholder="Password"
               />
               {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.password.message}
+                </p>
               )}
             </div>
           </div>

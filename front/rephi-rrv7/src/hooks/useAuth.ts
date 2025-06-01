@@ -1,11 +1,15 @@
-import { useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import api from '~/modules/api/api';
+import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import api from "~/modules/api/api";
 import PhoenixSocket from "~/modules/api/socket";
-import { useAuthStore } from '~/stores/auth.store';
-import type { AuthResponse, LoginCredentials, RegisterCredentials } from '~/types/auth.types';
-import type { ApiError } from '~/types/api.types';
-import { apisUrl, urls } from '~/env';
+import { useAuthStore } from "~/stores/auth.store";
+import type {
+  AuthResponse,
+  LoginCredentials,
+  RegisterCredentials,
+} from "~/types/auth.types";
+import type { ApiError } from "~/types/api.types";
+import { apisUrl, urls } from "~/env";
 
 export function useLogin() {
   const navigate = useNavigate();

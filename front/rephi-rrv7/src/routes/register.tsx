@@ -8,14 +8,18 @@ import type { RegisterCredentials } from "../types/auth.types";
 
 type RegisterFormData = RegisterCredentials;
 
-const registerSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  password_confirmation: z.string().min(6, "Password must be at least 6 characters"),
-}).refine(data => data.password === data.password_confirmation, {
-  message: "Passwords don't match",
-  path: ["password_confirmation"],
-});
+const registerSchema = z
+  .object({
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    password_confirmation: z
+      .string()
+      .min(6, "Password must be at least 6 characters"),
+  })
+  .refine((data) => data.password === data.password_confirmation, {
+    message: "Passwords don't match",
+    path: ["password_confirmation"],
+  });
 
 export default function Register() {
   const registerMutation = useRegister();
@@ -49,19 +53,23 @@ export default function Register() {
             </Link>
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {registerMutation.isError && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-800">
-                {registerMutation.error?.message || "An error occurred during registration"}
+                {registerMutation.error?.message ||
+                  "An error occurred during registration"}
               </div>
             </div>
           )}
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Email address
               </label>
               <input
@@ -73,12 +81,17 @@ export default function Register() {
                 placeholder="Email address"
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.email.message}
+                </p>
               )}
             </div>
-            
+
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Password
               </label>
               <input
@@ -90,12 +103,17 @@ export default function Register() {
                 placeholder="Password"
               />
               {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.password.message}
+                </p>
               )}
             </div>
-            
+
             <div>
-              <label htmlFor="password_confirmation" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password_confirmation"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Confirm Password
               </label>
               <input
@@ -107,7 +125,9 @@ export default function Register() {
                 placeholder="Confirm Password"
               />
               {errors.password_confirmation && (
-                <p className="mt-1 text-sm text-red-600">{errors.password_confirmation.message}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.password_confirmation.message}
+                </p>
               )}
             </div>
           </div>
@@ -118,7 +138,9 @@ export default function Register() {
               disabled={registerMutation.isPending}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {registerMutation.isPending ? "Creating account..." : "Create account"}
+              {registerMutation.isPending
+                ? "Creating account..."
+                : "Create account"}
             </button>
           </div>
         </form>

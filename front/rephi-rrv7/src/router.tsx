@@ -1,14 +1,14 @@
-import { createBrowserRouter } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
-import App from './App';
+import { createBrowserRouter } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import App from "./App";
 
 // Lazy load all route components
-const IndexPage = lazy(() => import('./routes/index'));
-const LoginPage = lazy(() => import('./routes/login'));
-const RegisterPage = lazy(() => import('./routes/register'));
-const HomePage = lazy(() => import('./routes/home'));
-const ProfilePage = lazy(() => import('./routes/pages/profile/index'));
-const DashboardPage = lazy(() => import('./routes/pages/dashboard/index'));
+const IndexPage = lazy(() => import("./routes/index"));
+const LoginPage = lazy(() => import("./routes/login"));
+const RegisterPage = lazy(() => import("./routes/register"));
+const HomePage = lazy(() => import("./routes/home"));
+const ProfilePage = lazy(() => import("./routes/pages/profile/index"));
+const DashboardPage = lazy(() => import("./routes/pages/dashboard/index"));
 
 // Loading component for lazy-loaded routes
 const RouteLoading = () => (
@@ -20,7 +20,7 @@ const RouteLoading = () => (
 // Create and export the router configuration
 export const router = createBrowserRouter([
   {
-    path: '/',
+    path: "/",
     element: <App />,
     children: [
       {
@@ -32,7 +32,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'login',
+        path: "login",
         element: (
           <Suspense fallback={<RouteLoading />}>
             <LoginPage />
@@ -40,7 +40,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'register',
+        path: "register",
         element: (
           <Suspense fallback={<RouteLoading />}>
             <RegisterPage />
@@ -48,7 +48,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'home',
+        path: "home",
         element: (
           <Suspense fallback={<RouteLoading />}>
             <HomePage />
@@ -56,10 +56,10 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'pages',
+        path: "pages",
         children: [
           {
-            path: 'profile',
+            path: "profile",
             element: (
               <Suspense fallback={<RouteLoading />}>
                 <ProfilePage />
@@ -67,7 +67,7 @@ export const router = createBrowserRouter([
             ),
           },
           {
-            path: 'dashboard',
+            path: "dashboard",
             element: (
               <Suspense fallback={<RouteLoading />}>
                 <DashboardPage />

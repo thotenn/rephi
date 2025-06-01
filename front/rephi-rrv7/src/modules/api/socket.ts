@@ -13,7 +13,8 @@ class PhoenixSocket {
     const token = useAuthStore.getState().token;
     this.socket = new Socket(SOCKET_URL, {
       params: { token },
-      reconnectAfterMs: (tries) => [1000, 2000, 5000, 10000][tries - 1] || 10000,
+      reconnectAfterMs: (tries) =>
+        [1000, 2000, 5000, 10000][tries - 1] || 10000,
       rejoinAfterMs: (tries) => [1000, 2000, 5000][tries - 1] || 5000,
       logger: (kind, msg, data) => {
         if (process.env.NODE_ENV === "development") {

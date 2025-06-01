@@ -1,5 +1,5 @@
-import { useAuthStore } from "../../../stores/auth.store";
-import Layout from "../../../components/Layout";
+import { useAuthStore } from "~/stores/auth.store";
+import Layout from "~/components/Layout";
 
 export default function Dashboard() {
   const { user } = useAuthStore();
