@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@remix-run/react';
 import api from '~/modules/api/api';
+import PhoenixSocket from "~/modules/api/socket";
 import { useAuthStore } from '~/stores/auth.store';
 import type { AuthResponse, LoginCredentials, RegisterCredentials } from '~/types/auth.types';
 import type { ApiError } from '~/types/api.types';
@@ -28,7 +29,7 @@ export function useRegister() {
 
   return useMutation<AuthResponse, ApiError, RegisterCredentials>({
     mutationFn: async (credentials) => {
-      const { data } = await api.post(apisUrl.auth.register, { user: credentials });
+      const { data } = await api.post(apisUrl.auth.register, credentials);
       return data;
     },
     onSuccess: (data) => {
@@ -44,6 +45,7 @@ export function useLogout() {
 
   return () => {
     logout();
-    navigate(apisUrl.auth.login);
+    navigate(urls.auth.login);
+    PhoenixSocket.disconnect();
   };
 }

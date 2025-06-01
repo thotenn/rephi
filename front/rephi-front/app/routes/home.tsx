@@ -2,6 +2,7 @@ import { useNavigate } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "~/stores/auth.store";
 import { useChannel } from "~/hooks/useChannel";
+import { useLogout } from "~/hooks/useAuth";
 import toast, { Toaster } from "react-hot-toast";
 import api from "~/modules/api/api";
 import PhoenixSocket from "~/modules/api/socket";
@@ -9,7 +10,8 @@ import { apisUrl, channelsProps, urls } from "~/env";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user, logout, token } = useAuthStore();
+  const { user, token } = useAuthStore();
+  const logout = useLogout();
   const [notificationText, setNotificationText] = useState("");
   const [sending, setSending] = useState(false);
   const { channel, connected } = useChannel(channelsProps.topics.user.lobby);
@@ -46,8 +48,6 @@ export default function Home() {
 
   const handleLogout = () => {
     logout();
-    navigate(urls.auth.login);
-    PhoenixSocket.disconnect();
   };
 
   const handleSendNotification = async () => {
