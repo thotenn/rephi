@@ -13,16 +13,17 @@ export function useChannel(channelName: string, params = {}) {
       const socket = PhoenixSocket.getSocket();
       
       if (!socket) {
-        console.error('Socket not connected');
+        console.error('Socket not connected. Please logout and log back in.');
+        setConnected(false);
         return;
       }
-
-      console.log(`Creating channel ${channelName}`);
       ch = socket.channel(channelName, params);
       
       ch.join()
         .receive("ok", (resp) => {
-          console.log(`Successfully joined ${channelName}`, resp);
+          if( process.env.NODE_ENV === "development" ) {
+            console.log(`Successfully joined ${channelName}`, resp);
+          }
           setConnected(true);
         })
         .receive("error", ({ reason }) => {
@@ -43,7 +44,9 @@ export function useChannel(channelName: string, params = {}) {
     return () => {
       clearTimeout(timer);
       if (ch) {
-        console.log(`Leaving channel ${channelName}`);
+        if (process.env.NODE_ENV === "development") {
+          console.log(`Leaving channel ${channelName}`);
+        }
         ch.leave();
         setConnected(false);
       }

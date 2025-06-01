@@ -29,13 +29,11 @@ export default function Home() {
 
   useEffect(() => {
     if (channel && connected) {
-      console.log("Setting up notification listener");
-      
       const ref = channel.on("new_notification", (payload) => {
-        console.log("Received notification:", payload);
         toast.success(payload.message, {
           duration: 5000,
           position: "top-right",
+          icon: "🔔",
         });
       });
 
@@ -136,7 +134,7 @@ export default function Home() {
                   value={notificationText}
                   onChange={(e) => setNotificationText(e.target.value)}
                   placeholder="Enter notification message"
-                  className="flex-1 min-w-0 block w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="flex-1 min-w-0 block w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black"
                   disabled={sending}
                   onKeyPress={(e) => {
                     if (e.key === "Enter") {
