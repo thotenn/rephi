@@ -7,34 +7,48 @@ export function useChannel(channelName: string, params = {}) {
   const [connected, setConnected] = useState(false);
   
   useEffect(() => {
-    const socket = PhoenixSocket.getSocket();
+    let ch: Channel | null = null;
     
-    if (!socket) {
-      console.error('Socket not connected');
-      return;
-    }
+    const connectChannel = () => {
+      const socket = PhoenixSocket.getSocket();
+      
+      if (!socket) {
+        console.error('Socket not connected');
+        return;
+      }
 
-    const ch = socket.channel(channelName, params);
+      console.log(`Creating channel ${channelName}`);
+      ch = socket.channel(channelName, params);
+      
+      ch.join()
+        .receive("ok", (resp) => {
+          console.log(`Successfully joined ${channelName}`, resp);
+          setConnected(true);
+        })
+        .receive("error", ({ reason }) => {
+          console.error(`Failed to join ${channelName}:`, reason);
+          setConnected(false);
+        })
+        .receive("timeout", () => {
+          console.error(`Timeout joining ${channelName}`);
+          setConnected(false);
+        });
+      
+      setChannel(ch);
+    };
     
-    ch.join()
-      .receive("ok", () => {
-        console.log(`Joined ${channelName}`);
-        setConnected(true);
-      })
-      .receive("error", ({ reason }) => {
-        console.error(`Failed to join ${channelName}:`, reason);
-        setConnected(false);
-      });
-    
-    setChannel(ch);
+    // Small delay to ensure socket is connected
+    const timer = setTimeout(connectChannel, 100);
     
     return () => {
+      clearTimeout(timer);
       if (ch) {
+        console.log(`Leaving channel ${channelName}`);
         ch.leave();
         setConnected(false);
       }
     };
-  }, [channelName, params]);
+  }, [channelName]); // Remove params from dependencies to avoid recreating channel
   
   return { channel, connected };
 }
