@@ -1,6 +1,0 @@
-@import "tailwindcss";
-
-/* Ensure Tailwind v4 variables are applied */
-:root {
-  color-scheme: light dark;
-}
