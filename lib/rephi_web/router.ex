@@ -15,8 +15,10 @@ defmodule RephiWeb.Router do
     pipe_through :api
 
     # Public routes
-    post "/users/register", AuthController, :register
-    post "/users/login", AuthController, :login
+    scope "/users" do
+      post "/register", AuthController, :register
+      post "/login", AuthController, :login
+    end
 
     # Protected routes
     pipe_through :authenticated
