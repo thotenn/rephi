@@ -5,17 +5,18 @@ import { useChannel } from "~/hooks/useChannel";
 import toast, { Toaster } from "react-hot-toast";
 import api from "~/modules/api/api";
 import PhoenixSocket from "~/modules/api/socket";
+import { apisUrl, channelsProps, urls } from "~/env";
 
 export default function Home() {
   const navigate = useNavigate();
   const { user, logout, token } = useAuthStore();
   const [notificationText, setNotificationText] = useState("");
   const [sending, setSending] = useState(false);
-  const { channel, connected } = useChannel("user:lobby");
+  const { channel, connected } = useChannel(channelsProps.topics.user.lobby);
 
   useEffect(() => {
     if (!token) {
-      navigate("/login");
+      navigate(urls.auth.login);
     } else {
       // Connect socket when user is authenticated
       PhoenixSocket.connect();
@@ -29,7 +30,7 @@ export default function Home() {
 
   useEffect(() => {
     if (channel && connected) {
-      const ref = channel.on("new_notification", (payload) => {
+      const ref = channel.on(channelsProps.events.user.notification, (payload) => {
         toast.success(payload.message, {
           duration: 5000,
           position: "top-right",
@@ -38,14 +39,15 @@ export default function Home() {
       });
 
       return () => {
-        channel.off("new_notification", ref);
+        channel.off(channelsProps.events.user.notification, ref);
       };
     }
   }, [channel, connected]);
 
   const handleLogout = () => {
     logout();
-    navigate("/login");
+    navigate(urls.auth.login);
+    PhoenixSocket.disconnect();
   };
 
   const handleSendNotification = async () => {
@@ -56,7 +58,7 @@ export default function Home() {
 
     setSending(true);
     try {
-      await api.post("/notifications/broadcast", {
+      await api.post(apisUrl.sockets.notifications, {
         message: notificationText,
       });
       setNotificationText("");

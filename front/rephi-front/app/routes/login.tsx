@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
 import api from "~/modules/api/api";
-import { apisUrl } from "~/env";
+import { apisUrl, urls } from "~/env";
 import { useAuthStore } from "~/stores/auth.store";
 import type { AuthResponse, LoginCredentials } from "~/types/auth.types";
 
@@ -34,7 +34,7 @@ export default function Login() {
     try {
       const response = await api.post<AuthResponse>(apisUrl.auth.login, data);
       setAuth(response.data.user, response.data.token);
-      navigate("/home");
+      navigate(urls.home);
     } catch (err) {
       if (err && typeof err === 'object' && 'response' in err) {
         const error = err as { response?: { data?: { error?: string } } };
@@ -57,7 +57,7 @@ export default function Login() {
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{" "}
             <Link
-              to="/register"
+              to={urls.auth.register}
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
               create a new account

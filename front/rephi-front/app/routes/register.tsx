@@ -6,7 +6,7 @@ import { useState } from "react";
 import api from "~/modules/api/api";
 import { useAuthStore } from "~/stores/auth.store";
 import type { AuthResponse } from "~/types/auth.types";
-import { apisUrl } from "~/env";
+import { apisUrl, urls } from "~/env";
 
 type RegisterFormData = {
   email: string;
@@ -44,7 +44,7 @@ export default function Register() {
     try {
       const response = await api.post<AuthResponse>(apisUrl.auth.register, data);
       setAuth(response.data.user, response.data.token);
-      navigate("/home");
+      navigate(urls.home);
     } catch (err) {
       if (err && typeof err === 'object' && 'response' in err) {
         const error = err as { response?: { data?: { error?: string } } };
