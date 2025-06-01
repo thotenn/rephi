@@ -6,6 +6,10 @@ export const urls = {
     auth: {
         login: '/login',
         register: '/register',
+    },
+    pages: {
+        profile: '/pages/profile',
+        dashboard: '/pages/dashboard'
     }
 }
 

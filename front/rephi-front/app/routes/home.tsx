@@ -1,34 +1,16 @@
-import { useNavigate } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "~/stores/auth.store";
 import { useChannel } from "~/hooks/useChannel";
-import { useLogout } from "~/hooks/useAuth";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import api from "~/modules/api/api";
-import PhoenixSocket from "~/modules/api/socket";
-import { apisUrl, channelsProps, urls } from "~/env";
+import Layout from "~/components/Layout";
+import { apisUrl, channelsProps } from "~/env";
 
 export default function Home() {
-  const navigate = useNavigate();
-  const { user, token } = useAuthStore();
-  const logout = useLogout();
+  const { user } = useAuthStore();
   const [notificationText, setNotificationText] = useState("");
   const [sending, setSending] = useState(false);
   const { channel, connected } = useChannel(channelsProps.topics.user.lobby);
-
-  useEffect(() => {
-    if (!token) {
-      navigate(urls.auth.login);
-    } else {
-      // Connect socket when user is authenticated
-      PhoenixSocket.connect();
-    }
-    
-    return () => {
-      // Disconnect on unmount
-      PhoenixSocket.disconnect();
-    };
-  }, [token, navigate]);
 
   useEffect(() => {
     if (channel && connected) {
@@ -45,10 +27,6 @@ export default function Home() {
       };
     }
   }, [channel, connected]);
-
-  const handleLogout = () => {
-    logout();
-  };
 
   const handleSendNotification = async () => {
     if (!notificationText.trim()) {
@@ -75,24 +53,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Toaster />
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <h1 className="text-3xl font-bold text-gray-900">Welcome to Rephi</h1>
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <Layout>
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">User Information</h2>
@@ -164,8 +125,6 @@ export default function Home() {
               </p>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+    </Layout>
   );
 }
