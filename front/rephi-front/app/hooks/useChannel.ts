@@ -31,7 +31,9 @@ export function useChannel(channelName: string, params = {}) {
           setConnected(false);
         })
         .receive("timeout", () => {
-          console.error(`Timeout joining ${channelName}`);
+          if (process.env.NODE_ENV === "development") {
+            console.warn(`Timeout joining ${channelName}`);
+          }
           setConnected(false);
         });
       
