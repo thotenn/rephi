@@ -1,9 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@remix-run/react';
 import api from '~/modules/api/api';
+import PhoenixSocket from "~/modules/api/socket";
 import { useAuthStore } from '~/stores/auth.store';
 import type { AuthResponse, LoginCredentials, RegisterCredentials } from '~/types/auth.types';
 import type { ApiError } from '~/types/api.types';
+import { apisUrl, urls } from '~/env';
 
 export function useLogin() {
   const navigate = useNavigate();
@@ -11,12 +13,12 @@ export function useLogin() {
 
   return useMutation<AuthResponse, ApiError, LoginCredentials>({
     mutationFn: async (credentials) => {
-      const { data } = await api.post('/login', credentials);
+      const { data } = await api.post(apisUrl.auth.login, credentials);
       return data;
     },
     onSuccess: (data) => {
       setAuth(data.user, data.token);
-      navigate('/dashboard');
+      navigate(urls.home);
     },
   });
 }
@@ -27,12 +29,12 @@ export function useRegister() {
 
   return useMutation<AuthResponse, ApiError, RegisterCredentials>({
     mutationFn: async (credentials) => {
-      const { data } = await api.post('/register', { user: credentials });
+      const { data } = await api.post(apisUrl.auth.register, credentials);
       return data;
     },
     onSuccess: (data) => {
       setAuth(data.user, data.token);
-      navigate('/dashboard');
+      navigate(urls.home);
     },
   });
 }
@@ -43,6 +45,7 @@ export function useLogout() {
 
   return () => {
     logout();
-    navigate('/login');
+    navigate(urls.auth.login);
+    PhoenixSocket.disconnect();
   };
 }
