@@ -22,6 +22,7 @@ defmodule RephiWeb.Router do
     pipe_through :authenticated
 
     get "/me", AuthController, :me
+    post "/notifications/broadcast", NotificationController, :broadcast
   end
 
   scope "/api/swagger" do
