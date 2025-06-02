@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "~/modules/api/api";
 import PhoenixSocket from "~/modules/api/socket";
 import { useAuthStore } from "~/stores/auth.store";
-import { getRedirectPath } from "~/components/ProtectedRoute";
+import { getRedirectPath } from "~/components/bedrock/ProtectedRoute";
 import type {
   AuthResponse,
   LoginCredentials,

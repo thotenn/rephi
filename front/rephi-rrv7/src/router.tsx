@@ -2,8 +2,8 @@ import { createBrowserRouter } from "react-router-dom";
 import { Suspense } from "react";
 import App from "./App";
 import { allRoutes, type RouteConfig } from "./config/routes";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { PublicRoute } from "./components/PublicRoute";
+import { ProtectedRoute } from "./components/bedrock/ProtectedRoute";
+import { PublicRoute } from "./components/bedrock/PublicRoute";
 
 // Loading component for lazy-loaded routes
 const RouteLoading = () => (

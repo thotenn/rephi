@@ -3,7 +3,7 @@ import { useAuthStore } from "../stores/auth.store";
 import { useChannel } from "../hooks/useChannel";
 import toast from "react-hot-toast";
 import api from "../modules/api/api";
-import Layout from "../components/Layout";
+import Layout from "../components/bedrock/Layout";
 import { apisUrl, channelsProps } from "../env";
 
 export default function Home() {
