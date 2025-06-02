@@ -10,14 +10,13 @@ import ErrorBoundary from "./components/ErrorBoundary";
 // Helper function to process routes
 const processRoutes = (routes: RouteConfig[]): RouteObject[] => {
   return routes.map(route => {
-    const processedRoute: RouteObject = {};
+    let processedRoute: RouteObject;
     
     // Handle path or index
     if (route.index === true) {
-      processedRoute.index = true;
-      processedRoute.path = undefined;
-    } else if (route.path) {
-      processedRoute.path = route.path;
+      processedRoute = { index: true };
+    } else {
+      processedRoute = route.path ? { path: route.path } : {};
     }
     
     // Handle element with Suspense and protection
