@@ -4,7 +4,7 @@ import { lazy } from "react";
 export interface RouteConfig {
   path?: string;
   index?: boolean;
-  element?: React.LazyExoticComponent<React.ComponentType<any>>;
+  element?: React.LazyExoticComponent<React.ComponentType>;
   children?: RouteConfig[];
   meta?: {
     title?: string;
@@ -13,6 +13,30 @@ export interface RouteConfig {
     publicOnly?: boolean; // For login/register pages
   };
 }
+
+// Route paths - centralized for easy management
+export const ROUTE_PATHS = {
+  home: "/home",
+  auth: {
+    login: "/login",
+    register: "/register",
+  },
+  pages: {
+    profile: "/pages/profile",
+    dashboard: "/pages/dashboard",
+  },
+} as const;
+
+// Re-export as ROUTES for backward compatibility
+export const ROUTES = {
+  home: "/",
+  auth: ROUTE_PATHS.auth,
+  dashboard: {
+    home: ROUTE_PATHS.home,
+    main: ROUTE_PATHS.pages.dashboard,
+    profile: ROUTE_PATHS.pages.profile,
+  },
+} as const;
 
 // Auth routes
 export const authRoutes: RouteConfig[] = [

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../stores/auth.store";
 import { useChannel } from "../hooks/useChannel";
-import toast from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import api from "../modules/api/api";
 import Layout from "../components/bedrock/Layout";
+import UserInfo from "../components/UserInfo";
 import { apisUrl, channelsProps } from "../env";
 
 export default function Home() {
@@ -57,33 +58,7 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
-            User Information
-          </h2>
-          <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Email</dt>
-              <dd className="mt-1 text-sm text-gray-900">{user.email}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">User ID</dt>
-              <dd className="mt-1 text-sm text-gray-900">{user.id}</dd>
-            </div>
-            {user.created_at && (
-              <div>
-                <dt className="text-sm font-medium text-gray-500">
-                  Member Since
-                </dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {new Date(user.created_at).toLocaleDateString()}
-                </dd>
-              </div>
-            )}
-          </dl>
-        </div>
-      </div>
+      <UserInfo user={user} />
 
       <div className="mt-8 bg-white overflow-hidden shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">

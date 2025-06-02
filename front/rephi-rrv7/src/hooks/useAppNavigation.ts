@@ -1,11 +1,11 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCallback } from "react";
-import { ROUTES } from "~/router";
+import { ROUTES } from "~/config/routes";
 import { useAuthStore } from "~/stores/auth.store";
 
 interface NavigationOptions {
   replace?: boolean;
-  state?: any;
+  state?: unknown;
 }
 
 export function useAppNavigation() {
@@ -26,7 +26,7 @@ export function useAppNavigation() {
     (options?: NavigationOptions) => {
       navigate(ROUTES.auth.login, {
         ...options,
-        state: { from: location, ...options?.state },
+        state: { from: location, ...(options?.state as Record<string, unknown>) },
       });
     },
     [navigate, location]

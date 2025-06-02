@@ -3,37 +3,42 @@ import { useNavigate } from "react-router-dom";
 import api from "~/modules/api/api";
 import PhoenixSocket from "~/modules/api/socket";
 import { useAuthStore } from "~/stores/auth.store";
-import { getRedirectPath } from "~/components/bedrock/ProtectedRoute";
+import { getRedirectPath, clearRedirectPath } from "~/components/bedrock/routes/routes_utils";
 import type {
   AuthResponse,
   LoginCredentials,
   RegisterCredentials,
 } from "~/types/auth.types";
-import type { ApiError } from "~/types/api.types";
 import { apisUrl, urls } from "~/env";
 
 export function useLogin() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
 
-  return useMutation<AuthResponse, ApiError, LoginCredentials>({
+  return useMutation<AuthResponse, Error, LoginCredentials>({
     mutationFn: async (credentials) => {
       const { data } = await api.post(apisUrl.auth.login, credentials);
       return data;
     },
     onSuccess: (data) => {
+      // Set auth first
       setAuth(data.user, data.token);
       
       // Get redirect path from sessionStorage
       const redirectPath = getRedirectPath();
+      if (process.env.NODE_ENV === "development") {
+        console.log("Login successful. Redirect path from storage:", redirectPath);
+      }
       
-      // Wait a bit to ensure state is updated
+      // Navigate after a small delay to ensure state is updated
       setTimeout(() => {
         const targetPath = redirectPath || urls.home;
         if (process.env.NODE_ENV === "development") {
           console.log("Navigating to:", targetPath);
         }
         navigate(targetPath, { replace: true });
+        // Clear the redirect path after successful navigation
+        clearRedirectPath();
       }, 100);
     },
   });
@@ -43,7 +48,7 @@ export function useRegister() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
 
-  return useMutation<AuthResponse, ApiError, RegisterCredentials>({
+  return useMutation<AuthResponse, Error, RegisterCredentials>({
     mutationFn: async (credentials) => {
       const { data } = await api.post(apisUrl.auth.register, credentials);
       return data;

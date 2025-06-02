@@ -1,12 +1,11 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "~/stores/auth.store";
-import { ROUTES } from "~/router";
+import { ROUTES } from "~/config/routes";
+import { setRedirectPath } from "~/components/bedrock/routes/routes_utils";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
-
-const REDIRECT_KEY = "auth_redirect_path";
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
@@ -14,7 +13,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!isAuthenticated) {
     // Save the attempted location
-    sessionStorage.setItem(REDIRECT_KEY, location.pathname);
+    if (process.env.NODE_ENV === "development") {
+      console.log("ProtectedRoute: Saving redirect path:", location.pathname);
+    }
+    setRedirectPath(location.pathname);
     
     // Redirect to login page
     return <Navigate 
@@ -24,12 +26,4 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   return <>{children}</>;
-}
-
-export function getRedirectPath(): string | null {
-  const path = sessionStorage.getItem(REDIRECT_KEY);
-  if (path) {
-    sessionStorage.removeItem(REDIRECT_KEY);
-  }
-  return path;
 }

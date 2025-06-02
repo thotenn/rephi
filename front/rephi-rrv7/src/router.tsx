@@ -1,49 +1,21 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { Suspense } from "react";
 import App from "./App";
 import { allRoutes, type RouteConfig } from "./config/routes";
-import { ProtectedRoute } from "./components/bedrock/ProtectedRoute";
-import { PublicRoute } from "./components/bedrock/PublicRoute";
-
-// Loading component for lazy-loaded routes
-const RouteLoading = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-pulse text-lg text-gray-600">Loading...</div>
-  </div>
-);
-
-// Error boundary component
-const ErrorBoundary = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="text-center">
-      <h1 className="text-2xl font-bold text-red-600 mb-4">Oops! Something went wrong</h1>
-      <p className="text-gray-600">Please try refreshing the page or contact support if the problem persists.</p>
-    </div>
-  </div>
-);
-
-// Route paths - centralized for easy management
-export const ROUTES = {
-  home: "/",
-  auth: {
-    login: "/login",
-    register: "/register",
-  },
-  dashboard: {
-    home: "/home",
-    main: "/pages/dashboard",
-    profile: "/pages/profile",
-  },
-} as const;
+import { ProtectedRoute } from "./components/bedrock/routes/ProtectedRoute";
+import { PublicRoute } from "./components/bedrock/routes/PublicRoute";
+import RouteLoading from "./components/bedrock/routes/RouteLoading";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Helper function to process routes
-const processRoutes = (routes: RouteConfig[]): any[] => {
+const processRoutes = (routes: RouteConfig[]): RouteObject[] => {
   return routes.map(route => {
-    const processedRoute: any = {};
+    const processedRoute: RouteObject = {};
     
     // Handle path or index
-    if (route.index) {
+    if (route.index === true) {
       processedRoute.index = true;
+      processedRoute.path = undefined;
     } else if (route.path) {
       processedRoute.path = route.path;
     }

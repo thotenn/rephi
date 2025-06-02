@@ -53,7 +53,7 @@ export function useChannel(channelName: string, params = {}) {
         setConnected(false);
       }
     };
-  }, []); // Remove params from dependencies to avoid recreating channel
+  }, [channelName]); // channelName should be in dependencies
 
   return { channel, connected };
 }
