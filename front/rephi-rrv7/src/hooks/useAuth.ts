@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "~/modules/api/api";
 import PhoenixSocket from "~/modules/api/socket";
 import { useAuthStore } from "~/stores/auth.store";
+import { getRedirectPath } from "~/components/ProtectedRoute";
 import type {
   AuthResponse,
   LoginCredentials,
@@ -22,7 +23,18 @@ export function useLogin() {
     },
     onSuccess: (data) => {
       setAuth(data.user, data.token);
-      navigate(urls.home);
+      
+      // Get redirect path from sessionStorage
+      const redirectPath = getRedirectPath();
+      
+      // Wait a bit to ensure state is updated
+      setTimeout(() => {
+        const targetPath = redirectPath || urls.home;
+        if (process.env.NODE_ENV === "development") {
+          console.log("Navigating to:", targetPath);
+        }
+        navigate(targetPath, { replace: true });
+      }, 100);
     },
   });
 }

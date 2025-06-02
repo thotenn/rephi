@@ -4,10 +4,6 @@ import Layout from "~/components/Layout";
 export default function Profile() {
   const { user } = useAuthStore();
 
-  if (!user) {
-    return null;
-  }
-
   return (
     <Layout title="User Profile">
       <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -17,19 +13,19 @@ export default function Profile() {
           <div className="space-y-6">
             <div>
               <h3 className="text-sm font-medium text-gray-500">Email Address</h3>
-              <p className="mt-1 text-sm text-gray-900">{user.email}</p>
+              <p className="mt-1 text-sm text-gray-900">{user?.email}</p>
             </div>
 
             <div>
               <h3 className="text-sm font-medium text-gray-500">User ID</h3>
-              <p className="mt-1 text-sm text-gray-900">{user.id}</p>
+              <p className="mt-1 text-sm text-gray-900">{user?.id}</p>
             </div>
 
-            {user.created_at && (
+            {user?.created_at && (
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Member Since</h3>
                 <p className="mt-1 text-sm text-gray-900">
-                  {new Date(user.created_at).toLocaleDateString('en-US', {
+                  {new Date(user?.created_at).toLocaleDateString('en-US', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
@@ -39,11 +35,11 @@ export default function Profile() {
               </div>
             )}
 
-            {user.updated_at && (
+            {user?.updated_at && (
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Last Updated</h3>
                 <p className="mt-1 text-sm text-gray-900">
-                  {new Date(user.updated_at).toLocaleDateString('en-US', {
+                  {new Date(user?.updated_at).toLocaleDateString('en-US', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',

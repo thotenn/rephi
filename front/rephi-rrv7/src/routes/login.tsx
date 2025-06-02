@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,6 +12,8 @@ const loginSchema = z.object({
 });
 
 export default function Login() {
+  const location = useLocation();
+  const from = location.state?.from;
   const loginMutation = useLogin();
 
   const {
@@ -45,6 +47,14 @@ export default function Login() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          {from && (
+            <div className="rounded-md bg-blue-50 p-4">
+              <div className="text-sm text-blue-800">
+                You need to login to access that page.
+              </div>
+            </div>
+          )}
+          
           {loginMutation.isError && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-800">

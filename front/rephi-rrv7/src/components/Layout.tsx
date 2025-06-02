@@ -1,8 +1,7 @@
 import { ReactNode, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
-import { urls, channelsProps } from "~/env";
+import { channelsProps } from "~/env";
 import Header from "./Header";
 import { useAuthStore } from "~/stores/auth.store";
 import PhoenixSocket from "~/modules/api/socket";
@@ -14,14 +13,21 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, title }: LayoutProps) {
-  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuthStore();
   const { token } = useAuthStore();
   const { channel, connected } = useChannel(channelsProps.topics.user.lobby);
 
+  // Show loading state while auth is being verified
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
   useEffect(() => {
-    if (!token) {
-      navigate(urls.auth.login);
-    } else {
+    if (token) {
       // Connect socket when user is authenticated
       PhoenixSocket.connect();
     }
@@ -30,7 +36,7 @@ export default function Layout({ children, title }: LayoutProps) {
       // Disconnect on unmount
       PhoenixSocket.disconnect();
     };
-  }, [token, navigate]);
+  }, [token]);
 
   useEffect(() => {
     if (channel && connected) {
@@ -47,10 +53,6 @@ export default function Layout({ children, title }: LayoutProps) {
       };
     }
   }, [channel, connected]);
-
-  if (!token) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">

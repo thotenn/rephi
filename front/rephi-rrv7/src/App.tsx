@@ -18,5 +18,9 @@ export default function App() {
     };
   }, [isAuthenticated]);
 
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+    </>
+  );
 }
