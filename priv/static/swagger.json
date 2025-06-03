@@ -7,10 +7,10 @@
       "in": "header"
     }
   },
-  "consumes": [
+  "produces": [
     "application/json"
   ],
-  "produces": [
+  "consumes": [
     "application/json"
   ],
   "swagger": "2.0",
@@ -842,230 +842,90 @@
     }
   },
   "definitions": {
-    "NotificationResponse": {
-      "example": {
-        "notification": {
-          "timestamp": "2024-01-01T12:00:00Z",
-          "message": "This is a test notification"
-        },
-        "message": "Notification sent successfully"
-      },
+    "PermissionsResponse": {
       "properties": {
-        "notification": {
-          "properties": {
-            "timestamp": {
-              "description": "Timestamp",
-              "format": "datetime",
-              "type": "string"
-            },
-            "message": {
-              "description": "Notification message",
-              "type": "string"
-            }
+        "data": {
+          "items": {
+            "x-nullable": null,
+            "minProperties": null,
+            "maxProperties": null,
+            "discriminator": null,
+            "$ref": "#/definitions/Permission",
+            "allOf": null,
+            "additionalProperties": null,
+            "uniqueItems": null,
+            "multipleOf": null,
+            "minimum": null,
+            "minItems": null,
+            "maxLength": null,
+            "maxItems": null,
+            "exclusiveMinimum": null,
+            "exclusiveMaximum": null,
+            "minLength": null,
+            "properties": null,
+            "example": null,
+            "required": null,
+            "items": null,
+            "title": null,
+            "pattern": null,
+            "description": null,
+            "enum": null,
+            "format": null,
+            "type": null,
+            "maximum": null,
+            "default": null
           },
-          "type": "object"
-        },
-        "message": {
-          "description": "Success message",
-          "type": "string"
-        }
-      },
-      "title": "Notification Response",
-      "description": "Notification broadcast response",
-      "type": "object"
-    },
-    "NotificationRequest": {
-      "example": {
-        "message": "This is a test notification"
-      },
-      "properties": {
-        "message": {
-          "description": "Notification message",
-          "type": "string"
+          "type": "array"
         }
       },
       "required": [
-        "message"
+        "data"
       ],
-      "title": "Notification Request",
-      "description": "Notification broadcast request",
+      "title": "Permissions Response",
+      "description": "List of permissions",
       "type": "object"
     },
-    "ValidationErrors": {
-      "example": {
-        "errors": {
-          "email": [
-            "can't be blank"
-          ],
-          "password": [
-            "should be at least 8 character(s)"
-          ]
-        }
-      },
+    "PermissionResponse": {
       "properties": {
-        "errors": {
-          "description": "Validation error messages",
-          "type": "object"
+        "data": {
+          "x-nullable": null,
+          "minProperties": null,
+          "maxProperties": null,
+          "discriminator": null,
+          "$ref": "#/definitions/Permission",
+          "allOf": null,
+          "additionalProperties": null,
+          "uniqueItems": null,
+          "multipleOf": null,
+          "minimum": null,
+          "minItems": null,
+          "maxLength": null,
+          "maxItems": null,
+          "exclusiveMinimum": null,
+          "exclusiveMaximum": null,
+          "minLength": null,
+          "properties": null,
+          "example": null,
+          "required": null,
+          "items": null,
+          "title": null,
+          "pattern": null,
+          "description": null,
+          "enum": null,
+          "format": null,
+          "type": null,
+          "maximum": null,
+          "default": null
         }
       },
       "required": [
-        "errors"
+        "data"
       ],
-      "title": "Validation Errors",
-      "description": "Validation error response",
-      "type": "object"
-    },
-    "UserRegistration": {
-      "example": {
-        "email": "user@example.com",
-        "password": "securepassword123"
-      },
-      "properties": {
-        "email": {
-          "description": "User's email address",
-          "format": "email",
-          "type": "string"
-        },
-        "password": {
-          "minLength": 8,
-          "description": "User's password",
-          "type": "string"
-        }
-      },
-      "required": [
-        "email",
-        "password"
-      ],
-      "title": "User Registration",
-      "description": "New user registration data",
-      "type": "object"
-    },
-    "UserResponse": {
-      "example": {
-        "user": {
-          "email": "user@example.com",
-          "id": 1
-        }
-      },
-      "properties": {
-        "user": {
-          "properties": {
-            "email": {
-              "description": "User's email address",
-              "type": "string"
-            },
-            "id": {
-              "description": "User ID",
-              "type": "integer"
-            }
-          },
-          "type": "object"
-        }
-      },
-      "required": [
-        "user"
-      ],
-      "title": "User Response",
-      "description": "User information response",
-      "type": "object"
-    },
-    "ErrorResponse": {
-      "example": {
-        "error": "Invalid email or password"
-      },
-      "properties": {
-        "error": {
-          "description": "Error message",
-          "type": "string"
-        }
-      },
-      "required": [
-        "error"
-      ],
-      "title": "Error Response",
-      "description": "Error response",
-      "type": "object"
-    },
-    "AuthResponse": {
-      "example": {
-        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-        "user": {
-          "email": "user@example.com",
-          "id": 1
-        }
-      },
-      "properties": {
-        "token": {
-          "description": "JWT authentication token",
-          "type": "string"
-        },
-        "user": {
-          "properties": {
-            "email": {
-              "description": "User's email address",
-              "type": "string"
-            },
-            "id": {
-              "description": "User ID",
-              "type": "integer"
-            }
-          },
-          "type": "object"
-        }
-      },
-      "required": [
-        "user",
-        "token"
-      ],
-      "title": "Authentication Response",
-      "description": "Successful authentication response",
-      "type": "object"
-    },
-    "LoginCredentials": {
-      "example": {
-        "email": "user@example.com",
-        "password": "securepassword123"
-      },
-      "properties": {
-        "email": {
-          "description": "User's email address",
-          "format": "email",
-          "type": "string"
-        },
-        "password": {
-          "description": "User's password",
-          "type": "string"
-        }
-      },
-      "required": [
-        "email",
-        "password"
-      ],
-      "title": "Login Credentials",
-      "description": "User login credentials",
-      "type": "object"
-    },
-    "AssignmentNotes": {
-      "example": {
-        "notes": "Granted for project management tasks"
-      },
-      "properties": {
-        "notes": {
-          "description": "Assignment notes",
-          "type": "string"
-        }
-      },
-      "title": "Assignment Notes",
-      "description": "Optional notes for permission/role assignment",
+      "title": "Permission Response",
+      "description": "Single permission response",
       "type": "object"
     },
     "PermissionInput": {
-      "example": {
-        "slug": "reports:create",
-        "category": "reports",
-        "description": "Allows creating new reports",
-        "name": "Create Reports"
-      },
       "properties": {
         "parent_id": {
           "nullable": true,
@@ -1089,6 +949,12 @@
           "type": "string"
         }
       },
+      "example": {
+        "slug": "reports:create",
+        "category": "reports",
+        "description": "Allows creating new reports",
+        "name": "Create Reports"
+      },
       "required": [
         "name",
         "slug"
@@ -1097,12 +963,50 @@
       "description": "Permission creation/update data",
       "type": "object"
     },
-    "RoleInput": {
-      "example": {
-        "slug": "content_editor",
-        "description": "Can create and edit content",
-        "name": "Content Editor"
+    "RolesResponse": {
+      "properties": {
+        "data": {
+          "items": {
+            "x-nullable": null,
+            "minProperties": null,
+            "maxProperties": null,
+            "discriminator": null,
+            "$ref": "#/definitions/Role",
+            "allOf": null,
+            "additionalProperties": null,
+            "uniqueItems": null,
+            "multipleOf": null,
+            "minimum": null,
+            "minItems": null,
+            "maxLength": null,
+            "maxItems": null,
+            "exclusiveMinimum": null,
+            "exclusiveMaximum": null,
+            "minLength": null,
+            "properties": null,
+            "example": null,
+            "required": null,
+            "items": null,
+            "title": null,
+            "pattern": null,
+            "description": null,
+            "enum": null,
+            "format": null,
+            "type": null,
+            "maximum": null,
+            "default": null
+          },
+          "type": "array"
+        }
       },
+      "required": [
+        "data"
+      ],
+      "title": "Roles Response",
+      "description": "List of roles",
+      "type": "object"
+    },
+    "RoleInput": {
       "properties": {
         "parent_id": {
           "nullable": true,
@@ -1122,6 +1026,11 @@
           "type": "string"
         }
       },
+      "example": {
+        "slug": "content_editor",
+        "description": "Can create and edit content",
+        "name": "Content Editor"
+      },
       "required": [
         "name",
         "slug"
@@ -1130,47 +1039,77 @@
       "description": "Role creation/update data",
       "type": "object"
     },
-    "PermissionResponse": {
+    "RoleDetailResponse": {
       "properties": {
         "data": {
-          "x-nullable": null,
-          "uniqueItems": null,
-          "multipleOf": null,
-          "minimum": null,
-          "minProperties": null,
-          "minLength": null,
-          "minItems": null,
-          "maxProperties": null,
-          "maxLength": null,
-          "maxItems": null,
-          "exclusiveMinimum": null,
-          "exclusiveMaximum": null,
-          "discriminator": null,
-          "$ref": "#/definitions/Permission",
-          "allOf": null,
-          "additionalProperties": null,
-          "example": null,
-          "properties": null,
-          "required": null,
-          "items": null,
-          "pattern": null,
-          "title": null,
-          "description": null,
-          "enum": null,
-          "format": null,
-          "type": null,
-          "maximum": null,
-          "default": null
+          "properties": {
+            "role": {
+              "x-nullable": null,
+              "minProperties": null,
+              "maxProperties": null,
+              "discriminator": null,
+              "$ref": "#/definitions/Role",
+              "allOf": null,
+              "additionalProperties": null,
+              "uniqueItems": null,
+              "multipleOf": null,
+              "minimum": null,
+              "minItems": null,
+              "maxLength": null,
+              "maxItems": null,
+              "exclusiveMinimum": null,
+              "exclusiveMaximum": null,
+              "minLength": null,
+              "properties": null,
+              "example": null,
+              "required": null,
+              "items": null,
+              "title": null,
+              "pattern": null,
+              "description": null,
+              "enum": null,
+              "format": null,
+              "type": null,
+              "maximum": null,
+              "default": null
+            },
+            "permissions": {
+              "items": {
+                "x-nullable": null,
+                "minProperties": null,
+                "maxProperties": null,
+                "discriminator": null,
+                "$ref": "#/definitions/Permission",
+                "allOf": null,
+                "additionalProperties": null,
+                "uniqueItems": null,
+                "multipleOf": null,
+                "minimum": null,
+                "minItems": null,
+                "maxLength": null,
+                "maxItems": null,
+                "exclusiveMinimum": null,
+                "exclusiveMaximum": null,
+                "minLength": null,
+                "properties": null,
+                "example": null,
+                "required": null,
+                "items": null,
+                "title": null,
+                "pattern": null,
+                "description": null,
+                "enum": null,
+                "format": null,
+                "type": null,
+                "maximum": null,
+                "default": null
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
         }
       },
-      "required": [
-        "data"
-      ],
-      "title": "Permission Response",
-      "description": "Single permission response",
-      "type": "object"
-    },
-    "RoleDetailResponse": {
       "example": {
         "data": {
           "role": {
@@ -1195,76 +1134,6 @@
           ]
         }
       },
-      "properties": {
-        "data": {
-          "properties": {
-            "role": {
-              "x-nullable": null,
-              "uniqueItems": null,
-              "multipleOf": null,
-              "minimum": null,
-              "minProperties": null,
-              "minLength": null,
-              "minItems": null,
-              "maxProperties": null,
-              "maxLength": null,
-              "maxItems": null,
-              "exclusiveMinimum": null,
-              "exclusiveMaximum": null,
-              "discriminator": null,
-              "$ref": "#/definitions/Role",
-              "allOf": null,
-              "additionalProperties": null,
-              "example": null,
-              "properties": null,
-              "required": null,
-              "items": null,
-              "pattern": null,
-              "title": null,
-              "description": null,
-              "enum": null,
-              "format": null,
-              "type": null,
-              "maximum": null,
-              "default": null
-            },
-            "permissions": {
-              "items": {
-                "x-nullable": null,
-                "uniqueItems": null,
-                "multipleOf": null,
-                "minimum": null,
-                "minProperties": null,
-                "minLength": null,
-                "minItems": null,
-                "maxProperties": null,
-                "maxLength": null,
-                "maxItems": null,
-                "exclusiveMinimum": null,
-                "exclusiveMaximum": null,
-                "discriminator": null,
-                "$ref": "#/definitions/Permission",
-                "allOf": null,
-                "additionalProperties": null,
-                "example": null,
-                "properties": null,
-                "required": null,
-                "items": null,
-                "pattern": null,
-                "title": null,
-                "description": null,
-                "enum": null,
-                "format": null,
-                "type": null,
-                "maximum": null,
-                "default": null
-              },
-              "type": "array"
-            }
-          },
-          "type": "object"
-        }
-      },
       "required": [
         "data"
       ],
@@ -1272,111 +1141,24 @@
       "description": "Role with permissions",
       "type": "object"
     },
-    "RolesResponse": {
+    "AssignmentNotes": {
       "properties": {
-        "data": {
-          "items": {
-            "x-nullable": null,
-            "uniqueItems": null,
-            "multipleOf": null,
-            "minimum": null,
-            "minProperties": null,
-            "minLength": null,
-            "minItems": null,
-            "maxProperties": null,
-            "maxLength": null,
-            "maxItems": null,
-            "exclusiveMinimum": null,
-            "exclusiveMaximum": null,
-            "discriminator": null,
-            "$ref": "#/definitions/Role",
-            "allOf": null,
-            "additionalProperties": null,
-            "example": null,
-            "properties": null,
-            "required": null,
-            "items": null,
-            "pattern": null,
-            "title": null,
-            "description": null,
-            "enum": null,
-            "format": null,
-            "type": null,
-            "maximum": null,
-            "default": null
-          },
-          "type": "array"
+        "notes": {
+          "description": "Assignment notes",
+          "type": "string"
         }
       },
-      "required": [
-        "data"
-      ],
-      "title": "Roles Response",
-      "description": "List of roles",
-      "type": "object"
-    },
-    "PermissionsResponse": {
-      "properties": {
-        "data": {
-          "items": {
-            "x-nullable": null,
-            "uniqueItems": null,
-            "multipleOf": null,
-            "minimum": null,
-            "minProperties": null,
-            "minLength": null,
-            "minItems": null,
-            "maxProperties": null,
-            "maxLength": null,
-            "maxItems": null,
-            "exclusiveMinimum": null,
-            "exclusiveMaximum": null,
-            "discriminator": null,
-            "$ref": "#/definitions/Permission",
-            "allOf": null,
-            "additionalProperties": null,
-            "example": null,
-            "properties": null,
-            "required": null,
-            "items": null,
-            "pattern": null,
-            "title": null,
-            "description": null,
-            "enum": null,
-            "format": null,
-            "type": null,
-            "maximum": null,
-            "default": null
-          },
-          "type": "array"
-        }
+      "example": {
+        "notes": "Granted for project management tasks"
       },
-      "required": [
-        "data"
-      ],
-      "title": "Permissions Response",
-      "description": "List of permissions",
+      "title": "Assignment Notes",
+      "description": "Optional notes for permission/role assignment",
       "type": "object"
     },
     "Permission": {
-      "example": {
-        "updated_at": "2025-01-03T10:00:00Z",
-        "inserted_at": "2025-01-03T10:00:00Z",
-        "parent_id": null,
-        "slug": "users:view",
-        "category": "users",
-        "description": "Allows viewing user profiles and listings",
-        "name": "View Users",
-        "id": 1
-      },
       "properties": {
         "updated_at": {
           "description": "Last update timestamp",
-          "format": "datetime",
-          "type": "string"
-        },
-        "inserted_at": {
-          "description": "Creation timestamp",
           "format": "datetime",
           "type": "string"
         },
@@ -1384,6 +1166,11 @@
           "nullable": true,
           "description": "Parent permission ID",
           "type": "integer"
+        },
+        "inserted_at": {
+          "description": "Creation timestamp",
+          "format": "datetime",
+          "type": "string"
         },
         "slug": {
           "description": "Permission slug (unique identifier)",
@@ -1406,6 +1193,16 @@
           "type": "integer"
         }
       },
+      "example": {
+        "updated_at": "2025-01-03T10:00:00Z",
+        "parent_id": null,
+        "inserted_at": "2025-01-03T10:00:00Z",
+        "slug": "users:view",
+        "category": "users",
+        "description": "Allows viewing user profiles and listings",
+        "name": "View Users",
+        "id": 1
+      },
       "required": [
         "id",
         "name",
@@ -1416,23 +1213,9 @@
       "type": "object"
     },
     "Role": {
-      "example": {
-        "updated_at": "2025-01-03T10:00:00Z",
-        "inserted_at": "2025-01-03T10:00:00Z",
-        "parent_id": null,
-        "slug": "manager",
-        "description": "Manages teams and resources",
-        "name": "Manager",
-        "id": 1
-      },
       "properties": {
         "updated_at": {
           "description": "Last update timestamp",
-          "format": "datetime",
-          "type": "string"
-        },
-        "inserted_at": {
-          "description": "Creation timestamp",
           "format": "datetime",
           "type": "string"
         },
@@ -1440,6 +1223,11 @@
           "nullable": true,
           "description": "Parent role ID for hierarchy",
           "type": "integer"
+        },
+        "inserted_at": {
+          "description": "Creation timestamp",
+          "format": "datetime",
+          "type": "string"
         },
         "slug": {
           "description": "Role slug (unique identifier)",
@@ -1458,6 +1246,15 @@
           "type": "integer"
         }
       },
+      "example": {
+        "updated_at": "2025-01-03T10:00:00Z",
+        "parent_id": null,
+        "inserted_at": "2025-01-03T10:00:00Z",
+        "slug": "manager",
+        "description": "Manages teams and resources",
+        "name": "Manager",
+        "id": 1
+      },
       "required": [
         "id",
         "name",
@@ -1465,6 +1262,209 @@
       ],
       "title": "Role",
       "description": "Role details",
+      "type": "object"
+    },
+    "NotificationResponse": {
+      "properties": {
+        "notification": {
+          "properties": {
+            "timestamp": {
+              "description": "Timestamp",
+              "format": "datetime",
+              "type": "string"
+            },
+            "message": {
+              "description": "Notification message",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "message": {
+          "description": "Success message",
+          "type": "string"
+        }
+      },
+      "example": {
+        "notification": {
+          "timestamp": "2024-01-01T12:00:00Z",
+          "message": "This is a test notification"
+        },
+        "message": "Notification sent successfully"
+      },
+      "title": "Notification Response",
+      "description": "Notification broadcast response",
+      "type": "object"
+    },
+    "NotificationRequest": {
+      "properties": {
+        "message": {
+          "description": "Notification message",
+          "type": "string"
+        }
+      },
+      "example": {
+        "message": "This is a test notification"
+      },
+      "required": [
+        "message"
+      ],
+      "title": "Notification Request",
+      "description": "Notification broadcast request",
+      "type": "object"
+    },
+    "ValidationErrors": {
+      "properties": {
+        "errors": {
+          "description": "Validation error messages",
+          "type": "object"
+        }
+      },
+      "example": {
+        "errors": {
+          "email": [
+            "can't be blank"
+          ],
+          "password": [
+            "should be at least 8 character(s)"
+          ]
+        }
+      },
+      "required": [
+        "errors"
+      ],
+      "title": "Validation Errors",
+      "description": "Validation error response",
+      "type": "object"
+    },
+    "UserRegistration": {
+      "properties": {
+        "email": {
+          "description": "User's email address",
+          "format": "email",
+          "type": "string"
+        },
+        "password": {
+          "minLength": 8,
+          "description": "User's password",
+          "type": "string"
+        }
+      },
+      "example": {
+        "email": "admin@admin.com",
+        "password": "password123!!"
+      },
+      "required": [
+        "email",
+        "password"
+      ],
+      "title": "User Registration",
+      "description": "New user registration data",
+      "type": "object"
+    },
+    "UserResponse": {
+      "properties": {
+        "user": {
+          "properties": {
+            "email": {
+              "description": "User's email address",
+              "type": "string"
+            },
+            "id": {
+              "description": "User ID",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "example": {
+        "user": {
+          "email": "user@example.com",
+          "id": 1
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "title": "User Response",
+      "description": "User information response",
+      "type": "object"
+    },
+    "ErrorResponse": {
+      "properties": {
+        "error": {
+          "description": "Error message",
+          "type": "string"
+        }
+      },
+      "example": {
+        "error": "Invalid email or password"
+      },
+      "required": [
+        "error"
+      ],
+      "title": "Error Response",
+      "description": "Error response",
+      "type": "object"
+    },
+    "AuthResponse": {
+      "properties": {
+        "token": {
+          "description": "JWT authentication token",
+          "type": "string"
+        },
+        "user": {
+          "properties": {
+            "email": {
+              "description": "User's email address",
+              "type": "string"
+            },
+            "id": {
+              "description": "User ID",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "example": {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "user": {
+          "email": "user@example.com",
+          "id": 1
+        }
+      },
+      "required": [
+        "user",
+        "token"
+      ],
+      "title": "Authentication Response",
+      "description": "Successful authentication response",
+      "type": "object"
+    },
+    "LoginCredentials": {
+      "properties": {
+        "email": {
+          "description": "User's email address",
+          "format": "email",
+          "type": "string"
+        },
+        "password": {
+          "description": "User's password",
+          "type": "string"
+        }
+      },
+      "example": {
+        "email": "admin@admin.com",
+        "password": "password123!!"
+      },
+      "required": [
+        "email",
+        "password"
+      ],
+      "title": "Login Credentials",
+      "description": "User login credentials",
       "type": "object"
     }
   },

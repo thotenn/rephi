@@ -109,8 +109,8 @@ defmodule RephiWeb.AuthController do
         },
         required: [:email, :password],
         example: %{
-          email: "user@example.com",
-          password: "securepassword123"
+          email: "admin@admin.com",
+          password: "password123!!"
         }
       },
       LoginCredentials: %{
@@ -123,8 +123,8 @@ defmodule RephiWeb.AuthController do
         },
         required: [:email, :password],
         example: %{
-          email: "user@example.com",
-          password: "securepassword123"
+          email: "admin@admin.com",
+          password: "password123!!"
         }
       },
       AuthResponse: %{
