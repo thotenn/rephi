@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Rephi is a Phoenix/Elixir backend with a Remix React frontend, featuring JWT authentication and real-time WebSocket communication.
+Rephi is a Phoenix/Elixir backend with a Remix React frontend, featuring JWT authentication, RBAC (Role-Based Access Control) authorization system, and real-time WebSocket communication.
 
 ## Environment Setup
 
@@ -61,16 +61,26 @@ npm run typecheck     # Run TypeScript type checking
 
 ## Architecture Overview
 
-### Authentication Flow
+### Authentication & Authorization Flow
 1. **Frontend → Backend**: Login/register sends credentials to `/api/users/{login|register}`
 2. **Token Storage**: JWT stored in both Zustand (persisted) and localStorage
-3. **API Requests**: Axios interceptor adds `Authorization: Bearer {token}` header automatically
-4. **WebSocket**: Token passed as connection param but **NOT currently validated** (security issue)
+3. **JWT Enhancement**: Tokens include user roles and permissions for client-side authorization
+4. **API Requests**: Axios interceptor adds `Authorization: Bearer {token}` header automatically
+5. **Authorization**: Server-side plugs verify permissions before allowing access to protected endpoints
+6. **WebSocket**: Token passed as connection param but **NOT currently validated** (security issue)
+
+### RBAC Authorization System
+- **Hierarchical Roles**: `admin` → `manager` → `user` with inheritance
+- **Granular Permissions**: Categorized by domain (`users:*`, `roles:*`, `permissions:*`, `system:*`)
+- **Flexible Checks**: Support for single permission, multiple permissions (any/all), role-based checks
+- **Database Schema**: 6 tables for complete RBAC implementation
+- **API Endpoints**: Full CRUD for roles and permissions with assignment capabilities
 
 ### Key Architectural Decisions
 - **Backend API**: All API routes under `/api/*` with JSON responses
 - **Frontend SPA**: Remix in SPA mode (no SSR) with client-side routing
 - **State Management**: Zustand with localStorage persistence for auth state
+- **Authorization**: Context-based with plugs for controller protection
 - **Real-time**: Phoenix Channels for WebSocket communication (user-specific channels)
 - **Forms**: React Hook Form + Zod for validation
 - **Styling**: Tailwind CSS v4 with custom configuration
@@ -241,6 +251,70 @@ For complex flows, create integration tests in `test/rephi_web/integration/`:
 ### Current API Documentation
 
 - **Authentication Endpoints** (`/api/users/*`): User registration, login, and profile
+- **Authorization Endpoints** (`/api/roles/*`, `/api/permissions/*`): Full RBAC management
+- **Role Assignment** (`/api/users/:id/roles/*`): Assign/remove roles from users
+- **Permission Assignment** (`/api/roles/:id/permissions/*`): Assign/remove permissions from roles
 - All endpoints return JSON responses
 - Authentication uses JWT tokens in Authorization header
+- Authorization uses permission-based access control
 - See Swagger UI for interactive documentation and testing
+
+## Authorization System Implementation
+
+### Context Module: `Rephi.Authorization`
+Main functions for role and permission management:
+
+**Role Management:**
+- `list_roles/0`, `get_role/1`, `get_role_by_slug/1`
+- `create_role/1`, `update_role/2`, `delete_role/1`
+- `assign_role_to_user/3`, `remove_role_from_user/2`
+
+**Permission Management:**
+- `list_permissions/0`, `get_permission/1`, `get_permission_by_slug/1`
+- `create_permission/1`, `update_permission/2`, `delete_permission/1`
+- `assign_permission_to_role/3`, `remove_permission_from_role/2`
+
+**Authorization Checks:**
+- `can?/2` - Check if user has specific permission
+- `has_role?/2` - Check if user has specific role
+- `get_user_roles/1`, `get_user_permissions/1`, `get_role_permissions/1`
+- `can_by?/1` - Flexible authorization with options
+
+### Authorization Plugs
+Located in `RephiWeb.Auth.AuthorizationPlug`:
+
+**Usage in Controllers:**
+```elixir
+plug AuthorizationPlug, {:permission, "users:edit"}
+plug AuthorizationPlug, {:role, "admin"}
+plug AuthorizationPlug, {:any_permission, ["users:create", "users:edit"]}
+plug AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
+```
+
+### Authorization Helpers
+Available in all controllers via `RephiWeb.Auth.AuthorizationHelpers`:
+- `can?/2`, `has_role?/2`, `can_any?/2`, `can_all?/2`
+- `current_user_roles/1`, `current_user_permissions/1`
+- `authorize/2` - Flexible authorization function
+
+### Database Schema
+Six tables support the RBAC system:
+1. `roles` - Role definitions with hierarchy support
+2. `permissions` - Permission definitions with hierarchy support  
+3. `user_roles` - User-role assignments
+4. `user_permissions` - Direct user-permission assignments
+5. `role_permissions` - Role-permission assignments
+6. `role_roles` - Role hierarchy (parent-child relationships)
+
+### Seed Data
+Default roles and permissions created automatically:
+- **Roles**: admin (inherits manager), manager (inherits user), user
+- **Permissions**: 17 permissions across users, roles, permissions, and system domains
+- **Admin User**: admin@admin.com / password123!! with admin role
+
+### Testing Authorization
+When testing endpoints with authorization:
+1. Use `RephiWeb.AuthTestHelpers` for auth setup
+2. Test both authorized and unauthorized scenarios
+3. Test different permission/role combinations
+4. Verify proper HTTP status codes (401 Unauthorized, 403 Forbidden)

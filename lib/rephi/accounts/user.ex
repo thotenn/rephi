@@ -2,12 +2,17 @@ defmodule Rephi.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
   alias Bcrypt
+  alias Rephi.Authorization.{Role, Permission}
+  alias Rephi.Accounts.{UserRole, UserPermission}
 
   schema "users" do
     field :email, :string
     field :password, :string, virtual: true
     field :password_confirmation, :string, virtual: true
     field :hashed_password, :string
+
+    many_to_many :roles, Role, join_through: UserRole
+    many_to_many :permissions, Permission, join_through: UserPermission
 
     timestamps(type: :utc_datetime)
   end

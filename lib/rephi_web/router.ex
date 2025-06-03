@@ -25,6 +25,16 @@ defmodule RephiWeb.Router do
 
     get "/me", AuthController, :me
     post "/notifications/broadcast", NotificationController, :broadcast
+
+    # Role management endpoints
+    resources "/roles", RoleController, except: [:new, :edit]
+    post "/users/:user_id/roles/:role_id", RoleController, :assign_to_user
+    delete "/users/:user_id/roles/:role_id", RoleController, :remove_from_user
+
+    # Permission management endpoints
+    resources "/permissions", PermissionController, except: [:new, :edit]
+    post "/roles/:role_id/permissions/:permission_id", PermissionController, :assign_to_role
+    delete "/roles/:role_id/permissions/:permission_id", PermissionController, :remove_from_role
   end
 
   scope "/api/swagger" do

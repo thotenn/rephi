@@ -142,12 +142,126 @@ npm start
 - **Estilos** con Tailwind CSS v4
 - **Cliente API** con Axios
 
-## 🔐 Autenticación
+## 🔐 Autenticación y Autorización
 
+### Autenticación JWT
 1. Los usuarios se registran/autentican en `/api/users/register` o `/api/users/login`
 2. El JWT se almacena en Zustand y localStorage
 3. Axios interceptor añade automáticamente el header `Authorization: Bearer {token}`
 4. Los endpoints protegidos requieren autenticación válida
+
+### Sistema de Roles y Permisos (RBAC)
+
+Rephi incluye un sistema completo de control de acceso basado en roles (RBAC) con las siguientes características:
+
+#### 🎭 Roles y Jerarquías
+- **Roles jerárquicos**: Los roles pueden heredar permisos de otros roles
+- **Roles por defecto**: 
+  - `admin` → hereda de `manager`
+  - `manager` → hereda de `user`
+  - `user` → acceso básico
+
+#### 🔑 Permisos Granulares
+Los permisos están organizados por categorías:
+
+- **users:** - Gestión de usuarios (`users:view`, `users:create`, `users:edit`, `users:delete`)
+- **roles:** - Gestión de roles (`roles:view`, `roles:create`, `roles:edit`, `roles:delete`, `roles:assign`)
+- **permissions:** - Gestión de permisos (`permissions:view`, `permissions:create`, etc.)
+- **system:** - Configuración del sistema (`system:settings`, `system:logs`, `system:manage`)
+
+#### 🛡️ Verificaciones de Autorización
+
+**En Controladores:**
+```elixir
+# Proteger acciones individuales
+plug AuthorizationPlug, {:permission, "users:edit"}
+plug AuthorizationPlug, {:role, "admin"}
+plug AuthorizationPlug, {:any_permission, ["users:create", "users:edit"]}
+plug AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
+
+# Verificaciones manuales
+if can?(conn, "users:edit") do
+  # Usuario puede editar usuarios
+end
+
+if has_role?(conn, "admin") do
+  # Usuario tiene rol de admin
+end
+```
+
+**En el Contexto:**
+```elixir
+# Verificaciones directas
+Authorization.can?(user, "users:edit")
+Authorization.has_role?(user, "admin")
+Authorization.role_has_permission?(role, permission)
+
+# Verificaciones flexibles
+Authorization.can_by?(user: user, permission: "system:manage")
+Authorization.can_by?(user: user, role: "admin")
+
+# Obtener datos
+Authorization.get_user_roles(user)
+Authorization.get_user_permissions(user)
+Authorization.get_role_permissions(role)
+```
+
+#### 📡 API de Roles y Permisos
+
+**Gestión de Roles:**
+```bash
+GET    /api/roles              # Listar roles
+POST   /api/roles              # Crear rol
+GET    /api/roles/:id          # Obtener rol específico
+PUT    /api/roles/:id          # Actualizar rol
+DELETE /api/roles/:id          # Eliminar rol
+
+# Asignación de roles a usuarios
+POST   /api/users/:user_id/roles/:role_id     # Asignar rol
+DELETE /api/users/:user_id/roles/:role_id     # Quitar rol
+```
+
+**Gestión de Permisos:**
+```bash
+GET    /api/permissions         # Listar permisos
+POST   /api/permissions         # Crear permiso
+GET    /api/permissions/:id     # Obtener permiso específico
+PUT    /api/permissions/:id     # Actualizar permiso
+DELETE /api/permissions/:id     # Eliminar permiso
+
+# Asignación de permisos a roles
+POST   /api/roles/:role_id/permissions/:perm_id     # Asignar permiso
+DELETE /api/roles/:role_id/permissions/:perm_id     # Quitar permiso
+```
+
+**Información del Usuario Actual:**
+```bash
+GET /api/me  # Incluye roles y permisos del usuario autenticado
+```
+
+#### 🌱 Datos Semilla
+Al ejecutar `mix ecto.reset` o `mix run priv/repo/seeds.exs`, se crean automáticamente:
+
+- **3 roles** con jerarquía (admin → manager → user)
+- **17 permisos** categorizados por funcionalidad
+- **Usuario administrador** (`admin@admin.com` / `password123!!`) con rol admin
+
+#### 💡 JWT Integrado
+Los tokens JWT incluyen automáticamente:
+- Lista de roles del usuario (`"roles": ["admin", "manager"]`)
+- Lista de permisos efectivos (`"permissions": ["users:view", "users:create", ...]`)
+
+#### 🔧 Helpers de Autorización
+Disponibles en todos los controladores y vistas:
+```elixir
+can?(conn, "permission:slug")           # ¿Tiene permiso específico?
+has_role?(conn, "role_slug")           # ¿Tiene rol específico?
+can_any?(conn, ["perm1", "perm2"])     # ¿Tiene alguno de estos permisos?
+can_all?(conn, ["perm1", "perm2"])     # ¿Tiene todos estos permisos?
+current_user_roles(conn)               # Roles del usuario actual
+current_user_permissions(conn)         # Permisos del usuario actual
+authorize(conn, permission: "users:edit") # Verificación flexible
+```
 
 ## 📡 WebSockets
 

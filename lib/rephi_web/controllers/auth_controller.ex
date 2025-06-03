@@ -2,7 +2,7 @@ defmodule RephiWeb.AuthController do
   use RephiWeb, :controller
   use PhoenixSwagger
 
-  alias Rephi.Accounts
+  alias Rephi.{Accounts, Authorization}
   alias RephiWeb.Auth.Guardian
   alias PhoenixSwagger.Schema
   alias RephiWeb.UserView
@@ -88,10 +88,12 @@ defmodule RephiWeb.AuthController do
 
   def me(conn, _params) do
     user = Guardian.Plug.current_resource(conn)
+    roles = Authorization.get_user_roles(user)
+    permissions = Authorization.get_user_permissions(user)
 
     conn
     |> put_view(UserView)
-    |> render("me.json", user: user)
+    |> render("me_with_auth.json", user: user, roles: roles, permissions: permissions)
   end
 
   # Swagger schema definitions

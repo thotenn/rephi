@@ -23,4 +23,28 @@ defmodule RephiWeb.UserView do
       user: render("user.json", %{user: user})
     }
   end
+
+  def render("me_with_auth.json", %{user: user, roles: roles, permissions: permissions}) do
+    %{
+      user: render("user.json", %{user: user}),
+      roles: Enum.map(roles, &render_role/1),
+      permissions: Enum.map(permissions, &render_permission/1)
+    }
+  end
+
+  defp render_role(role) do
+    %{
+      id: role.id,
+      name: role.name,
+      slug: role.slug
+    }
+  end
+
+  defp render_permission(permission) do
+    %{
+      id: permission.id,
+      name: permission.name,
+      slug: permission.slug
+    }
+  end
 end

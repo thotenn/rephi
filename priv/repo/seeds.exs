@@ -12,6 +12,10 @@
 
 alias Rephi.Repo
 alias Rephi.Accounts.User
+alias Rephi.Authorization
+
+# Run authorization seeds first (creates roles and permissions)
+Code.eval_file("priv/repo/authorization_seeds.exs")
 
 # Create first user
 admin_attrs = %{
@@ -19,14 +23,25 @@ admin_attrs = %{
   password: "password123!!"
 }
 
-case Repo.get_by(User, email: admin_attrs.email) do
+admin_user = case Repo.get_by(User, email: admin_attrs.email) do
   nil ->
-    %User{}
+    user = %User{}
     |> User.changeset(admin_attrs)
     |> Repo.insert!()
 
     IO.puts("User created: #{admin_attrs.email}")
+    user
 
-  _user ->
+  user ->
     IO.puts("User already exists: #{admin_attrs.email}")
+    user
+end
+
+# Assign admin role to the admin user
+admin_role = Authorization.get_role_by_slug("admin")
+if admin_role do
+  case Authorization.assign_role_to_user(admin_user, admin_role) do
+    {:ok, _} -> IO.puts("Assigned admin role to #{admin_user.email}")
+    {:error, _} -> IO.puts("Admin role already assigned to #{admin_user.email}")
+  end
 end
