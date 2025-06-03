@@ -1,4 +1,31 @@
 defmodule RephiWeb.RoleController do
+  @moduledoc """
+  Controller for managing roles in the authorization system.
+
+  This controller provides a full REST API for role management, including
+  CRUD operations and role assignment to users. All actions are protected
+  by appropriate permission checks.
+
+  ## Endpoints
+
+    * `GET /api/roles` - List all roles (requires "roles:view")
+    * `POST /api/roles` - Create a new role (requires "roles:create")
+    * `GET /api/roles/:id` - Get role details (requires "roles:view")
+    * `PUT /api/roles/:id` - Update role (requires "roles:edit")
+    * `DELETE /api/roles/:id` - Delete role (requires "roles:delete")
+    * `POST /api/users/:user_id/roles/:role_id` - Assign role to user (requires "roles:assign")
+    * `DELETE /api/users/:user_id/roles/:role_id` - Remove role from user (requires "roles:assign")
+
+  ## Permission Requirements
+
+  All actions require authentication and specific permissions:
+  - View actions: `roles:view`
+  - Create actions: `roles:create`
+  - Update actions: `roles:edit`
+  - Delete actions: `roles:delete`
+  - Assignment actions: `roles:assign`
+
+  """
   use RephiWeb, :controller
 
   alias Rephi.Authorization

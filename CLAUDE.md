@@ -318,3 +318,193 @@ When testing endpoints with authorization:
 2. Test both authorized and unauthorized scenarios
 3. Test different permission/role combinations
 4. Verify proper HTTP status codes (401 Unauthorized, 403 Forbidden)
+
+## Documentation Requirements with ExDoc
+
+**IMPORTANT**: This project uses ExDoc for comprehensive API documentation. For every new function, module, or significant code addition, you MUST provide proper documentation following these guidelines.
+
+### Documentation Standards
+
+1. **All public modules** must have a `@moduledoc` with:
+   - Clear description of the module's purpose
+   - Usage examples
+   - Important notes or warnings
+   - Related modules or concepts
+
+2. **All public functions** must have a `@doc` with:
+   - Description of what the function does
+   - Parameter documentation with types and descriptions
+   - Return value documentation
+   - At least one practical example
+   - Any side effects or important behavior
+
+3. **Schema modules** should document:
+   - Field descriptions and types
+   - Validation rules and constraints
+   - Association explanations
+   - Changeset examples
+
+### Documentation Template for Functions
+
+```elixir
+@doc """
+Brief description of what the function does.
+
+Longer explanation if needed, including any important behavior,
+side effects, or integration points.
+
+## Parameters
+
+  * `param1` - Description of first parameter with type info
+  * `param2` - Description of second parameter
+
+## Examples
+
+    iex> ModuleName.function_name(param1, param2)
+    expected_return_value
+
+    iex> ModuleName.function_name(invalid_input)
+    {:error, :reason}
+
+## Returns
+
+  * `{:ok, result}` - Success case description
+  * `{:error, reason}` - Error case description
+
+"""
+def function_name(param1, param2) do
+  # implementation
+end
+```
+
+### Documentation Template for Modules
+
+```elixir
+defmodule MyApp.ModuleName do
+  @moduledoc """
+  Brief description of the module's purpose.
+
+  Longer explanation of what this module provides, how it fits
+  into the application architecture, and any important concepts.
+
+  ## Key Features
+
+  - Feature 1 with brief explanation
+  - Feature 2 with brief explanation
+  - Feature 3 with brief explanation
+
+  ## Usage
+
+      # Basic usage example
+      result = ModuleName.main_function(params)
+
+      # Advanced usage example
+      ModuleName.advanced_function(complex_params)
+
+  ## Integration
+
+  This module integrates with:
+  - Other.Module - for specific functionality
+  - Another.Module - for other functionality
+
+  ## Important Notes
+
+  Any warnings, constraints, or important behavioral notes.
+
+  """
+
+  # Module implementation...
+end
+```
+
+### Authorization System Documentation Examples
+
+When working with the authorization system, follow these patterns:
+
+**Context Functions:**
+```elixir
+@doc """
+Checks if a user has a specific permission.
+
+Verifies both direct permissions and permissions inherited through
+roles and role hierarchy.
+
+## Parameters
+
+  * `user` - The user struct to check permissions for
+  * `permission` - Permission slug (string) or Permission struct
+
+## Examples
+
+    iex> Authorization.can?(user, "users:edit")
+    true
+
+    iex> Authorization.can?(user, %Permission{slug: "users:delete"})
+    false
+
+## Returns
+
+  * `true` - User has the permission
+  * `false` - User lacks the permission or is invalid
+
+"""
+```
+
+**Controller Documentation:**
+```elixir
+@moduledoc """
+Controller for managing [resource] with authorization.
+
+This controller provides REST API endpoints for [resource] management.
+All actions are protected by appropriate permission checks.
+
+## Endpoints
+
+  * `GET /api/resource` - List resources (requires "resource:view")
+  * `POST /api/resource` - Create resource (requires "resource:create")
+
+## Permission Requirements
+
+All actions require authentication and specific permissions:
+- View actions: `resource:view`
+- Create actions: `resource:create`
+
+"""
+```
+
+### Generating Documentation
+
+After adding or modifying documentation:
+
+```bash
+# Generate HTML and EPUB documentation
+mix docs
+
+# View generated documentation
+open doc/index.html
+```
+
+### Documentation Quality Checklist
+
+Before submitting code, ensure:
+
+- [ ] All new public functions have `@doc` with examples
+- [ ] All new modules have comprehensive `@moduledoc`
+- [ ] Examples are realistic and practical
+- [ ] Parameter and return types are documented
+- [ ] Integration points are explained
+- [ ] `mix docs` generates without warnings
+- [ ] Documentation follows project conventions
+
+### Special Considerations for Authorization Code
+
+When documenting authorization-related code:
+
+1. **Always include permission requirements** in controller docs
+2. **Document security implications** of functions
+3. **Provide role hierarchy examples** when relevant
+4. **Show both success and failure cases** in examples
+5. **Explain integration with JWT tokens** when applicable
+6. **Document helper function usage in views** and controllers
+
+This documentation standard ensures that the codebase remains maintainable and that new developers can quickly understand and work with the authorization system.

@@ -1,6 +1,34 @@
 defmodule RephiWeb.Auth.AuthorizationPlug do
   @moduledoc """
-  Plugs for handling authorization in controllers.
+  Phoenix plugs for authorization checks in controllers.
+
+  This module provides various plugs to protect controller actions based on
+  user permissions and roles. The plugs integrate with the authorization
+  system to check user permissions before allowing access to protected actions.
+
+  ## Usage
+
+  Add authorization plugs to your controller:
+
+      defmodule MyAppWeb.UserController do
+        use MyAppWeb, :controller
+
+        # Protect specific actions
+        plug AuthorizationPlug, {:permission, "users:edit"} when action in [:edit, :update]
+        plug AuthorizationPlug, {:role, "admin"} when action in [:delete]
+        
+        # Multiple permission checks
+        plug AuthorizationPlug, {:any_permission, ["users:create", "users:edit"]}
+        plug AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
+
+        # Your controller actions...
+      end
+
+  ## Response Codes
+
+  - `401 Unauthorized` - User is not authenticated
+  - `403 Forbidden` - User is authenticated but lacks required permissions
+
   """
   
   import Plug.Conn
@@ -9,11 +37,21 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
 
   @doc """
   Ensures the current user has the specified permission.
-  
+
+  Returns 401 if user is not authenticated, 403 if user lacks the permission.
+
+  ## Parameters
+
+    * `conn` - The Plug.Conn struct
+    * `permission_slug` - The permission slug to check (e.g., "users:edit")
+
   ## Examples
   
-      # In a controller
-      plug RephiWeb.Auth.AuthorizationPlug, :require_permission, "users:edit"
+      # Direct function call (not recommended)
+      conn = require_permission(conn, "users:edit")
+
+      # Use as plug (recommended)
+      plug AuthorizationPlug, {:permission, "users:edit"}
   """
   def require_permission(conn, permission_slug) when is_binary(permission_slug) do
     case conn.assigns[:current_user] do

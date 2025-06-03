@@ -1,19 +1,75 @@
 defmodule RephiWeb.Auth.AuthorizationHelpers do
   @moduledoc """
-  Helper functions for authorization in controllers and views.
+  Helper functions for authorization checks in controllers and views.
+
+  These helpers provide a convenient way to check user permissions and roles
+  within controller actions and view templates. They automatically handle
+  cases where no user is authenticated.
+
+  ## Usage in Controllers
+
+      defmodule MyAppWeb.UserController do
+        use MyAppWeb, :controller  # Automatically imports these helpers
+
+        def show(conn, %{"id" => id}) do
+          if can?(conn, "users:view") do
+            # User can view users
+            user = Accounts.get_user!(id)
+            render(conn, :show, user: user)
+          else
+            # Handle unauthorized access
+            conn |> put_status(:forbidden) |> json(%{error: "Forbidden"})
+          end
+        end
+      end
+
+  ## Usage in Views/Templates
+
+      # In a template (EEx)
+      <%= if can?(@conn, "users:edit") do %>
+        <button>Edit User</button>
+      <% end %>
+
+      <%= if has_role?(@conn, "admin") do %>
+        <div class="admin-panel">Admin Tools</div>
+      <% end %>
+
+  ## Safe Defaults
+
+  All functions return `false` when no user is authenticated, making them
+  safe to use without additional nil checks.
+
   """
 
   alias Rephi.Authorization
 
   @doc """
-  Checks if the current user can perform an action.
-  
+  Checks if the current user has a specific permission.
+
+  Returns `false` if no user is authenticated or if the user lacks the permission.
+
+  ## Parameters
+
+    * `conn` - The Plug.Conn struct containing user information
+    * `permission_slug` - The permission slug to check (e.g., "users:edit")
+
   ## Examples
   
-      # In a controller or view
+      # In a controller action
       if can?(conn, "users:edit") do
-        # Show edit button
+        # User can edit users
       end
+
+      # In a view template
+      <%= if can?(@conn, "roles:create") do %>
+        <a href="/roles/new">Create Role</a>
+      <% end %>
+
+  ## Returns
+
+    * `true` - User is authenticated and has the permission
+    * `false` - User is not authenticated or lacks the permission
+
   """
   def can?(conn, permission_slug) do
     case conn.assigns[:current_user] do
@@ -23,14 +79,32 @@ defmodule RephiWeb.Auth.AuthorizationHelpers do
   end
 
   @doc """
-  Checks if the current user has a role.
-  
+  Checks if the current user has a specific role.
+
+  Returns `false` if no user is authenticated or if the user doesn't have the role.
+
+  ## Parameters
+
+    * `conn` - The Plug.Conn struct containing user information
+    * `role_slug` - The role slug to check (e.g., "admin", "manager")
+
   ## Examples
   
-      # In a controller or view
+      # In a controller action
       if has_role?(conn, "admin") do
-        # Show admin panel
+        # User is an admin
       end
+
+      # In a view template
+      <%= if has_role?(@conn, "manager") do %>
+        <div class="manager-tools">Manager Dashboard</div>
+      <% end %>
+
+  ## Returns
+
+    * `true` - User is authenticated and has the role
+    * `false` - User is not authenticated or doesn't have the role
+
   """
   def has_role?(conn, role_slug) do
     case conn.assigns[:current_user] do
