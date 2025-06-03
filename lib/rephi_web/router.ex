@@ -35,6 +35,9 @@ defmodule RephiWeb.Router do
     resources "/permissions", PermissionController, except: [:new, :edit]
     post "/roles/:role_id/permissions/:permission_id", PermissionController, :assign_to_role
     delete "/roles/:role_id/permissions/:permission_id", PermissionController, :remove_from_role
+
+    # User management endpoints (admin only)
+    resources "/users", UserController, only: [:index, :show, :update, :delete]
   end
 
   scope "/api/swagger" do

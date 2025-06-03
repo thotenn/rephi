@@ -16,7 +16,7 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
         # Protect specific actions
         plug AuthorizationPlug, {:permission, "users:edit"} when action in [:edit, :update]
         plug AuthorizationPlug, {:role, "admin"} when action in [:delete]
-        
+
         # Multiple permission checks
         plug AuthorizationPlug, {:any_permission, ["users:create", "users:edit"]}
         plug AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
@@ -30,7 +30,7 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
   - `403 Forbidden` - User is authenticated but lacks required permissions
 
   """
-  
+
   import Plug.Conn
   import Phoenix.Controller
   alias Rephi.Authorization
@@ -46,7 +46,7 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
     * `permission_slug` - The permission slug to check (e.g., "users:edit")
 
   ## Examples
-  
+
       # Direct function call (not recommended)
       conn = require_permission(conn, "users:edit")
 
@@ -61,7 +61,7 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
         |> put_view(RephiWeb.ErrorJSON)
         |> render(:"401")
         |> halt()
-      
+
       user ->
         if Authorization.can?(user, permission_slug) do
           conn
@@ -77,9 +77,9 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
 
   @doc """
   Ensures the current user has the specified role.
-  
+
   ## Examples
-  
+
       # In a controller
       plug RephiWeb.Auth.AuthorizationPlug, :require_role, "admin"
   """
@@ -91,7 +91,7 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
         |> put_view(RephiWeb.ErrorJSON)
         |> render(:"401")
         |> halt()
-      
+
       user ->
         if Authorization.has_role?(user, role_slug) do
           conn
@@ -107,9 +107,9 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
 
   @doc """
   Ensures the current user has any of the specified permissions.
-  
+
   ## Examples
-  
+
       # In a controller
       plug RephiWeb.Auth.AuthorizationPlug, :require_any_permission, ["users:edit", "users:create"]
   """
@@ -121,10 +121,10 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
         |> put_view(RephiWeb.ErrorJSON)
         |> render(:"401")
         |> halt()
-      
+
       user ->
         has_any = Enum.any?(permission_slugs, &Authorization.can?(user, &1))
-        
+
         if has_any do
           conn
         else
@@ -139,9 +139,9 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
 
   @doc """
   Ensures the current user has all of the specified permissions.
-  
+
   ## Examples
-  
+
       # In a controller
       plug RephiWeb.Auth.AuthorizationPlug, :require_all_permissions, ["users:edit", "system:manage"]
   """
@@ -153,10 +153,10 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
         |> put_view(RephiWeb.ErrorJSON)
         |> render(:"401")
         |> halt()
-      
+
       user ->
         has_all = Enum.all?(permission_slugs, &Authorization.can?(user, &1))
-        
+
         if has_all do
           conn
         else
@@ -172,9 +172,9 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
   @doc """
   Plug to use in controllers for authorization.
   Call with :init_options set to {:permission, "permission:slug"} or {:role, "role_slug"}
-  
+
   ## Examples
-  
+
       # In a controller
       plug RephiWeb.Auth.AuthorizationPlug, {:permission, "users:edit"}
       plug RephiWeb.Auth.AuthorizationPlug, {:role, "admin"}

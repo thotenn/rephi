@@ -2,11 +2,11 @@ defmodule Rephi.Authorization do
   @moduledoc """
   The Authorization context manages roles, permissions, and user authorization.
 
-  This module implements a complete Role-Based Access Control (RBAC) system with 
+  This module implements a complete Role-Based Access Control (RBAC) system with
   hierarchical roles and permissions. It provides functions for:
 
   - Role management (CRUD operations)
-  - Permission management (CRUD operations) 
+  - Permission management (CRUD operations)
   - User-role assignments
   - User-permission assignments (direct)
   - Role-permission assignments
@@ -38,7 +38,7 @@ defmodule Rephi.Authorization do
 
   Permissions are organized by domain using colon notation:
   - `users:*` - User management permissions
-  - `roles:*` - Role management permissions  
+  - `roles:*` - Role management permissions
   - `permissions:*` - Permission management permissions
   - `system:*` - System administration permissions
   """
@@ -270,7 +270,7 @@ defmodule Rephi.Authorization do
   ## Examples
 
       iex> Authorization.create_permission(%{
-      ...>   name: "Export Users", 
+      ...>   name: "Export Users",
       ...>   slug: "users:export",
       ...>   description: "Export user data"
       ...> })
@@ -481,7 +481,7 @@ defmodule Rephi.Authorization do
   """
   def get_role_permissions(%Role{} = role) do
     # Get direct permissions
-    direct_permissions = 
+    direct_permissions =
       role
       |> Repo.preload(:permissions)
       |> Map.get(:permissions)
@@ -525,7 +525,7 @@ defmodule Rephi.Authorization do
   @doc """
   Checks if a user has a specific permission.
 
-  This function checks both direct permissions assigned to the user and 
+  This function checks both direct permissions assigned to the user and
   permissions inherited through roles. It supports hierarchical role inheritance.
 
   ## Parameters
@@ -560,7 +560,10 @@ defmodule Rephi.Authorization do
   end
 
   def can?(%User{} = user, %Permission{} = permission) do
-    has_direct_permission?(user, permission) or has_permission_through_role?(user, permission)
+    has_direct = has_direct_permission?(user, permission)
+    has_through_role = has_permission_through_role?(user, permission)
+
+    has_direct or has_through_role
   end
 
   def can?(%User{} = _user, nil), do: false
@@ -599,7 +602,7 @@ defmodule Rephi.Authorization do
   def has_role?(%User{} = user, %Role{} = role) do
     query = from ur in UserRole,
       where: ur.user_id == ^user.id and ur.role_id == ^role.id
-    
+
     Repo.exists?(query)
   end
 
@@ -652,7 +655,7 @@ defmodule Rephi.Authorization do
 
   defp has_permission_through_role?(%User{} = user, %Permission{} = permission) do
     user_roles = get_user_roles(user)
-    
+
     Enum.any?(user_roles, fn role ->
       role_permissions = get_role_permissions(role)
       Enum.any?(role_permissions, & &1.id == permission.id)
@@ -670,7 +673,7 @@ defmodule Rephi.Authorization do
 
   defp get_user_role_permissions(%User{} = user) do
     user_roles = get_user_roles(user)
-    
+
     user_roles
     |> Enum.flat_map(&get_role_permissions/1)
     |> Enum.uniq_by(& &1.id)
@@ -678,7 +681,7 @@ defmodule Rephi.Authorization do
 
   defp get_inherited_permissions(%Role{} = role) do
     parent_roles = get_parent_roles(role)
-    
+
     parent_roles
     |> Enum.flat_map(&get_role_permissions/1)
     |> Enum.uniq_by(& &1.id)
@@ -691,11 +694,11 @@ defmodule Rephi.Authorization do
       where: rr.child_role_id == ^role.id
 
     parent_roles = Repo.all(query)
-    
+
     # Recursively get parent roles of parent roles
     grandparent_roles = parent_roles
       |> Enum.flat_map(&get_parent_roles/1)
-    
+
     (parent_roles ++ grandparent_roles)
     |> Enum.uniq_by(& &1.id)
   end
@@ -731,10 +734,10 @@ defmodule Rephi.Authorization do
     cond do
       opts[:user] && opts[:permission] ->
         can?(opts[:user], opts[:permission])
-      
+
       opts[:user] && opts[:role] ->
         has_role?(opts[:user], opts[:role])
-      
+
       true ->
         false
     end
@@ -743,7 +746,7 @@ defmodule Rephi.Authorization do
   @doc """
   Checks if a role has a specific permission.
 
-  This function checks both direct permissions assigned to the role and 
+  This function checks both direct permissions assigned to the role and
   permissions inherited through role hierarchy.
 
   ## Parameters
