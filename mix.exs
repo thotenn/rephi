@@ -48,7 +48,7 @@ defmodule Rephi.MixProject do
       {:phoenix_swagger, "~> 0.8.3"},
       {:plug, "~> 1.18"},
       {:plug_cowboy, "~> 2.7.3"},
-      {:poison, "~> 3.1"},
+      {:poison, "~> 3.0"},
       {:postgrex, ">= 0.20.0"},
       {:swoosh, "~> 1.19.1"},
       {:telemetry_metrics, "~> 1.1.0"},
