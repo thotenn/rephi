@@ -5,6 +5,8 @@ defmodule RephiWeb.AuthController do
   alias Rephi.Accounts
   alias RephiWeb.Auth.Guardian
   alias PhoenixSwagger.Schema
+  alias RephiWeb.UserView
+  import RephiWeb.ErrorHelpers
 
   swagger_path :register do
     post("/api/users/register")
@@ -29,18 +31,11 @@ defmodule RephiWeb.AuthController do
 
         conn
         |> put_status(:created)
-        |> json(%{
-          user: %{
-            id: user.id,
-            email: user.email
-          },
-          token: token
-        })
+        |> put_view(UserView)
+        |> render("user_with_token.json", user: user, token: token)
 
       {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{errors: translate_errors(changeset)})
+        render_changeset_errors(conn, changeset)
     end
   end
 
@@ -66,26 +61,17 @@ defmodule RephiWeb.AuthController do
         {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
         conn
-        |> json(%{
-          user: %{
-            id: user.id,
-            email: user.email
-          },
-          token: token
-        })
+        |> put_view(UserView)
+        |> render("user_with_token.json", user: user, token: token)
 
       {:error, :invalid_credentials} ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "Invalid email or password"})
+        render_unauthorized(conn, "Invalid email or password")
     end
   end
 
   # Catch-all for missing parameters
   def login(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Email and password are required"})
+    render_bad_request(conn, "Email and password are required")
   end
 
   swagger_path :me do
@@ -104,20 +90,8 @@ defmodule RephiWeb.AuthController do
     user = Guardian.Plug.current_resource(conn)
 
     conn
-    |> json(%{
-      user: %{
-        id: user.id,
-        email: user.email
-      }
-    })
-  end
-
-  defp translate_errors(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
-        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-      end)
-    end)
+    |> put_view(UserView)
+    |> render("me.json", user: user)
   end
 
   # Swagger schema definitions

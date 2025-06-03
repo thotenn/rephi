@@ -23,10 +23,10 @@ defmodule RephiWeb.UserSocketTest do
       user = create_user()
       # Create token that expires immediately
       {:ok, token, _claims} = RephiWeb.Auth.Guardian.encode_and_sign(user, %{}, ttl: {0, :second})
-      
+
       # Wait a moment to ensure token is expired
       Process.sleep(100)
-      
+
       # Connect with expired token
       assert :error = connect(UserSocket, %{"token" => token})
     end
@@ -51,7 +51,7 @@ defmodule RephiWeb.UserSocketTest do
     test "socket id is based on user_id" do
       user = create_user()
       {:ok, token, _claims} = RephiWeb.Auth.Guardian.encode_and_sign(user)
-      
+
       {:ok, socket} = connect(UserSocket, %{"token" => token})
       assert UserSocket.id(socket) == "user_socket:#{user.id}"
     end

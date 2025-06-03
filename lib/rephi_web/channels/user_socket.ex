@@ -29,6 +29,7 @@ defmodule RephiWeb.UserSocket do
     case RephiWeb.Auth.Guardian.resource_from_token(token) do
       {:ok, user, _claims} ->
         {:ok, assign(socket, :user_id, user.id)}
+
       {:error, _reason} ->
         :error
     end

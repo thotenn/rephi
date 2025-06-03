@@ -1,6 +1,6 @@
 defmodule RephiWeb.Auth.Pipeline do
   use Guardian.Plug.Pipeline,
-    otp_app: :erp_commerce,
+    otp_app: :rephi,
     error_handler: RephiWeb.Auth.ErrorHandler,
     module: RephiWeb.Auth.Guardian
 

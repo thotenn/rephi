@@ -41,7 +41,10 @@ config :phoenix, :json_library, Jason
 
 config :rephi, RephiWeb.Auth.Guardian,
   issuer: "rephi",
-  secret_key: System.get_env("GUARDIAN_SECRET_KEY") || "d3mVezqyv5GuKhoKELh30QdnY3P0u46Y6pIP8DaWVElPvBeahq61pHcey6n4wjhq" # Use mix guardian.gen.secret
+  # Use mix guardian.gen.secret
+  secret_key:
+    System.get_env("GUARDIAN_SECRET_KEY") ||
+      "d3mVezqyv5GuKhoKELh30QdnY3P0u46Y6pIP8DaWVElPvBeahq61pHcey6n4wjhq"
 
 # Phoenix Swagger configuration
 config :rephi, :phoenix_swagger,

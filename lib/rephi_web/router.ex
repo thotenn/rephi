@@ -43,22 +43,22 @@ defmodule RephiWeb.Router do
       info: %{
         version: "1.0",
         title: "Rephi API",
-        description: "Phoenix/Elixir backend with JWT authentication and real-time WebSocket communication"
+        description:
+          "Phoenix/Elixir backend with JWT authentication and real-time WebSocket communication"
       },
       securityDefinitions: %{
         Bearer: %{
           type: "apiKey",
           name: "Authorization",
           in: "header",
-          description: "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
+          description:
+            "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
         }
       },
       consumes: ["application/json"],
       produces: ["application/json"]
     }
   end
-
-
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:rephi, :dev_routes) do

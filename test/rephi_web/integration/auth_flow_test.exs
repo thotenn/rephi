@@ -1,6 +1,6 @@
 defmodule RephiWeb.Integration.AuthFlowTest do
   use RephiWeb.ConnCase
-  
+
   @user_attrs %{
     "email" => "integration@example.com",
     "password" => "password123"
@@ -64,7 +64,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         conn
         |> put_req_header("authorization", "Bearer invalid-token")
         |> get(~p"/api/me")
-      
+
       assert json_response(conn2, 401)
 
       # Try with wrong format
@@ -72,13 +72,14 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         conn
         |> put_req_header("authorization", "NotBearer some-token")
         |> get(~p"/api/me")
-      
+
       assert json_response(conn3, 401)
     end
 
     test "multiple users can coexist with separate sessions", %{conn: conn} do
       # Create first user
       user1_attrs = %{"email" => "user1@example.com", "password" => "password123"}
+
       conn1 =
         conn
         |> put_req_header("content-type", "application/json")
@@ -88,6 +89,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
 
       # Create second user
       user2_attrs = %{"email" => "user2@example.com", "password" => "password456"}
+
       conn2 =
         conn
         |> put_req_header("content-type", "application/json")

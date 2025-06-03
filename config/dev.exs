@@ -23,7 +23,11 @@ config :rephi, RephiWeb.Endpoint,
   check_origin: System.get_env("CHECK_ORIGIN", "false") == "true",
   code_reloader: System.get_env("CODE_RELOADER", "true") == "true",
   debug_errors: System.get_env("DEBUG_ERRORS", "true") == "true",
-  secret_key_base: System.get_env("SECRET_KEY_BASE", "dGdaq64Jh97Vi7pXO6Vyz5OvUM7s1e17//sZuXaMgdgvpsqt6CDkqDLuAppk4nEK"),
+  secret_key_base:
+    System.get_env(
+      "SECRET_KEY_BASE",
+      "dGdaq64Jh97Vi7pXO6Vyz5OvUM7s1e17//sZuXaMgdgvpsqt6CDkqDLuAppk4nEK"
+    ),
   watchers: []
 
 # ## SSL Support

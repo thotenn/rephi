@@ -10,51 +10,55 @@ defmodule RephiWeb.NotificationControllerTest do
     end
 
     test "broadcasts notification with valid message", %{conn: conn} do
-      conn = post(conn, ~p"/api/notifications/broadcast", %{
-        "message" => "Test notification message"
-      })
+      conn =
+        post(conn, ~p"/api/notifications/broadcast", %{
+          "message" => "Test notification message"
+        })
 
       assert json_response(conn, 200) == %{
-        "message" => "Notification sent successfully",
-        "notification" => %{
-          "message" => "Test notification message",
-          "timestamp" => json_response(conn, 200)["notification"]["timestamp"]
-        }
-      }
+               "message" => "Notification sent successfully",
+               "notification" => %{
+                 "message" => "Test notification message",
+                 "timestamp" => json_response(conn, 200)["notification"]["timestamp"]
+               }
+             }
     end
 
     test "returns error when message is missing", %{conn: conn} do
       conn = post(conn, ~p"/api/notifications/broadcast", %{})
 
       assert json_response(conn, 422) == %{
-        "errors" => %{
-          "message" => ["can't be blank"]
-        }
-      }
+               "errors" => %{
+                 "message" => ["can't be blank"]
+               }
+             }
     end
 
     test "returns error when message is empty", %{conn: conn} do
-      conn = post(conn, ~p"/api/notifications/broadcast", %{
-        "message" => ""
-      })
+      conn =
+        post(conn, ~p"/api/notifications/broadcast", %{
+          "message" => ""
+        })
 
       assert json_response(conn, 422) == %{
-        "errors" => %{
-          "message" => ["can't be blank"]
-        }
-      }
+               "errors" => %{
+                 "message" => ["can't be blank"]
+               }
+             }
     end
 
     test "requires authentication", %{conn: _conn} do
       # Create a new connection without authentication
       conn = build_conn()
-      conn = post(conn, ~p"/api/notifications/broadcast", %{
-        "message" => "Test notification"
-      })
+
+      conn =
+        post(conn, ~p"/api/notifications/broadcast", %{
+          "message" => "Test notification"
+        })
 
       assert json_response(conn, 401) == %{
-        "error" => "unauthenticated"
-      }
+               "error" => "unauthenticated"
+             }
     end
   end
 end

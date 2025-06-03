@@ -30,6 +30,7 @@ defmodule Rephi.Accounts.User do
       %Ecto.Changeset{valid?: true, changes: %{password: password}} ->
         put_change(changeset, :hashed_password, Bcrypt.hash_pwd_salt(password))
         |> delete_change(:password)
+
       _ ->
         changeset
     end

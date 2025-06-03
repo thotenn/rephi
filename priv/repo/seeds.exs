@@ -24,6 +24,7 @@ case Repo.get_by(User, email: admin_attrs.email) do
     %User{}
     |> User.changeset(admin_attrs)
     |> Repo.insert!()
+
     IO.puts("User created: #{admin_attrs.email}")
 
   _user ->

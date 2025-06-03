@@ -3,6 +3,7 @@ defmodule RephiWeb.NotificationController do
   use PhoenixSwagger
   alias PhoenixSwagger.Schema
   alias RephiWeb.Endpoint
+  import RephiWeb.ErrorHelpers
 
   action_fallback RephiWeb.FallbackController
 
@@ -12,21 +13,23 @@ defmodule RephiWeb.NotificationController do
     description("Sends a notification message to all users connected via WebSocket")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       body(:body, Schema.ref(:NotificationRequest), "Notification data", required: true)
     end
-    
+
     response(200, "Success", Schema.ref(:NotificationResponse))
     response(401, "Unauthorized")
     response(422, "Unprocessable Entity")
   end
 
   def broadcast(conn, %{"message" => message}) when message != "" do
+    timestamp = DateTime.utc_now()
+
     # Broadcast to all connected users
     Endpoint.broadcast!("user:lobby", "new_notification", %{
       message: message,
-      timestamp: DateTime.utc_now(),
+      timestamp: timestamp,
       type: "general"
     })
 
@@ -36,15 +39,13 @@ defmodule RephiWeb.NotificationController do
       message: "Notification sent successfully",
       notification: %{
         message: message,
-        timestamp: DateTime.utc_now()
+        timestamp: timestamp
       }
     })
   end
 
   def broadcast(conn, _params) do
-    conn
-    |> put_status(:unprocessable_entity)
-    |> json(%{errors: %{message: ["can't be blank"]}})
+    render_errors(conn, :unprocessable_entity, %{message: ["can't be blank"]})
   end
 
   def swagger_definitions do
