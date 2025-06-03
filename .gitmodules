@@ -1,0 +1,3 @@
+[submodule "lib/auth_manager_core"]
+	path = lib/auth_manager_core
+	url = https://github.com/thotenn/auth_manager_core.git
