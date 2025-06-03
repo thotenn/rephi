@@ -37,6 +37,7 @@ defmodule Rephi.MixProject do
       {:cors_plug, "~> 3.0.3"},
       {:dns_cluster, "~> 0.1.1"},
       {:ecto_sql, "~> 3.12.1"},
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true},
       {:ex_json_schema, "~> 0.5"},
       {:finch, "~> 0.19.0"},
       {:gettext, "~> 0.26.2"},
