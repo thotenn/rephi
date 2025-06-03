@@ -33,25 +33,26 @@ defmodule Rephi.MixProject do
   defp deps do
     [
       {:bandit, "~> 1.7.0"},
-      {:bcrypt_elixir, "~> 3.0"},
-      {:cors_plug, "~> 3.0"},
+      {:bcrypt_elixir, "~> 3.3.2"},
+      {:cors_plug, "~> 3.0.3"},
       {:dns_cluster, "~> 0.1.1"},
-      {:ecto_sql, "~> 3.10"},
-      {:finch, "~> 0.13"},
-      {:gettext, "~> 0.26"},
-      {:guardian, "~> 2.3"},
-      {:jason, "~> 1.2"},
-      {:phoenix, "~> 1.7.20"},
-      {:phoenix_ecto, "~> 4.5"},
-      {:postgrex, ">= 0.0.0"},
-      {:phoenix_live_dashboard, "~> 0.8.4"},
-      {:swoosh, "~> 1.5"},
-      {:telemetry_metrics, "~> 1.0"},
-      {:telemetry_poller, "~> 1.0"},
-      {:plug_cowboy, "~> 2.5"},
-      {:phoenix_swagger, "~> 0.8"},
+      {:ecto_sql, "~> 3.12.1"},
       {:ex_json_schema, "~> 0.5"},
-      {:poison, "~> 3.1"}
+      {:finch, "~> 0.19.0"},
+      {:gettext, "~> 0.26.2"},
+      {:guardian, "~> 2.3.2"},
+      {:jason, "~> 1.4.4"},
+      {:phoenix, "~> 1.7.21"},
+      {:phoenix_ecto, "~> 4.6.4"},
+      {:phoenix_live_dashboard, "~> 0.8.4"},
+      {:phoenix_swagger, "~> 0.8.3"},
+      {:plug, "~> 1.18"},
+      {:plug_cowboy, "~> 2.7.3"},
+      {:poison, "~> 3.1"},
+      {:postgrex, ">= 0.20.0"},
+      {:swoosh, "~> 1.19.1"},
+      {:telemetry_metrics, "~> 1.1.0"},
+      {:telemetry_poller, "~> 1.2.0"}
     ]
   end
 
