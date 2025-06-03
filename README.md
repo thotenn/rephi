@@ -153,7 +153,7 @@ npm start
 
 La conexión WebSocket se establece en `ws://localhost:4000/socket` con canales específicos por usuario.
 
-**⚠️ Nota de Seguridad**: Actualmente las conexiones WebSocket no validan el token de autenticación. Esto debe ser corregido en producción.
+**✅ Seguridad**: Las conexiones WebSocket validan el token JWT antes de permitir la conexión. Los tokens inválidos o ausentes son rechazados automáticamente.
 
 ## 🧪 Testing
 
