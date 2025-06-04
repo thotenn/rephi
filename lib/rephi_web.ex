@@ -44,6 +44,8 @@ defmodule RephiWeb do
       use Gettext, backend: RephiWeb.Gettext
 
       import Plug.Conn
+      import RephiWeb.Auth.AuthorizationHelpers
+      alias RephiWeb.Auth.AuthorizationPlug
 
       unquote(verified_routes())
     end

@@ -2,10 +2,10 @@ defmodule RephiWeb.AuthController do
   use RephiWeb, :controller
   use PhoenixSwagger
 
-  alias Rephi.Accounts
+  alias Rephi.{Accounts, Authorization}
   alias RephiWeb.Auth.Guardian
   alias PhoenixSwagger.Schema
-  alias RephiWeb.UserView
+  alias RephiWeb.UserJSON
   import RephiWeb.ErrorHelpers
 
   swagger_path :register do
@@ -31,8 +31,7 @@ defmodule RephiWeb.AuthController do
 
         conn
         |> put_status(:created)
-        |> put_view(UserView)
-        |> render("user_with_token.json", user: user, token: token)
+        |> json(UserJSON.user_with_token(%{user: user, token: token}))
 
       {:error, changeset} ->
         render_changeset_errors(conn, changeset)
@@ -61,8 +60,7 @@ defmodule RephiWeb.AuthController do
         {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
         conn
-        |> put_view(UserView)
-        |> render("user_with_token.json", user: user, token: token)
+        |> json(UserJSON.user_with_token(%{user: user, token: token}))
 
       {:error, :invalid_credentials} ->
         render_unauthorized(conn, "Invalid email or password")
@@ -88,10 +86,11 @@ defmodule RephiWeb.AuthController do
 
   def me(conn, _params) do
     user = Guardian.Plug.current_resource(conn)
+    roles = Authorization.get_user_roles(user)
+    permissions = Authorization.get_user_permissions(user)
 
     conn
-    |> put_view(UserView)
-    |> render("me.json", user: user)
+    |> json(UserJSON.me_with_auth(%{user: user, roles: roles, permissions: permissions}))
   end
 
   # Swagger schema definitions
@@ -107,8 +106,8 @@ defmodule RephiWeb.AuthController do
         },
         required: [:email, :password],
         example: %{
-          email: "user@example.com",
-          password: "securepassword123"
+          email: "admin@admin.com",
+          password: "password123!!"
         }
       },
       LoginCredentials: %{
@@ -121,8 +120,8 @@ defmodule RephiWeb.AuthController do
         },
         required: [:email, :password],
         example: %{
-          email: "user@example.com",
-          password: "securepassword123"
+          email: "admin@admin.com",
+          password: "password123!!"
         }
       },
       AuthResponse: %{
