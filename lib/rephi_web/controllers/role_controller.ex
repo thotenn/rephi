@@ -35,7 +35,7 @@ defmodule RephiWeb.RoleController do
 
   action_fallback RephiWeb.FallbackController
 
-  plug AuthorizationPlug, {:permission, "roles:view"} when action in [:index, :show]
+  plug AuthorizationPlug, {:permission, "roles:view"} when action in [:index, :show, :get_role_permissions]
   plug AuthorizationPlug, {:permission, "roles:create"} when action in [:create]
   plug AuthorizationPlug, {:permission, "roles:edit"} when action in [:update]
   plug AuthorizationPlug, {:permission, "roles:delete"} when action in [:delete]
@@ -227,6 +227,30 @@ defmodule RephiWeb.RoleController do
     end
   end
 
+  swagger_path :get_role_permissions do
+    get("/api/roles/{id}/permissions")
+    summary("Get role permissions")
+    description("Returns a list of permissions assigned to the role")
+    produces("application/json")
+    security([%{Bearer: []}])
+    
+    parameters do
+      id(:path, :string, "Role ID", required: true)
+    end
+    
+    response(200, "Success", Schema.ref(:RolePermissionsResponse))
+    response(401, "Unauthorized")
+    response(403, "Forbidden - requires roles:view permission")
+    response(404, "Role not found")
+  end
+
+  def get_role_permissions(conn, %{"id" => id}) do
+    role = Authorization.get_role!(id)
+    permissions = Authorization.get_role_permissions(role)
+    
+    render(conn, :permissions, permissions: permissions)
+  end
+
   # Swagger schema definitions
   def swagger_definitions do
     %{
@@ -334,6 +358,25 @@ defmodule RephiWeb.RoleController do
         },
         example: %{
           notes: "Assigned for project X management"
+        }
+      },
+      RolePermissionsResponse: %{
+        type: :object,
+        title: "Role Permissions Response",
+        description: "Response containing role permissions",
+        properties: %{
+          data: %{
+            type: :array,
+            items: %{
+              type: :object,
+              properties: %{
+                id: %{type: :integer},
+                name: %{type: :string},
+                slug: %{type: :string},
+                description: %{type: :string}
+              }
+            }
+          }
         }
       }
     }

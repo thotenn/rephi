@@ -155,6 +155,38 @@ defmodule RephiWeb.UserController do
     end
   end
 
+  @doc """
+  Gets roles for a specific user.
+
+  Returns a list of roles assigned to the user. Only accessible by users with admin role.
+  """
+  swagger_path :get_user_roles do
+    get("/api/users/{id}/roles")
+    summary("Get user roles")
+    description("Returns a list of roles assigned to the user. Requires admin role.")
+    produces("application/json")
+    security([%{Bearer: []}])
+    
+    parameters do
+      id(:path, :string, "User ID", required: true)
+    end
+    
+    response(200, "Success", Schema.ref(:UserRolesResponse))
+    response(401, "Unauthorized - No authentication token")
+    response(403, "Forbidden - User lacks admin role")
+    response(404, "User not found")
+  end
+
+  def get_user_roles(conn, %{"id" => id}) do
+    case Accounts.get_user(id) do
+      nil ->
+        {:error, :not_found}
+      user ->
+        roles = Rephi.Authorization.get_user_roles(user)
+        render(conn, :roles, roles: roles)
+    end
+  end
+
   # Swagger definitions
   def swagger_definitions do
     %{
@@ -234,6 +266,25 @@ defmodule RephiWeb.UserController do
         },
         example: %{
           email: "user@example.com"
+        }
+      },
+      UserRolesResponse: %{
+        type: :object,
+        title: "User Roles Response",
+        description: "Response containing user roles",
+        properties: %{
+          data: %{
+            type: :array,
+            items: %{
+              type: :object,
+              properties: %{
+                id: %{type: :integer},
+                name: %{type: :string},
+                slug: %{type: :string},
+                description: %{type: :string}
+              }
+            }
+          }
         }
       }
     }

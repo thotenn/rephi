@@ -49,6 +49,13 @@ defmodule RephiWeb.UserJSON do
     }
   end
 
+  @doc """
+  Renders user roles.
+  """
+  def roles(%{roles: roles}) do
+    %{data: for(role <- roles, do: role_data(role))}
+  end
+
   defp data(%User{} = user) do
     %{
       id: user.id,
@@ -57,6 +64,15 @@ defmodule RephiWeb.UserJSON do
       permissions: render_permissions(user.permissions || []),
       inserted_at: user.inserted_at,
       updated_at: user.updated_at
+    }
+  end
+
+  defp role_data(role) do
+    %{
+      id: role.id,
+      name: role.name,
+      slug: role.slug,
+      description: role.description
     }
   end
 

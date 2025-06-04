@@ -5,14 +5,14 @@ defmodule RephiWeb.PermissionJSON do
   Renders a list of permissions.
   """
   def index(%{permissions: permissions}) do
-    %{permissions: for(permission <- permissions, do: data(permission))}
+    %{data: for(permission <- permissions, do: data(permission))}
   end
 
   @doc """
   Renders a single permission.
   """
   def show(%{permission: permission}) do
-    data(permission)
+    %{data: data(permission)}
   end
 
   defp data(%Permission{} = permission) do

@@ -5,14 +5,21 @@ defmodule RephiWeb.RoleJSON do
   Renders a list of roles.
   """
   def index(%{roles: roles}) do
-    %{roles: for(role <- roles, do: data(role))}
+    %{data: for(role <- roles, do: data(role))}
   end
 
   @doc """
   Renders a single role.
   """
   def show(%{role: role, permissions: permissions}) do
-    data(role, permissions)
+    %{data: data(role, permissions)}
+  end
+
+  @doc """
+  Renders role permissions.
+  """
+  def permissions(%{permissions: permissions}) do
+    %{data: render_permissions(permissions)}
   end
 
   defp data(%Role{} = role) do
