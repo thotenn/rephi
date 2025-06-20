@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import api from "~/modules/api/api";
 import PhoenixSocket from "~/modules/api/socket";
@@ -14,15 +14,30 @@ import { apisUrl, urls } from "~/env";
 export function useLogin() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
+  const queryClient = useQueryClient();
 
   return useMutation<AuthResponse, Error, LoginCredentials>({
     mutationFn: async (credentials) => {
       const { data } = await api.post(apisUrl.auth.login, credentials);
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       // Set auth first
       setAuth(data.user, data.token);
+      
+      // Fetch fresh user profile with roles and permissions
+      try {
+        const profileResponse = await api.get(apisUrl.auth.me);
+        if (profileResponse.data?.user) {
+          // Update auth store with complete user data
+          setAuth(profileResponse.data.user, data.token);
+        }
+      } catch (error) {
+        console.warn("Failed to fetch user profile:", error);
+      }
+      
+      // Invalidate all queries to refresh data
+      queryClient.clear();
       
       // Get redirect path from sessionStorage
       const redirectPath = getRedirectPath();

@@ -11,6 +11,7 @@ export interface RouteConfig {
     description?: string;
     requireAuth?: boolean;
     publicOnly?: boolean; // For login/register pages
+    requireAdmin?: boolean; // For admin-only pages
   };
 }
 
@@ -24,6 +25,11 @@ export const ROUTE_PATHS = {
   pages: {
     profile: "/pages/profile",
     dashboard: "/pages/dashboard",
+  },
+  admin: {
+    users: "/admin/users",
+    roles: "/admin/roles",
+    permissions: "/admin/permissions",
   },
 } as const;
 
@@ -105,9 +111,46 @@ export const publicRoutes: RouteConfig[] = [
   },
 ];
 
+// Admin routes
+export const adminRoutes: RouteConfig[] = [
+  {
+    path: "admin",
+    children: [
+      {
+        path: "users",
+        element: lazy(() => import("~/routes/admin/users/index")),
+        meta: {
+          title: "User Management",
+          requireAuth: true,
+          requireAdmin: true,
+        },
+      },
+      {
+        path: "roles",
+        element: lazy(() => import("~/routes/admin/roles/index")),
+        meta: {
+          title: "Roles Management", 
+          requireAuth: true,
+          requireAdmin: true,
+        },
+      },
+      {
+        path: "permissions",
+        element: lazy(() => import("~/routes/admin/permissions/index")),
+        meta: {
+          title: "Permissions Management",
+          requireAuth: true,
+          requireAdmin: true,
+        },
+      },
+    ],
+  },
+];
+
 // Combine all routes
 export const allRoutes: RouteConfig[] = [
   ...publicRoutes,
   ...authRoutes,
   ...dashboardRoutes,
+  ...adminRoutes,
 ];

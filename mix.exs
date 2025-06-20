@@ -45,7 +45,7 @@ defmodule Rephi.MixProject do
       {:jason, "~> 1.4.4"},
       {:phoenix, "~> 1.7.21"},
       {:phoenix_ecto, "~> 4.6.4"},
-      {:phoenix_live_dashboard, "~> 0.8.4"},
+      {:phoenix_live_dashboard, "~> 0.8.7"},
       {:phoenix_swagger, "~> 0.8.3"},
       {:plug, "~> 1.18"},
       {:plug_cowboy, "~> 2.7.3"},

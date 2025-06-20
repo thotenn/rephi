@@ -4,6 +4,7 @@ import App from "./App";
 import { allRoutes, type RouteConfig } from "./config/routes";
 import { ProtectedRoute } from "./components/bedrock/routes/ProtectedRoute";
 import { PublicRoute } from "./components/bedrock/routes/PublicRoute";
+import { AdminRoute } from "./components/bedrock/routes/AdminRoute";
 import RouteLoading from "./components/bedrock/routes/RouteLoading";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -29,7 +30,13 @@ const processRoutes = (routes: RouteConfig[]): RouteObject[] => {
       );
       
       // Wrap with appropriate route protection
-      if (route.meta?.requireAuth) {
+      if (route.meta?.requireAdmin) {
+        processedRoute.element = (
+          <AdminRoute>
+            {element}
+          </AdminRoute>
+        );
+      } else if (route.meta?.requireAuth) {
         processedRoute.element = (
           <ProtectedRoute>
             {element}
