@@ -68,3 +68,4 @@ pending.txt
 # Ignore node_modules in shared components
 /node_modules/
 /packages/shared-components/node_modules/
+/packages/shared-components/dist/
