@@ -75,28 +75,64 @@ defmodule Rephi.MixProject do
   end
 
   defp build_frontends(_) do
-    if File.exists?("build_frontends.sh") do
-      Mix.shell().info("Building frontend applications...")
+    apps = ["dashboard", "admin", "ecommerce", "landing"]
 
-      {_output, exit_code} =
-        System.cmd("bash", ["build_frontends.sh"],
-          stderr_to_stdout: true,
-          into: IO.stream(:stdio, :line)
-        )
+    # Ensure priv/static directories exist
+    Enum.each(apps, fn app ->
+      File.mkdir_p!("priv/static/#{app}")
+    end)
 
-      if exit_code != 0 do
-        Mix.raise("Frontend build failed with exit code #{exit_code}")
+    # Build each frontend app that exists
+    Enum.each(apps, fn app ->
+      app_path = "apps/#{app}"
+
+      if File.exists?(app_path) do
+        Mix.shell().info("Building #{app}...")
+
+        # Install dependencies
+        case System.cmd("npm", ["install"], cd: app_path, stderr_to_stdout: true) do
+          {_output, 0} ->
+            Mix.shell().info("✓ Dependencies installed for #{app}")
+
+            # Build the app
+            case System.cmd("npm", ["run", "build"], cd: app_path, stderr_to_stdout: true) do
+              {_output, 0} ->
+                # Copy build files to priv/static
+                source = Path.join(app_path, "dist")
+                dest = "priv/static/#{app}"
+
+                if File.exists?(source) do
+                  File.cp_r!(source, dest)
+                  Mix.shell().info("✓ #{app} built successfully")
+                else
+                  Mix.shell().error("Build directory not found for #{app}")
+                end
+
+              {output, exit_code} ->
+                Mix.shell().error("Failed to build #{app}: #{output}")
+                Mix.raise("Frontend build failed with exit code #{exit_code}")
+            end
+
+          {output, exit_code} ->
+            Mix.shell().error("Failed to install dependencies for #{app}: #{output}")
+            Mix.raise("npm install failed with exit code #{exit_code}")
+        end
+      else
+        Mix.shell().info("Skipping #{app} (not found)")
       end
-    else
-      Mix.shell().info("No build_frontends.sh found, skipping frontend build")
-    end
+    end)
+
+    Mix.shell().info("Frontend builds completed!")
   end
 
   defp clean_frontends(_) do
     Mix.shell().info("Cleaning frontend builds...")
-    File.rm_rf("priv/static/dashboard")
-    File.rm_rf("priv/static/admin")
-    File.rm_rf("priv/static/ecommerce")
-    File.rm_rf("priv/static/landing")
+    apps = ["dashboard", "admin", "ecommerce", "landing"]
+
+    Enum.each(apps, fn app ->
+      File.rm_rf("priv/static/#{app}")
+    end)
+
+    Mix.shell().info("Frontend builds cleaned!")
   end
 end
