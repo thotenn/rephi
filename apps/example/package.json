@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "clean": "rm -rf dist",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "preview": "vite preview",
     "typecheck": "tsc"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
+    "@rephi/shared-components": "workspace:*",
     "@tanstack/react-query": "^5.79.0",
     "axios": "^1.9.0",
     "phoenix": "^1.7.21",
