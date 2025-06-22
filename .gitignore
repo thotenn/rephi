@@ -1,6 +1,7 @@
 # The directory Mix will write compiled artifacts to.
 /_build/
 /lib/auth_manager_core/
+/installer/_build/
 
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
@@ -8,8 +9,9 @@
 # The directory Mix downloads your dependencies sources to.
 /deps/
 
-# Where 3rd-party dependencies like ExDoc output generated docs.
+# Where 3rd-party dependencies like ExDoc and Swagger output generated docs.
 /doc/
+/priv/static/swagger.json
 
 # Ignore .fetch files in case you like to edit your project deps locally.
 /.fetch
@@ -29,8 +31,29 @@ rephi-*.tar
 mix.lock
 
 .claude/
+CLAUDE.md
+/apps/dashboard/CLAUDE.md
 
 # Environment variables
 .env
 .env.local
 .env.*.local
+
+# Frontend builds
+/priv/static/dashboard/
+/priv/static/admin/
+/priv/static/ecommerce/
+/priv/static/landing/
+
+# Frontend node_modules and build artifacts
+/apps/*/node_modules/
+/apps/*/dist/
+/apps/*/.vite/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
