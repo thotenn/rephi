@@ -40,7 +40,6 @@ defmodule Mix.Tasks.Rephi.New do
 
   use Mix.Task
 
-  @version Mix.Project.config()[:version]
   @requirements ["app.new"]
 
   @impl Mix.Task
@@ -81,16 +80,10 @@ defmodule Mix.Tasks.Rephi.New do
     File.cd!(base_path, fn ->
       Mix.shell().info("* creating new Rephi application #{app}")
       
-      # Generate Phoenix app
-      Mix.Tasks.Phx.New.run([
-        ".",
-        "--app", app,
-        "--module", module,
-        "--database", opts[:database] || "postgres",
-        "--no-html",
-        "--no-assets",
-        "--no-mailer"
-      ] ++ if opts[:binary_id], do: ["--binary-id"], else: [])
+      # TODO: Generate Phoenix app structure
+      # This would normally call Mix.Tasks.Phx.New but that requires phoenix_new archive
+      # For now, we'll just create the basic structure
+      Mix.shell().info("TODO: Generate Phoenix app structure")
       
       # Copy Rephi-specific files
       copy_rephi_files(module, app)
@@ -171,16 +164,16 @@ defmodule Mix.Tasks.Rephi.New do
     File.write!(target, content)
   end
 
-  defp update_router(module, app) do
+  defp update_router(_module, app) do
     # Add Rephi-specific routes to the router
-    router_path = "lib/#{app}_web/router.ex"
-    # Implementation to inject routes
+    _router_path = "lib/#{app}_web/router.ex"
+    # TODO: Implementation to inject routes
   end
 
-  defp update_mix_exs(app) do
+  defp update_mix_exs(_app) do
     # Add Rephi-specific dependencies
-    mix_path = "mix.exs"
-    # Implementation to add dependencies
+    _mix_path = "mix.exs"
+    # TODO: Implementation to add dependencies
   end
 
   defp generate_frontend_apps do
