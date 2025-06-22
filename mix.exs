@@ -1,9 +1,9 @@
 defmodule Rephi.MixProject do
   use Mix.Project
 
-  @version "0.0.1"
+  @version "0.0.2"
   @source_url "https://github.com/thotenn/rephi"
-  @manteiners ["thotenn"]
+  @maintainers ["thotenn"]
 
   def project do
     [
@@ -20,8 +20,7 @@ defmodule Rephi.MixProject do
       description: description(),
       package: package(),
       docs: docs(),
-      source_url: @source_url,
-      manteiners: @manteiners
+      source_url: @source_url
     ]
   end
 
@@ -159,7 +158,7 @@ defmodule Rephi.MixProject do
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
       },
-      maintainers: ["Your Name"],
+      maintainers: @maintainers,
       files: ~w(lib priv/repo config mix.exs README* LICENSE* CHANGELOG* apps/shared),
       exclude_patterns: ["priv/static/dashboard", "priv/static/admin", "priv/static/ecommerce", "priv/static/landing"]
     ]
