@@ -30,6 +30,8 @@ rephi-*.tar
 mix.lock
 
 .claude/
+CLAUDE.md
+/apps/dashboard/CLAUDE.md
 
 # Environment variables
 .env

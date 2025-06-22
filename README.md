@@ -1,6 +1,6 @@
 # Rephi
 
-Rephi es una aplicación full-stack que combina un backend Phoenix/Elixir con un frontend Remix/React, ofreciendo autenticación JWT y comunicación en tiempo real mediante WebSockets.
+A production-ready Phoenix boilerplate with JWT authentication, RBAC authorization, WebSocket support, and multi-frontend architecture.
 
 ## 🚀 Inicio Rápido
 
@@ -269,41 +269,52 @@ La conexión WebSocket se establece en `ws://localhost:4000/socket` con canales 
 
 **✅ Seguridad**: Las conexiones WebSocket validan el token JWT antes de permitir la conexión. Los tokens inválidos o ausentes son rechazados automáticamente.
 
-## 🧪 Testing
+## Testing
 
-### Backend
 ```bash
+# Run backend tests
 mix test
+
+# Run with coverage
+mix test --cover
 ```
 
-### Frontend
-No hay framework de pruebas configurado actualmente.
+## Deployment
 
-## 📝 Variables de Entorno
+### Building for Production
 
-Las principales variables de entorno incluyen:
+```bash
+# Backend
+MIX_ENV=prod mix compile
+MIX_ENV=prod mix assets.deploy
 
-- `DATABASE_URL`: URL completa de PostgreSQL
-- `SECRET_KEY_BASE`: Clave secreta para Phoenix (mínimo 64 caracteres)
-- `GUARDIAN_SECRET_KEY`: Clave secreta para JWT
-- `PHX_HOST`: Host del servidor Phoenix
-- `PORT`: Puerto del servidor
-- `FRONTEND_URL`: URL del frontend (para CORS)
+# Frontends
+mix frontends.build
+```
 
-Ver `.env.example` para la lista completa.
+### Docker Support
 
-## 🚢 Despliegue
+```bash
+docker build -t rephi .
+docker run -p 4000:4000 rephi
+```
 
-Para producción:
+## Publishing to Hex.pm
 
-1. Configura las variables de entorno apropiadas
-2. Compila los assets del frontend: `npm run build`
-3. Ejecuta las migraciones: `MIX_ENV=prod mix ecto.migrate`
-4. Inicia el servidor: `MIX_ENV=prod mix phx.server`
+1. Update the version in `mix.exs`
+2. Update `CHANGELOG.md` with release notes
+3. Ensure tests pass: `mix test`
+4. Create git tag: `git tag -a v0.1.0 -m "Release v0.1.0"`
+5. Publish: `mix hex.publish`
 
-## 📖 Recursos
+## Contributing
 
-- [Phoenix Framework](https://www.phoenixframework.org/)
-- [Remix Documentation](https://remix.run/docs)
-- [Guardian JWT](https://github.com/ueberauth/guardian)
-- [Phoenix Swagger](https://github.com/xerions/phoenix_swagger)
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

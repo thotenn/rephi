@@ -1,15 +1,27 @@
 defmodule Rephi.MixProject do
   use Mix.Project
 
+  @version "0.0.1"
+  @source_url "https://github.com/thotenn/rephi"
+  @manteiners ["thotenn"]
+
   def project do
     [
       app: :rephi,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+
+      # Hex
+      name: "Rephi",
+      description: description(),
+      package: package(),
+      docs: docs(),
+      source_url: @source_url,
+      manteiners: @manteiners
     ]
   end
 
@@ -134,5 +146,32 @@ defmodule Rephi.MixProject do
     end)
 
     Mix.shell().info("Frontend builds cleaned!")
+  end
+
+  defp description do
+    "Phoenix framework with JWT auth, RBAC authorization, WebSocket support, and multiple React frontends architecture"
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
+      },
+      maintainers: ["Your Name"],
+      files: ~w(lib priv/repo config mix.exs README* LICENSE* CHANGELOG* apps/shared),
+      exclude_patterns: ["priv/static/dashboard", "priv/static/admin", "priv/static/ecommerce", "priv/static/landing"]
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: ["README.md", "CHANGELOG.md"],
+      source_ref: "v#{@version}",
+      source_url: @source_url,
+      formatters: ["html"]
+    ]
   end
 end
