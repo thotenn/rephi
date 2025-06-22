@@ -31,12 +31,13 @@ defmodule RephiWeb.UserSocketTest do
       # Guardian might have a grace period for recently expired tokens,
       # so we accept either :error or a successful connection
       result = connect(UserSocket, %{"token" => token})
-      
+
       case result do
-        :error -> 
+        :error ->
           # Expected behavior - token is rejected
           assert true
-        {:ok, socket} -> 
+
+        {:ok, socket} ->
           # Guardian accepted the token (possibly due to clock skew tolerance)
           # Verify it's the correct user at least
           assert socket.assigns.user_id == user.id

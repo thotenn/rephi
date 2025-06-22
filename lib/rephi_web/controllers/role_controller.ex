@@ -35,11 +35,15 @@ defmodule RephiWeb.RoleController do
 
   action_fallback RephiWeb.FallbackController
 
-  plug AuthorizationPlug, {:permission, "roles:view"} when action in [:index, :show, :get_role_permissions]
+  plug AuthorizationPlug,
+       {:permission, "roles:view"} when action in [:index, :show, :get_role_permissions]
+
   plug AuthorizationPlug, {:permission, "roles:create"} when action in [:create]
   plug AuthorizationPlug, {:permission, "roles:edit"} when action in [:update]
   plug AuthorizationPlug, {:permission, "roles:delete"} when action in [:delete]
-  plug AuthorizationPlug, {:permission, "roles:assign"} when action in [:assign_to_user, :remove_from_user]
+
+  plug AuthorizationPlug,
+       {:permission, "roles:assign"} when action in [:assign_to_user, :remove_from_user]
 
   swagger_path :index do
     get("/api/roles")
@@ -47,7 +51,7 @@ defmodule RephiWeb.RoleController do
     description("Returns a list of all available roles in the system")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     response(200, "Success", Schema.ref(:RolesResponse))
     response(401, "Unauthorized")
     response(403, "Forbidden - requires roles:view permission")
@@ -64,11 +68,11 @@ defmodule RephiWeb.RoleController do
     description("Returns detailed information about a specific role including its permissions")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "Role ID", required: true)
     end
-    
+
     response(200, "Success", Schema.ref(:RoleDetailResponse))
     response(401, "Unauthorized")
     response(403, "Forbidden - requires roles:view permission")
@@ -78,7 +82,7 @@ defmodule RephiWeb.RoleController do
   def show(conn, %{"id" => id}) do
     role = Authorization.get_role!(id)
     permissions = Authorization.get_role_permissions(role)
-    
+
     render(conn, :show, role: role, permissions: permissions)
   end
 
@@ -89,11 +93,11 @@ defmodule RephiWeb.RoleController do
     consumes("application/json")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       role(:body, Schema.ref(:RoleInput), "Role details", required: true)
     end
-    
+
     response(201, "Role created successfully", Schema.ref(:RoleDetailResponse))
     response(400, "Bad request")
     response(401, "Unauthorized")
@@ -117,12 +121,12 @@ defmodule RephiWeb.RoleController do
     consumes("application/json")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "Role ID", required: true)
       role(:body, Schema.ref(:RoleInput), "Updated role details", required: true)
     end
-    
+
     response(200, "Role updated successfully", Schema.ref(:RoleDetailResponse))
     response(400, "Bad request")
     response(401, "Unauthorized")
@@ -146,11 +150,11 @@ defmodule RephiWeb.RoleController do
     description("Deletes a role from the system")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "Role ID", required: true)
     end
-    
+
     response(204, "Role deleted successfully")
     response(401, "Unauthorized")
     response(403, "Forbidden - requires roles:delete permission")
@@ -172,13 +176,13 @@ defmodule RephiWeb.RoleController do
     consumes("application/json")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       user_id(:path, :string, "User ID", required: true)
       role_id(:path, :string, "Role ID", required: true)
       body(:body, Schema.ref(:AssignmentNotes), "Assignment notes", required: false)
     end
-    
+
     response(201, "Role assigned successfully")
     response(401, "Unauthorized")
     response(403, "Forbidden - requires roles:assign permission")
@@ -189,7 +193,7 @@ defmodule RephiWeb.RoleController do
   def assign_to_user(conn, %{"user_id" => user_id, "role_id" => role_id} = params) do
     user = Rephi.Accounts.get_user!(user_id)
     role = Authorization.get_role!(role_id)
-    
+
     opts = %{
       assigned_by: conn.assigns.current_user.id,
       notes: params["notes"]
@@ -206,12 +210,12 @@ defmodule RephiWeb.RoleController do
     description("Removes a role from a specific user")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       user_id(:path, :string, "User ID", required: true)
       role_id(:path, :string, "Role ID", required: true)
     end
-    
+
     response(204, "Role removed successfully")
     response(401, "Unauthorized")
     response(403, "Forbidden - requires roles:assign permission")
@@ -233,11 +237,11 @@ defmodule RephiWeb.RoleController do
     description("Returns a list of permissions assigned to the role")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "Role ID", required: true)
     end
-    
+
     response(200, "Success", Schema.ref(:RolePermissionsResponse))
     response(401, "Unauthorized")
     response(403, "Forbidden - requires roles:view permission")
@@ -247,7 +251,7 @@ defmodule RephiWeb.RoleController do
   def get_role_permissions(conn, %{"id" => id}) do
     role = Authorization.get_role!(id)
     permissions = Authorization.get_role_permissions(role)
-    
+
     render(conn, :permissions, permissions: permissions)
   end
 
@@ -263,7 +267,11 @@ defmodule RephiWeb.RoleController do
           name: %{type: :string, description: "Role display name"},
           slug: %{type: :string, description: "Role slug (unique identifier)"},
           description: %{type: :string, description: "Role description"},
-          parent_id: %{type: :integer, description: "Parent role ID for hierarchy", nullable: true},
+          parent_id: %{
+            type: :integer,
+            description: "Parent role ID for hierarchy",
+            nullable: true
+          },
           inserted_at: %{type: :string, format: :datetime, description: "Creation timestamp"},
           updated_at: %{type: :string, format: :datetime, description: "Last update timestamp"}
         },
@@ -286,7 +294,11 @@ defmodule RephiWeb.RoleController do
           name: %{type: :string, description: "Role display name"},
           slug: %{type: :string, description: "Role slug (unique identifier)"},
           description: %{type: :string, description: "Role description"},
-          parent_id: %{type: :integer, description: "Parent role ID for hierarchy", nullable: true}
+          parent_id: %{
+            type: :integer,
+            description: "Parent role ID for hierarchy",
+            nullable: true
+          }
         },
         required: [:name, :slug],
         example: %{
@@ -381,5 +393,4 @@ defmodule RephiWeb.RoleController do
       }
     }
   end
-
 end

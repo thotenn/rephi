@@ -20,6 +20,8 @@ defmodule Rephi.Accounts.UserPermission do
     |> validate_required([:user_id, :permission_id])
     |> foreign_key_constraint(:user_id)
     |> foreign_key_constraint(:permission_id)
-    |> unique_constraint([:user_id, :permission_id], name: :user_permissions_user_id_permission_id_index)
+    |> unique_constraint([:user_id, :permission_id],
+      name: :user_permissions_user_id_permission_id_index
+    )
   end
 end

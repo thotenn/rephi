@@ -65,10 +65,38 @@ defmodule Rephi.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup"],
+      setup: ["deps.get", "ecto.setup", "frontends.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      "frontends.build": &build_frontends/1,
+      "frontends.clean": &clean_frontends/1
     ]
+  end
+
+  defp build_frontends(_) do
+    if File.exists?("build_frontends.sh") do
+      Mix.shell().info("Building frontend applications...")
+
+      {_output, exit_code} =
+        System.cmd("bash", ["build_frontends.sh"],
+          stderr_to_stdout: true,
+          into: IO.stream(:stdio, :line)
+        )
+
+      if exit_code != 0 do
+        Mix.raise("Frontend build failed with exit code #{exit_code}")
+      end
+    else
+      Mix.shell().info("No build_frontends.sh found, skipping frontend build")
+    end
+  end
+
+  defp clean_frontends(_) do
+    Mix.shell().info("Cleaning frontend builds...")
+    File.rm_rf("priv/static/dashboard")
+    File.rm_rf("priv/static/admin")
+    File.rm_rf("priv/static/ecommerce")
+    File.rm_rf("priv/static/landing")
   end
 end

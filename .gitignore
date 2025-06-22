@@ -35,3 +35,22 @@ mix.lock
 .env
 .env.local
 .env.*.local
+
+# Frontend builds
+/priv/static/dashboard/
+/priv/static/admin/
+/priv/static/ecommerce/
+/priv/static/landing/
+
+# Frontend node_modules and build artifacts
+/apps/*/node_modules/
+/apps/*/dist/
+/apps/*/.vite/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store

@@ -12,7 +12,9 @@ defmodule RephiWeb.PermissionController do
   plug AuthorizationPlug, {:permission, "permissions:create"} when action in [:create]
   plug AuthorizationPlug, {:permission, "permissions:edit"} when action in [:update]
   plug AuthorizationPlug, {:permission, "permissions:delete"} when action in [:delete]
-  plug AuthorizationPlug, {:permission, "permissions:assign"} when action in [:assign_to_role, :remove_from_role]
+
+  plug AuthorizationPlug,
+       {:permission, "permissions:assign"} when action in [:assign_to_role, :remove_from_role]
 
   swagger_path :index do
     get("/api/permissions")
@@ -20,7 +22,7 @@ defmodule RephiWeb.PermissionController do
     description("Returns a list of all available permissions in the system")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     response(200, "Success", Schema.ref(:PermissionsResponse))
     response(401, "Unauthorized")
     response(403, "Forbidden - requires permissions:view permission")
@@ -37,11 +39,11 @@ defmodule RephiWeb.PermissionController do
     description("Returns detailed information about a specific permission")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "Permission ID", required: true)
     end
-    
+
     response(200, "Success", Schema.ref(:PermissionResponse))
     response(401, "Unauthorized")
     response(403, "Forbidden - requires permissions:view permission")
@@ -60,11 +62,11 @@ defmodule RephiWeb.PermissionController do
     consumes("application/json")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       permission(:body, Schema.ref(:PermissionInput), "Permission details", required: true)
     end
-    
+
     response(201, "Permission created successfully", Schema.ref(:PermissionResponse))
     response(400, "Bad request")
     response(401, "Unauthorized")
@@ -88,12 +90,15 @@ defmodule RephiWeb.PermissionController do
     consumes("application/json")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "Permission ID", required: true)
-      permission(:body, Schema.ref(:PermissionInput), "Updated permission details", required: true)
+
+      permission(:body, Schema.ref(:PermissionInput), "Updated permission details",
+        required: true
+      )
     end
-    
+
     response(200, "Permission updated successfully", Schema.ref(:PermissionResponse))
     response(400, "Bad request")
     response(401, "Unauthorized")
@@ -105,7 +110,8 @@ defmodule RephiWeb.PermissionController do
   def update(conn, %{"id" => id, "permission" => permission_params}) do
     permission = Authorization.get_permission!(id)
 
-    with {:ok, %Permission{} = permission} <- Authorization.update_permission(permission, permission_params) do
+    with {:ok, %Permission{} = permission} <-
+           Authorization.update_permission(permission, permission_params) do
       render(conn, :show, permission: permission)
     end
   end
@@ -116,11 +122,11 @@ defmodule RephiWeb.PermissionController do
     description("Deletes a permission from the system")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "Permission ID", required: true)
     end
-    
+
     response(204, "Permission deleted successfully")
     response(401, "Unauthorized")
     response(403, "Forbidden - requires permissions:delete permission")
@@ -142,13 +148,13 @@ defmodule RephiWeb.PermissionController do
     consumes("application/json")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       role_id(:path, :string, "Role ID", required: true)
       permission_id(:path, :string, "Permission ID", required: true)
       body(:body, Schema.ref(:AssignmentNotes), "Assignment notes", required: false)
     end
-    
+
     response(201, "Permission assigned successfully")
     response(401, "Unauthorized")
     response(403, "Forbidden - requires permissions:assign permission")
@@ -159,7 +165,7 @@ defmodule RephiWeb.PermissionController do
   def assign_to_role(conn, %{"role_id" => role_id, "permission_id" => permission_id} = params) do
     role = Authorization.get_role!(role_id)
     permission = Authorization.get_permission!(permission_id)
-    
+
     opts = %{
       assigned_by: conn.assigns.current_user.id,
       notes: params["notes"]
@@ -176,12 +182,12 @@ defmodule RephiWeb.PermissionController do
     description("Removes a permission from a specific role")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       role_id(:path, :string, "Role ID", required: true)
       permission_id(:path, :string, "Permission ID", required: true)
     end
-    
+
     response(204, "Permission removed successfully")
     response(401, "Unauthorized")
     response(403, "Forbidden - requires permissions:assign permission")
@@ -279,5 +285,4 @@ defmodule RephiWeb.PermissionController do
       }
     }
   end
-
 end

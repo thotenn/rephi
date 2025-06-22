@@ -34,10 +34,14 @@ defmodule RephiWeb.UserController do
   swagger_path :index do
     get("/api/users")
     summary("List all users")
-    description("Returns a list of all users in the system with their roles and permissions. Requires admin role.")
+
+    description(
+      "Returns a list of all users in the system with their roles and permissions. Requires admin role."
+    )
+
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     response(200, "Success", Schema.ref(:UsersResponse))
     response(401, "Unauthorized - No authentication token")
     response(403, "Forbidden - User lacks admin role")
@@ -60,11 +64,11 @@ defmodule RephiWeb.UserController do
     description("Returns detailed information about a specific user. Requires admin role.")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "User ID", required: true)
     end
-    
+
     response(200, "Success", Schema.ref(:UserResponse))
     response(401, "Unauthorized - No authentication token")
     response(403, "Forbidden - User lacks admin role")
@@ -75,6 +79,7 @@ defmodule RephiWeb.UserController do
     case Accounts.get_user(id) do
       nil ->
         {:error, :not_found}
+
       user ->
         render(conn, :show, user: user)
     end
@@ -92,12 +97,12 @@ defmodule RephiWeb.UserController do
     produces("application/json")
     consumes("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "User ID", required: true)
       user(:body, Schema.ref(:UpdateUserRequest), "User attributes to update", required: true)
     end
-    
+
     response(200, "Success", Schema.ref(:UserResponse))
     response(401, "Unauthorized - No authentication token")
     response(403, "Forbidden - User lacks admin role")
@@ -109,10 +114,12 @@ defmodule RephiWeb.UserController do
     case Accounts.get_user(id) do
       nil ->
         {:error, :not_found}
+
       user ->
         case Accounts.update_user(user, params) do
           {:ok, updated_user} ->
             render(conn, :show, user: updated_user)
+
           {:error, changeset} ->
             {:error, changeset}
         end
@@ -130,11 +137,11 @@ defmodule RephiWeb.UserController do
     description("Permanently removes a user from the system. Requires admin role.")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "User ID", required: true)
     end
-    
+
     response(204, "No Content - User deleted successfully")
     response(401, "Unauthorized - No authentication token")
     response(403, "Forbidden - User lacks admin role")
@@ -145,10 +152,12 @@ defmodule RephiWeb.UserController do
     case Accounts.get_user(id) do
       nil ->
         {:error, :not_found}
+
       user ->
         case Accounts.delete_user(user) do
           {:ok, _user} ->
             send_resp(conn, :no_content, "")
+
           {:error, changeset} ->
             {:error, changeset}
         end
@@ -166,11 +175,11 @@ defmodule RephiWeb.UserController do
     description("Returns a list of roles assigned to the user. Requires admin role.")
     produces("application/json")
     security([%{Bearer: []}])
-    
+
     parameters do
       id(:path, :string, "User ID", required: true)
     end
-    
+
     response(200, "Success", Schema.ref(:UserRolesResponse))
     response(401, "Unauthorized - No authentication token")
     response(403, "Forbidden - User lacks admin role")
@@ -181,6 +190,7 @@ defmodule RephiWeb.UserController do
     case Accounts.get_user(id) do
       nil ->
         {:error, :not_found}
+
       user ->
         roles = Rephi.Authorization.get_user_roles(user)
         render(conn, :roles, roles: roles)

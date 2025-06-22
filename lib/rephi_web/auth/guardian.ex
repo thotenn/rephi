@@ -77,7 +77,7 @@ defmodule RephiWeb.Auth.Guardian do
     roles = Authorization.get_user_roles(resource)
     permissions = Authorization.get_user_permissions(resource)
 
-    claims = 
+    claims =
       claims
       |> Map.put("roles", Enum.map(roles, & &1.slug))
       |> Map.put("permissions", Enum.map(permissions, & &1.slug))

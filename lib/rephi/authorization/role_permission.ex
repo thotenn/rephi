@@ -19,6 +19,8 @@ defmodule Rephi.Authorization.RolePermission do
     |> validate_required([:role_id, :permission_id])
     |> foreign_key_constraint(:role_id)
     |> foreign_key_constraint(:permission_id)
-    |> unique_constraint([:role_id, :permission_id], name: :role_permissions_role_id_permission_id_index)
+    |> unique_constraint([:role_id, :permission_id],
+      name: :role_permissions_role_id_permission_id_index
+    )
   end
 end

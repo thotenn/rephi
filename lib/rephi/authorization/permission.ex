@@ -94,7 +94,9 @@ defmodule Rephi.Authorization.Permission do
     |> cast(attrs, [:name, :slug, :description, :parent_id])
     |> validate_required([:name, :slug])
     |> unique_constraint(:slug)
-    |> validate_format(:slug, ~r/^[a-z0-9:_-]+$/, message: "must contain only lowercase letters, numbers, colons, underscores and hyphens")
+    |> validate_format(:slug, ~r/^[a-z0-9:_-]+$/,
+      message: "must contain only lowercase letters, numbers, colons, underscores and hyphens"
+    )
     |> foreign_key_constraint(:parent_id)
   end
 end

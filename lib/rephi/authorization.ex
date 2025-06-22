@@ -600,8 +600,9 @@ defmodule Rephi.Authorization do
   end
 
   def has_role?(%User{} = user, %Role{} = role) do
-    query = from ur in UserRole,
-      where: ur.user_id == ^user.id and ur.role_id == ^role.id
+    query =
+      from ur in UserRole,
+        where: ur.user_id == ^user.id and ur.role_id == ^role.id
 
     Repo.exists?(query)
   end
@@ -647,8 +648,9 @@ defmodule Rephi.Authorization do
   # Private Helper Functions
 
   defp has_direct_permission?(%User{} = user, %Permission{} = permission) do
-    query = from up in UserPermission,
-      where: up.user_id == ^user.id and up.permission_id == ^permission.id
+    query =
+      from up in UserPermission,
+        where: up.user_id == ^user.id and up.permission_id == ^permission.id
 
     Repo.exists?(query)
   end
@@ -658,15 +660,16 @@ defmodule Rephi.Authorization do
 
     Enum.any?(user_roles, fn role ->
       role_permissions = get_role_permissions(role)
-      Enum.any?(role_permissions, & &1.id == permission.id)
+      Enum.any?(role_permissions, &(&1.id == permission.id))
     end)
   end
 
   defp get_direct_user_permissions(%User{} = user) do
-    query = from p in Permission,
-      join: up in UserPermission,
-      on: up.permission_id == p.id,
-      where: up.user_id == ^user.id
+    query =
+      from p in Permission,
+        join: up in UserPermission,
+        on: up.permission_id == p.id,
+        where: up.user_id == ^user.id
 
     Repo.all(query)
   end
@@ -688,15 +691,17 @@ defmodule Rephi.Authorization do
   end
 
   defp get_parent_roles(%Role{} = role) do
-    query = from r in Role,
-      join: rr in RoleRole,
-      on: rr.parent_role_id == r.id,
-      where: rr.child_role_id == ^role.id
+    query =
+      from r in Role,
+        join: rr in RoleRole,
+        on: rr.parent_role_id == r.id,
+        where: rr.child_role_id == ^role.id
 
     parent_roles = Repo.all(query)
 
     # Recursively get parent roles of parent roles
-    grandparent_roles = parent_roles
+    grandparent_roles =
+      parent_roles
       |> Enum.flat_map(&get_parent_roles/1)
 
     (parent_roles ++ grandparent_roles)
@@ -773,7 +778,7 @@ defmodule Rephi.Authorization do
   """
   def role_has_permission?(%Role{} = role, %Permission{} = permission) do
     permissions = get_role_permissions(role)
-    Enum.any?(permissions, & &1.id == permission.id)
+    Enum.any?(permissions, &(&1.id == permission.id))
   end
 
   def role_has_permission?(%Role{} = role, permission_slug) when is_binary(permission_slug) do

@@ -29,6 +29,27 @@ defmodule RephiWeb.Endpoint do
     gzip: false,
     only: RephiWeb.static_paths()
 
+  # Serve static files for each app
+  plug Plug.Static,
+    at: "/dashboard",
+    from: {:rephi, "priv/static/dashboard"},
+    gzip: false
+
+  plug Plug.Static,
+    at: "/admin",
+    from: {:rephi, "priv/static/admin"},
+    gzip: false
+
+  plug Plug.Static,
+    at: "/ecommerce",
+    from: {:rephi, "priv/static/ecommerce"},
+    gzip: false
+
+  plug Plug.Static,
+    at: "/landing",
+    from: {:rephi, "priv/static/landing"},
+    gzip: false
+
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do

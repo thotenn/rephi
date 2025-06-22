@@ -13,6 +13,7 @@ defmodule RephiWeb.Auth.Pipeline do
     case Guardian.Plug.current_resource(conn) do
       nil ->
         conn
+
       user ->
         Plug.Conn.assign(conn, :current_user, user)
     end

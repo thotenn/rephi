@@ -6,6 +6,14 @@ defmodule RephiWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_flash
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
   pipeline :authenticated do
     plug RephiWeb.Auth.Pipeline
     plug Guardian.Plug.EnsureAuthenticated
@@ -53,6 +61,23 @@ defmodule RephiWeb.Router do
     get "/swagger.json", RephiWeb.SwaggerController, :index
   end
 
+  # SPA routes
+  scope "/", RephiWeb do
+    pipe_through :browser
+
+    get "/dashboard", AppController, :serve_app, app: "dashboard"
+    get "/dashboard/*path", AppController, :serve_app, app: "dashboard"
+
+    get "/admin", AppController, :serve_app, app: "admin"
+    get "/admin/*path", AppController, :serve_app, app: "admin"
+
+    get "/ecommerce", AppController, :serve_app, app: "ecommerce"
+    get "/ecommerce/*path", AppController, :serve_app, app: "ecommerce"
+
+    get "/", AppController, :serve_app, app: "landing"
+    get "/*path", AppController, :serve_app, app: "landing"
+  end
+
   def swagger_info do
     %{
       info: %{
@@ -87,7 +112,7 @@ defmodule RephiWeb.Router do
     scope "/dev" do
       pipe_through [:fetch_session, :protect_from_forgery]
 
-      live_dashboard "/dashboard", metrics: RephiWeb.Telemetry
+      live_dashboard "/metrics", metrics: RephiWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
   end

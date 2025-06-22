@@ -54,7 +54,7 @@ defmodule RephiWeb.Auth.AuthorizationHelpers do
     * `permission_slug` - The permission slug to check (e.g., "users:edit")
 
   ## Examples
-  
+
       # In a controller action
       if can?(conn, "users:edit") do
         # User can edit users
@@ -89,7 +89,7 @@ defmodule RephiWeb.Auth.AuthorizationHelpers do
     * `role_slug` - The role slug to check (e.g., "admin", "manager")
 
   ## Examples
-  
+
       # In a controller action
       if has_role?(conn, "admin") do
         # User is an admin
@@ -162,9 +162,9 @@ defmodule RephiWeb.Auth.AuthorizationHelpers do
 
   @doc """
   Authorize action with flexible options.
-  
+
   ## Examples
-  
+
       authorize(conn, permission: "users:edit")
       authorize(conn, role: "admin")
       authorize(conn, any_permission: ["users:edit", "users:create"])
@@ -173,16 +173,16 @@ defmodule RephiWeb.Auth.AuthorizationHelpers do
     cond do
       opts[:permission] ->
         can?(conn, opts[:permission])
-      
+
       opts[:role] ->
         has_role?(conn, opts[:role])
-      
+
       opts[:any_permission] ->
         can_any?(conn, opts[:any_permission])
-      
+
       opts[:all_permissions] ->
         can_all?(conn, opts[:all_permissions])
-      
+
       true ->
         false
     end
