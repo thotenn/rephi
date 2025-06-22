@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import Layout from "~/components/bedrock/Layout";
 import { rolesApi, permissionsApi } from "~/modules/api/admin";
 import type { Role, Permission } from "~/types/admin.types";
-import { Modal } from "~/components/commons";
+import RolesTable from "./RolesTable";
+import CreateEditRoleModal from "./CreateEditRoleModal";
+import RolePermissionsModal from "./RolePermissionsModal";
 
 export default function RolesManagement() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -138,6 +140,13 @@ export default function RolesManagement() {
     });
   };
 
+  const handleFormDataChange = (field: string, value: string) => {
+    setFormData({
+      ...formData,
+      [field]: value,
+    });
+  };
+
   if (loading) {
     return <div className="flex justify-center p-8">Loading...</div>;
   }
@@ -161,230 +170,32 @@ export default function RolesManagement() {
           </div>
         )}
 
-        {/* Create/Edit Form */}
-        <Modal
+        <CreateEditRoleModal
           isOpen={showCreateForm}
+          editingRole={editingRole}
+          formData={formData}
           onClose={resetForm}
-          title={editingRole ? "Edit Role" : "Create Role"}
-        >
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label
-                htmlFor="role-name"
-                className="block text-sm font-medium mb-2"
-              >
-                Name
-              </label>
-              <input
-                id="role-name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                required
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="role-slug"
-                className="block text-sm font-medium mb-2"
-              >
-                Slug
-              </label>
-              <input
-                id="role-slug"
-                type="text"
-                value={formData.slug}
-                onChange={(e) =>
-                  setFormData({ ...formData, slug: e.target.value })
-                }
-                className="w-full border rounded px-3 py-2"
-                required
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="role-description"
-                className="block text-sm font-medium mb-2"
-              >
-                Description
-              </label>
-              <textarea
-                id="role-description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    description: e.target.value,
-                  })
-                }
-                className="w-full border rounded px-3 py-2"
-                rows={3}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2 border rounded hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                {editingRole ? "Update" : "Create"}
-              </button>
-            </div>
-          </form>
-        </Modal>
+          onSubmit={handleSubmit}
+          onNameChange={handleNameChange}
+          onFormDataChange={handleFormDataChange}
+        />
 
-        {/* Roles Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Slug
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Description
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {roles && roles.length > 0 ? (
-                roles.map((role) => (
-                  <tr key={role.id}>
-                    <td className="px-6 py-4 whitespace-nowrap font-medium">
-                      {role.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                      {role.slug}
-                    </td>
-                    <td className="px-6 py-4 text-gray-500">
-                      {role.description || "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => handleViewPermissions(role)}
-                        className="text-blue-600 hover:text-blue-800 mr-3"
-                      >
-                        Permissions
-                      </button>
-                      <button
-                        onClick={() => handleEdit(role)}
-                        className="text-indigo-600 hover:text-indigo-800 mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(role.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-6 py-4 text-center text-gray-500"
-                  >
-                    {loading ? "Loading roles..." : "No roles found"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <RolesTable
+          roles={roles}
+          loading={loading}
+          onViewPermissions={handleViewPermissions}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
 
-        {/* Role Permissions Modal */}
-        <Modal
-          isOpen={!!selectedRole}
+        <RolePermissionsModal
+          selectedRole={selectedRole}
+          rolePermissions={rolePermissions}
+          permissions={permissions}
           onClose={() => setSelectedRole(null)}
-          title={selectedRole ? `Permissions for ${selectedRole.name}` : undefined}
-          className="max-w-4xl max-h-[80vh] overflow-y-auto"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Assigned Permissions */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">
-                Assigned Permissions
-              </h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {(rolePermissions || []).map((permission) => (
-                  <div
-                    key={permission.id}
-                    className="flex justify-between items-center p-2 bg-green-50 rounded"
-                  >
-                    <div>
-                      <span className="font-medium">{permission.name}</span>
-                      <span className="text-sm text-gray-500 ml-2">
-                        ({permission.slug})
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleRemovePermission(permission.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                {(!rolePermissions || rolePermissions.length === 0) && (
-                  <p className="text-gray-500">No permissions assigned</p>
-                )}
-              </div>
-            </div>
-
-            {/* Available Permissions */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">
-                Available Permissions
-              </h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {(permissions || [])
-                  .filter(
-                    (p) =>
-                      !(rolePermissions || []).some((rp) => rp.id === p.id)
-                  )
-                  .map((permission) => (
-                    <div
-                      key={permission.id}
-                      className="flex justify-between items-center p-2 bg-gray-50 rounded"
-                    >
-                      <div>
-                        <span className="font-medium">
-                          {permission.name}
-                        </span>
-                        <span className="text-sm text-gray-500 ml-2">
-                          ({permission.slug})
-                        </span>
-                      </div>
-                      <button
-                        onClick={() =>
-                          handleAssignPermission(permission.id)
-                        }
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        Assign
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        </Modal>
+          onAssignPermission={handleAssignPermission}
+          onRemovePermission={handleRemovePermission}
+        />
       </div>
     </Layout>
   );
