@@ -2,272 +2,322 @@
 
 A production-ready Phoenix boilerplate with JWT authentication, RBAC authorization, WebSocket support, and multi-frontend architecture.
 
-## 🚀 Inicio Rápido
+## 🚀 Quick Start
 
-### Prerrequisitos
+### Create a new project using Rephi
 
-- **Elixir** 1.14 o superior
-- **Erlang** 24 o superior
-- **PostgreSQL** 12 o superior
-- **Node.js** 18 o superior
-- **npm** o **yarn**
-
-### 📥 Instalación Inicial
-
-1. **Clonar el repositorio**
+1. **Install the Rephi project generator**
    ```bash
-   git clone <repository-url>
+   mix archive.install hex rephi_new
+   ```
+
+2. **Create your new project**
+   ```bash
+   mix rephi.new my_app
+   cd my_app
+   ```
+
+3. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your database credentials and configuration
+   ```
+
+4. **Setup and run**
+   ```bash
+   mix setup
+   mix phx.server
+   ```
+
+   Visit [`localhost:4000`](http://localhost:4000) from your browser.
+
+### Prerequisites
+
+- **Elixir** 1.14 or higher
+- **Erlang** 24 or higher
+- **PostgreSQL** 12 or higher
+- **Node.js** 18 or higher
+- **npm** or **yarn**
+
+## Features
+
+- **🔐 JWT Authentication**: Secure token-based authentication system
+- **👮 RBAC Authorization**: Complete Role-Based Access Control with hierarchical permissions
+- **🔌 WebSocket Support**: Real-time communication via Phoenix Channels
+- **⚛️ Multi-Frontend Architecture**: Support for multiple React SPAs (dashboard, admin, e-commerce, landing)
+- **📚 API Documentation**: Auto-generated Swagger/OpenAPI documentation
+- **🏗️ Production Ready**: Configured for scalability and best practices
+- **🛡️ CSRF Protection**: Built-in CSRF token injection for SPAs
+
+### Manual Setup (for development)
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/thotenn/rephi.git
    cd rephi
    ```
 
-2. **Configurar variables de entorno**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edita el archivo `.env` con tus configuraciones:
-   - Credenciales de base de datos
-   - Claves secretas (genera nuevas con `mix phx.gen.secret`)
-   - Configuración de puertos y hosts
-
-### 🔧 Configuración del Backend
-
-1. **Instalar dependencias**
+2. **Install dependencies**
    ```bash
    mix deps.get
    ```
 
-2. **Configurar la base de datos**
+3. **Configure database**
    ```bash
    mix ecto.create
    mix ecto.migrate
    ```
 
-   O usar el comando de setup completo:
+   Or use the complete setup command:
    ```bash
    mix setup
    ```
 
-3. **Iniciar el servidor Phoenix**
+4. **Start Phoenix server**
    ```bash
    mix phx.server
    ```
    
-   O con shell interactivo:
+   Or with interactive shell:
    ```bash
    iex -S mix phx.server
    ```
 
-   El backend estará disponible en `http://localhost:4000`
+   Backend will be available at `http://localhost:4000`
 
-### 💻 Configuración del Frontend
+## Frontend Development
 
-1. **Navegar al directorio del frontend**
-   ```bash
-   cd front/rephi-front
-   ```
+Each frontend app is a standalone React application:
 
-2. **Instalar dependencias**
-   ```bash
-   npm install
-   ```
+```bash
+cd apps/dashboard
+npm install
+npm run dev
+```
 
-3. **Iniciar el servidor de desarrollo**
-   ```bash
-   npm run dev
-   ```
+### Building Frontends
 
-   El frontend estará disponible en `http://localhost:5173` (o el puerto configurado)
+```bash
+# Build all frontends
+mix frontends.build
 
-## 📚 API Documentation
+# Clean frontend builds
+mix frontends.clean
+```
 
-La documentación interactiva de la API está disponible mediante Swagger:
+## Architecture
+
+### Backend Structure
+```
+lib/
+├── rephi/              # Core business logic
+│   ├── accounts/       # User management
+│   └── authorization/  # RBAC system
+├── rephi_web/          # Web layer
+│   ├── controllers/    # API controllers
+│   ├── auth/          # Authentication plugs
+│   └── channels/      # WebSocket channels
+```
+
+### Frontend Structure
+```
+apps/
+├── shared/            # Shared React components
+├── dashboard/         # Dashboard SPA
+├── admin/            # Admin panel SPA
+├── ecommerce/        # E-commerce SPA
+└── landing/          # Landing page SPA
+```
+
+## API Documentation
+
+Interactive API documentation is available via Swagger:
 
 - **Swagger UI**: `http://localhost:4000/api/swagger`
 - **Swagger JSON**: `http://localhost:4000/api/swagger/swagger.json`
 
-Para regenerar la documentación después de cambios:
+To regenerate documentation after changes:
 ```bash
 mix phx.swagger.generate
 ```
 
-## 🛠️ Comandos Útiles
+## Useful Commands
 
 ### Backend
 ```bash
-# Ejecutar pruebas
+# Run tests
 mix test
 
-# Formatear código
+# Format code
 mix format
 
-# Limpiar y reconstruir
+# Clean and rebuild
 mix clean && mix compile
 
-# Resetear base de datos
+# Reset database
 mix ecto.reset
 
-# Generar documentación Swagger
+# Generate Swagger documentation
 mix phx.swagger.generate
 ```
 
 ### Frontend
 ```bash
-# Construir para producción
+# Build for production
 npm run build
 
-# Ejecutar linter
+# Run linter
 npm run lint
 
-# Verificar tipos TypeScript
+# Check TypeScript types
 npm run typecheck
 
-# Iniciar servidor de producción
+# Start production server
 npm start
 ```
 
-## 🏗️ Arquitectura
+## Technology Stack
 
 ### Backend (Phoenix/Elixir)
-- **API REST** bajo `/api/*`
-- **Autenticación JWT** con Guardian
-- **WebSockets** con Phoenix Channels
-- **Base de datos** PostgreSQL con Ecto
-- **Documentación** automática con Phoenix Swagger
+- **REST API** under `/api/*`
+- **JWT Authentication** with Guardian
+- **WebSockets** with Phoenix Channels
+- **Database** PostgreSQL with Ecto
+- **Documentation** automatic with Phoenix Swagger
 
-### Frontend (Remix/React)
-- **SPA Mode** sin SSR
-- **Estado Global** con Zustand (persistido)
-- **Formularios** con React Hook Form + Zod
-- **Estilos** con Tailwind CSS v4
-- **Cliente API** con Axios
+### Frontend (React)
+- **SPA Mode** without SSR
+- **Global State** with Zustand (persisted)
+- **Forms** with React Hook Form + Zod
+- **Styling** with Tailwind CSS v4
+- **API Client** with Axios
 
-## 🔐 Autenticación y Autorización
+## Authorization System
 
-### Autenticación JWT
-1. Los usuarios se registran/autentican en `/api/users/register` o `/api/users/login`
-2. El JWT se almacena en Zustand y localStorage
-3. Axios interceptor añade automáticamente el header `Authorization: Bearer {token}`
-4. Los endpoints protegidos requieren autenticación válida
+### JWT Authentication
+1. Users register/authenticate at `/api/users/register` or `/api/users/login`
+2. JWT is stored in Zustand and localStorage
+3. Axios interceptor automatically adds `Authorization: Bearer {token}` header
+4. Protected endpoints require valid authentication
 
-### Sistema de Roles y Permisos (RBAC)
+### Role-Based Access Control (RBAC)
 
-Rephi incluye un sistema completo de control de acceso basado en roles (RBAC) con las siguientes características:
+Rephi includes a complete role-based access control (RBAC) system with the following features:
 
-#### 🎭 Roles y Jerarquías
-- **Roles jerárquicos**: Los roles pueden heredar permisos de otros roles
-- **Roles por defecto**: 
-  - `admin` → hereda de `manager`
-  - `manager` → hereda de `user`
-  - `user` → acceso básico
+#### Roles and Hierarchies
+- **Hierarchical roles**: Roles can inherit permissions from other roles
+- **Default roles**: 
+  - `admin` → inherits from `manager`
+  - `manager` → inherits from `user`
+  - `user` → basic access
 
-#### 🔑 Permisos Granulares
-Los permisos están organizados por categorías:
+#### Granular Permissions
+Permissions are organized by categories:
 
-- **users:** - Gestión de usuarios (`users:view`, `users:create`, `users:edit`, `users:delete`)
-- **roles:** - Gestión de roles (`roles:view`, `roles:create`, `roles:edit`, `roles:delete`, `roles:assign`)
-- **permissions:** - Gestión de permisos (`permissions:view`, `permissions:create`, etc.)
-- **system:** - Configuración del sistema (`system:settings`, `system:logs`, `system:manage`)
+- **users:** - User management (`users:view`, `users:create`, `users:edit`, `users:delete`)
+- **roles:** - Role management (`roles:view`, `roles:create`, `roles:edit`, `roles:delete`, `roles:assign`)
+- **permissions:** - Permission management (`permissions:view`, `permissions:create`, etc.)
+- **system:** - System configuration (`system:settings`, `system:logs`, `system:manage`)
 
-#### 🛡️ Verificaciones de Autorización
+#### Authorization Checks
 
-**En Controladores:**
+**In Controllers:**
 ```elixir
-# Proteger acciones individuales
+# Protect individual actions
 plug AuthorizationPlug, {:permission, "users:edit"}
 plug AuthorizationPlug, {:role, "admin"}
 plug AuthorizationPlug, {:any_permission, ["users:create", "users:edit"]}
 plug AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
 
-# Verificaciones manuales
+# Manual checks
 if can?(conn, "users:edit") do
-  # Usuario puede editar usuarios
+  # User can edit users
 end
 
 if has_role?(conn, "admin") do
-  # Usuario tiene rol de admin
+  # User has admin role
 end
 ```
 
-**En el Contexto:**
+**In Context:**
 ```elixir
-# Verificaciones directas
+# Direct checks
 Authorization.can?(user, "users:edit")
 Authorization.has_role?(user, "admin")
 Authorization.role_has_permission?(role, permission)
 
-# Verificaciones flexibles
+# Flexible checks
 Authorization.can_by?(user: user, permission: "system:manage")
 Authorization.can_by?(user: user, role: "admin")
 
-# Obtener datos
+# Get data
 Authorization.get_user_roles(user)
 Authorization.get_user_permissions(user)
 Authorization.get_role_permissions(role)
 ```
 
-#### 📡 API de Roles y Permisos
+#### Roles and Permissions API
 
-**Gestión de Roles:**
+**Role Management:**
 ```bash
-GET    /api/roles              # Listar roles
-POST   /api/roles              # Crear rol
-GET    /api/roles/:id          # Obtener rol específico
-PUT    /api/roles/:id          # Actualizar rol
-DELETE /api/roles/:id          # Eliminar rol
+GET    /api/roles              # List roles
+POST   /api/roles              # Create role
+GET    /api/roles/:id          # Get specific role
+PUT    /api/roles/:id          # Update role
+DELETE /api/roles/:id          # Delete role
 
-# Asignación de roles a usuarios
-POST   /api/users/:user_id/roles/:role_id     # Asignar rol
-DELETE /api/users/:user_id/roles/:role_id     # Quitar rol
+# Role assignment to users
+POST   /api/users/:user_id/roles/:role_id     # Assign role
+DELETE /api/users/:user_id/roles/:role_id     # Remove role
 ```
 
-**Gestión de Permisos:**
+**Permission Management:**
 ```bash
-GET    /api/permissions         # Listar permisos
-POST   /api/permissions         # Crear permiso
-GET    /api/permissions/:id     # Obtener permiso específico
-PUT    /api/permissions/:id     # Actualizar permiso
-DELETE /api/permissions/:id     # Eliminar permiso
+GET    /api/permissions         # List permissions
+POST   /api/permissions         # Create permission
+GET    /api/permissions/:id     # Get specific permission
+PUT    /api/permissions/:id     # Update permission
+DELETE /api/permissions/:id     # Delete permission
 
-# Asignación de permisos a roles
-POST   /api/roles/:role_id/permissions/:perm_id     # Asignar permiso
-DELETE /api/roles/:role_id/permissions/:perm_id     # Quitar permiso
+# Permission assignment to roles
+POST   /api/roles/:role_id/permissions/:perm_id     # Assign permission
+DELETE /api/roles/:role_id/permissions/:perm_id     # Remove permission
 ```
 
-**Información del Usuario Actual:**
+**Current User Information:**
 ```bash
-GET /api/me  # Incluye roles y permisos del usuario autenticado
+GET /api/me  # Includes roles and permissions of authenticated user
 ```
 
-#### 🌱 Datos Semilla
-Al ejecutar `mix ecto.reset` o `mix run priv/repo/seeds.exs`, se crean automáticamente:
+#### Seed Data
+When running `mix ecto.reset` or `mix run priv/repo/seeds.exs`, the following are automatically created:
 
-- **3 roles** con jerarquía (admin → manager → user)
-- **17 permisos** categorizados por funcionalidad
-- **Usuario administrador** (`admin@admin.com` / `password123!!`) con rol admin
+- **3 roles** with hierarchy (admin → manager → user)
+- **17 permissions** categorized by functionality
+- **Administrator user** (`admin@admin.com` / `password123!!`) with admin role
 
-#### 💡 JWT Integrado
-Los tokens JWT incluyen automáticamente:
-- Lista de roles del usuario (`"roles": ["admin", "manager"]`)
-- Lista de permisos efectivos (`"permissions": ["users:view", "users:create", ...]`)
+#### JWT Integration
+JWT tokens automatically include:
+- User roles list (`"roles": ["admin", "manager"]`)
+- Effective permissions list (`"permissions": ["users:view", "users:create", ...]`)
 
-#### 🔧 Helpers de Autorización
-Disponibles en todos los controladores y vistas:
+#### Authorization Helpers
+Available in all controllers and views:
 ```elixir
-can?(conn, "permission:slug")           # ¿Tiene permiso específico?
-has_role?(conn, "role_slug")           # ¿Tiene rol específico?
-can_any?(conn, ["perm1", "perm2"])     # ¿Tiene alguno de estos permisos?
-can_all?(conn, ["perm1", "perm2"])     # ¿Tiene todos estos permisos?
-current_user_roles(conn)               # Roles del usuario actual
-current_user_permissions(conn)         # Permisos del usuario actual
-authorize(conn, permission: "users:edit") # Verificación flexible
+can?(conn, "permission:slug")           # Has specific permission?
+has_role?(conn, "role_slug")           # Has specific role?
+can_any?(conn, ["perm1", "perm2"])     # Has any of these permissions?
+can_all?(conn, ["perm1", "perm2"])     # Has all these permissions?
+current_user_roles(conn)               # Current user roles
+current_user_permissions(conn)         # Current user permissions
+authorize(conn, permission: "users:edit") # Flexible verification
 ```
 
-## 📡 WebSockets
+## WebSockets
 
-La conexión WebSocket se establece en `ws://localhost:4000/socket` con canales específicos por usuario.
+WebSocket connection is established at `ws://localhost:4000/socket` with user-specific channels.
 
-**✅ Seguridad**: Las conexiones WebSocket validan el token JWT antes de permitir la conexión. Los tokens inválidos o ausentes son rechazados automáticamente.
+**✅ Security**: WebSocket connections validate the JWT token before allowing connection. Invalid or missing tokens are automatically rejected.
 
 ## Testing
 
