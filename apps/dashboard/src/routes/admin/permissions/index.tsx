@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import Layout from "~/components/bedrock/Layout";
 import { permissionsApi } from "~/modules/api/admin";
 import type { Permission } from "~/types/admin.types";
-import { Modal } from "~/components/commons";
+import PermissionsTable from "./PermissionsTable";
+import CreateEditPermissionModal from "./CreateEditPermissionModal";
 
 export default function PermissionsManagement() {
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -95,19 +96,18 @@ export default function PermissionsManagement() {
     });
   };
 
+  const handleFormDataChange = (field: string, value: string) => {
+    setFormData({
+      ...formData,
+      [field]: value,
+    });
+  };
+
   const getPermissionCategory = (slug: string) => {
     const [category] = slug.split(":");
     return category;
   };
 
-  const groupedPermissions = (permissions || []).reduce((acc, permission) => {
-    const category = getPermissionCategory(permission.slug);
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push(permission);
-    return acc;
-  }, {} as Record<string, Permission[]>);
 
   if (loading) {
     return <div className="flex justify-center p-8">Loading...</div>;
@@ -132,177 +132,24 @@ export default function PermissionsManagement() {
           </div>
         )}
 
-        {/* Create/Edit Form */}
-        <Modal
+        <CreateEditPermissionModal
           isOpen={showCreateForm}
+          editingPermission={editingPermission}
+          formData={formData}
           onClose={resetForm}
-          title={editingPermission ? "Edit Permission" : "Create Permission"}
-        >
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label
-                htmlFor="permission-name"
-                className="block text-sm font-medium mb-2"
-              >
-                Name
-              </label>
-              <input
-                id="permission-name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                placeholder="e.g., Edit Users"
-                required
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="permission-slug"
-                className="block text-sm font-medium mb-2"
-              >
-                Slug
-              </label>
-              <input
-                id="permission-slug"
-                type="text"
-                value={formData.slug}
-                onChange={(e) =>
-                  setFormData({ ...formData, slug: e.target.value })
-                }
-                className="w-full border rounded px-3 py-2"
-                placeholder="e.g., users:edit"
-                required
-              />
-            </div>
-            <p className="text-sm text-gray-500 mt-1">
-              Use format: category:action (e.g., users:edit, roles:create)
-            </p>
-            <div className="mb-4">
-              <label
-                htmlFor="permission-description"
-                className="block text-sm font-medium mb-2"
-              >
-                Description
-              </label>
-              <textarea
-                id="permission-description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                className="w-full border rounded px-3 py-2"
-                rows={3}
-                placeholder="Describe what this permission allows"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2 border rounded hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                {editingPermission ? "Update" : "Create"}
-              </button>
-            </div>
-          </form>
-        </Modal>
+          onSubmit={handleSubmit}
+          onNameChange={handleNameChange}
+          onFormDataChange={handleFormDataChange}
+        />
 
-        {/* Permissions by Category */}
-        <div className="space-y-6">
-          {Object.entries(groupedPermissions).map(
-            ([category, categoryPermissions]) => (
-              <div
-                key={category}
-                className="bg-white rounded-lg shadow overflow-hidden"
-              >
-                <div className="bg-gray-50 px-6 py-3 border-b">
-                  <h3 className="text-lg font-semibold capitalize">
-                    {category} Permissions
-                  </h3>
-                </div>
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Slug
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Description
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {categoryPermissions && categoryPermissions.length > 0 ? (
-                      categoryPermissions.map((permission) => (
-                        <tr key={permission.id}>
-                          <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-500">
-                            {permission.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <code className="bg-gray-100 px-2 py-1 rounded text-sm text-gray-700">
-                              {permission.slug}
-                            </code>
-                          </td>
-                          <td className="px-6 py-4 text-gray-500">
-                            {permission.description || "-"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <button
-                              onClick={() => handleEdit(permission)}
-                              className="text-indigo-600 hover:text-indigo-800 mr-3"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(permission.id)}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={4}
-                          className="px-6 py-4 text-center text-gray-500"
-                        >
-                          No permissions in this category
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )
-          )}
-        </div>
-
-        {permissions.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No permissions found</p>
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-            >
-              Create First Permission
-            </button>
-          </div>
-        )}
+        <PermissionsTable
+          permissions={permissions}
+          loading={loading}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onCreateFirst={() => setShowCreateForm(true)}
+          getPermissionCategory={getPermissionCategory}
+        />
       </div>
     </Layout>
   );
