@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import Layout from "~/components/bedrock/Layout";
-import { Modal } from "~/components/commons";
 import { usersApi, rolesApi } from "~/modules/api/admin";
 import type { UserWithAuth, Role } from "~/types/admin.types";
+import UsersTable from "./UsersTable";
+import UserRolesModal from "./UserRolesModal";
 
 export default function UsersManagement() {
   const [users, setUsers] = useState<UserWithAuth[]>([]);
@@ -106,203 +107,23 @@ export default function UsersManagement() {
           </div>
         )}
 
-        {/* Users Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Current Roles
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Permissions Count
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Joined
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {(users || []).map((user) => (
-                <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {user.email}
-                      </div>
-                      <div className="text-sm text-gray-500">ID: {user.id}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles && user.roles.length > 0 ? (
-                        (user.roles || []).map((role) => (
-                          <span
-                            key={role.id}
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(
-                              role.slug
-                            )}`}
-                          >
-                            {role.name}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-400 text-sm">No roles</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.permissions ? user.permissions.length : 0}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(user.inserted_at)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleViewUserRoles(user)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      Manage Roles
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <UsersTable
+          users={users}
+          loading={loading}
+          onViewUserRoles={handleViewUserRoles}
+          formatDate={formatDate}
+          getRoleColor={getRoleColor}
+        />
 
-        {users.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No users found</p>
-          </div>
-        )}
-
-        {/* User Roles Management Modal */}
-        <Modal
-          isOpen={!!selectedUser}
+        <UserRolesModal
+          selectedUser={selectedUser}
+          userRoles={userRoles}
+          roles={roles}
           onClose={() => setSelectedUser(null)}
-          title={selectedUser ? `Manage Roles for ${selectedUser.email}` : ''}
-        >
-          {selectedUser && (
-            <div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Assigned Roles */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 text-gray-500">Current Roles</h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {(userRoles || []).map((role) => (
-                      <div
-                        key={role.id}
-                        className="flex justify-between items-center p-3 bg-green-50 rounded border"
-                      >
-                        <div>
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(
-                              role.slug
-                            )}`}
-                          >
-                            {role.name}
-                          </span>
-                          <div className="text-sm text-gray-500 mt-1">
-                            {role.description || role.slug}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveRole(role.id)}
-                          className="text-red-600 hover:text-red-800 text-sm font-medium"
-                          disabled={
-                            role.slug === "admin" && userRoles.length === 1
-                          }
-                          title={
-                            role.slug === "admin" && userRoles.length === 1
-                              ? "Cannot remove the last admin role"
-                              : "Remove role"
-                          }
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                    {(!userRoles || userRoles.length === 0) && (
-                      <p className="text-gray-500">No roles assigned</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Available Roles */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 text-gray-500">
-                    Available Roles
-                  </h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {(roles || [])
-                      .filter(
-                        (role) =>
-                          !(userRoles || []).some((ur) => ur.id === role.id)
-                      )
-                      .map((role) => (
-                        <div
-                          key={role.id}
-                          className="flex justify-between items-center p-3 bg-gray-50 rounded border"
-                        >
-                          <div>
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(
-                                role.slug
-                              )}`}
-                            >
-                              {role.name}
-                            </span>
-                            <div className="text-sm text-gray-500 mt-1">
-                              {role.description || role.slug}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleAssignRole(role.id)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            Assign
-                          </button>
-                        </div>
-                      ))}
-                    {(roles || []).filter(
-                      (role) =>
-                        !(userRoles || []).some((ur) => ur.id === role.id)
-                    ).length === 0 && (
-                      <p className="text-gray-500">All roles assigned</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* User Permissions Preview */}
-              {selectedUser.permissions &&
-                selectedUser.permissions.length > 0 && (
-                  <div className="mt-6 pt-6 border-t">
-                    <h3 className="text-lg font-semibold mb-3">
-                      Current Permissions
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {(selectedUser.permissions || []).map((permission) => (
-                        <span
-                          key={permission.id}
-                          className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800"
-                        >
-                          {permission.slug}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-            </div>
-          )}
-        </Modal>
+          onAssignRole={handleAssignRole}
+          onRemoveRole={handleRemoveRole}
+          getRoleColor={getRoleColor}
+        />
       </div>
     </Layout>
   );
