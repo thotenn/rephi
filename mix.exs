@@ -159,7 +159,7 @@ defmodule Rephi.MixProject do
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
       },
       maintainers: @maintainers,
-      files: ~w(lib priv/repo config mix.exs README* LICENSE* CHANGELOG* apps/shared),
+      files: ~w(lib priv/repo config mix.exs README* LICENSE* CHANGELOG*),
       exclude_patterns: [
         "priv/static/dashboard",
         "priv/static/admin",

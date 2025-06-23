@@ -91,6 +91,12 @@ defmodule Mix.Tasks.Rephi.New do
       # Generate frontend apps unless disabled
       unless opts[:no_frontend] do
         generate_frontend_apps()
+      else
+        # Remove apps directory if no_frontend is specified and it exists
+        if File.exists?("apps") do
+          File.rm_rf!("apps")
+          Mix.shell().info("* removed frontend applications directory")
+        end
       end
 
       Mix.shell().info("""
@@ -179,17 +185,9 @@ defmodule Mix.Tasks.Rephi.New do
   defp generate_frontend_apps do
     Mix.shell().info("* generating frontend applications")
 
-    File.mkdir_p!("apps")
-
-    # Create shared components directory
-    File.mkdir_p!("apps/shared")
-
-    # Generate each frontend app
-    ~w(dashboard admin ecommerce landing)
-    |> Enum.each(fn app ->
-      Mix.shell().info("  * creating #{app} frontend")
-      File.mkdir_p!("apps/#{app}")
-      # Copy frontend template files
-    end)
+    # Only create apps directory if it doesn't exist
+    unless File.exists?("apps") do
+      File.mkdir_p!("apps")
+    end
   end
 end
