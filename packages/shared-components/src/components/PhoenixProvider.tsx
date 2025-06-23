@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Socket, Channel } from 'phoenix';
-import { env } from '../env';
+import { env } from '@/env';
 
 interface PhoenixContextType {
   socket: Socket | null;

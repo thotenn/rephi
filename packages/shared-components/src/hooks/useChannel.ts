@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Channel } from 'phoenix';
-import { usePhoenix } from '../components/PhoenixProvider';
+import { usePhoenix } from '@/components/PhoenixProvider';
 
 interface UseChannelOptions {
   onJoin?: () => void;
