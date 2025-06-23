@@ -23,7 +23,3 @@ export const channelsProps = {
     },
   },
 };
-
-export const storeNames = {
-  authToken: "auth_token",
-};

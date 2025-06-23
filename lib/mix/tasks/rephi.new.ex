@@ -72,27 +72,27 @@ defmodule Mix.Tasks.Rephi.New do
     base_path = Path.expand(base_path)
     app = opts[:app] || Path.basename(base_path)
     module = opts[:module] || Macro.camelize(app)
-    
+
     unless File.exists?(base_path) do
       File.mkdir_p!(base_path)
     end
-    
+
     File.cd!(base_path, fn ->
       Mix.shell().info("* creating new Rephi application #{app}")
-      
+
       # TODO: Generate Phoenix app structure
       # This would normally call Mix.Tasks.Phx.New but that requires phoenix_new archive
       # For now, we'll just create the basic structure
       Mix.shell().info("TODO: Generate Phoenix app structure")
-      
+
       # Copy Rephi-specific files
       copy_rephi_files(module, app)
-      
+
       # Generate frontend apps unless disabled
       unless opts[:no_frontend] do
         generate_frontend_apps()
       end
-      
+
       Mix.shell().info("""
 
       Your Rephi application is ready!
@@ -112,7 +112,7 @@ defmodule Mix.Tasks.Rephi.New do
 
   defp copy_rephi_files(module, app) do
     source_dir = Application.app_dir(:rephi, "priv/templates/rephi.new")
-    
+
     # Copy authorization context
     copy_file(
       Path.join(source_dir, "authorization.ex"),
@@ -120,7 +120,7 @@ defmodule Mix.Tasks.Rephi.New do
       module: module,
       app: app
     )
-    
+
     # Copy auth controllers and plugs
     copy_file(
       Path.join(source_dir, "auth_controller.ex"),
@@ -128,14 +128,14 @@ defmodule Mix.Tasks.Rephi.New do
       module: module,
       app: app
     )
-    
+
     copy_file(
       Path.join(source_dir, "authorization_plug.ex"),
       "lib/#{app}_web/auth/authorization_plug.ex",
       module: module,
       app: app
     )
-    
+
     # Copy RBAC controllers
     copy_file(
       Path.join(source_dir, "role_controller.ex"),
@@ -143,17 +143,17 @@ defmodule Mix.Tasks.Rephi.New do
       module: module,
       app: app
     )
-    
+
     copy_file(
       Path.join(source_dir, "permission_controller.ex"),
       "lib/#{app}_web/controllers/permission_controller.ex",
       module: module,
       app: app
     )
-    
+
     # Update router with Rephi routes
     update_router(module, app)
-    
+
     # Add Rephi dependencies
     update_mix_exs(app)
   end
@@ -178,12 +178,12 @@ defmodule Mix.Tasks.Rephi.New do
 
   defp generate_frontend_apps do
     Mix.shell().info("* generating frontend applications")
-    
+
     File.mkdir_p!("apps")
-    
+
     # Create shared components directory
     File.mkdir_p!("apps/shared")
-    
+
     # Generate each frontend app
     ~w(dashboard admin ecommerce landing)
     |> Enum.each(fn app ->
