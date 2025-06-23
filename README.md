@@ -87,22 +87,81 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
 
 ## Frontend Development
 
-Each frontend app is a standalone React application:
+The project uses a Yarn workspace monorepo structure with multiple frontend applications.
+
+### Working with Frontend Apps
 
 ```bash
-cd apps/dashboard
-npm install
-npm run dev
+# Install dependencies for all apps
+yarn install
+
+# Start a specific app in development mode
+yarn example:dev
+yarn dashboard:dev
+
+# Build all apps
+yarn build
+
+# Run linting/type checking for all apps
+yarn lint
+yarn typecheck
 ```
 
-### Building Frontends
+### Creating a New Frontend App
+
+Use the Mix generator to create a new frontend application:
 
 ```bash
-# Build all frontends
-mix frontends.build
+# Generate a new frontend app based on the example template
+mix rephi.gen.frontend APP_NAME
 
-# Clean frontend builds
-mix frontends.clean
+# Example
+mix rephi.gen.frontend dashboard
+mix rephi.gen.frontend admin_panel
+```
+
+This command will:
+1. Copy the example app as a template
+2. Update all configuration files with the new app name
+3. Add the route to Phoenix router (`/app/APP_NAME`)
+4. Configure the shared environment settings
+5. Add workspace scripts to the root package.json
+
+After generating a new app:
+```bash
+# Install dependencies
+yarn install
+
+# Start the development server
+yarn APP_NAME:dev
+
+# Build for production
+yarn build
+
+# Access your app at
+http://localhost:4000/app/APP_NAME
+```
+
+### Frontend Architecture
+
+Each frontend app:
+- Is served at `/app/APP_NAME` with automatic CSRF token injection
+- Has its own development port configured
+- Uses React Router with the correct basename
+- Shares common components from `packages/shared-components`
+- Builds to `priv/static/apps/APP_NAME` for Phoenix to serve
+
+### Building and Deploying Frontends
+
+```bash
+# Build all frontends (automatically copies to priv/static/apps/)
+yarn build
+
+# Build a specific app
+yarn APP_NAME:build
+
+# Clean all builds
+yarn clean
 ```
 
 ## Architecture
@@ -121,12 +180,16 @@ lib/
 
 ### Frontend Structure
 ```
-apps/
-├── shared/            # Shared React components
-├── dashboard/         # Dashboard SPA
-├── admin/            # Admin panel SPA
-├── ecommerce/        # E-commerce SPA
-└── landing/          # Landing page SPA
+apps/                         # Frontend applications
+├── example/                  # Example app (template)
+└── [your-apps]/             # Generated apps
+
+packages/                     # Shared packages
+└── shared-components/       # Common React components, hooks, utilities
+
+priv/static/apps/            # Built frontend apps served by Phoenix
+├── example/
+└── [your-apps]/
 ```
 
 ## API Documentation
