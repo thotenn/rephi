@@ -10,8 +10,13 @@ export const env = {
   NODE_ENV: import.meta.env.MODE || 'development',
   IS_DEV: import.meta.env.DEV,
   IS_PROD: import.meta.env.PROD,
-  APPS_SETTINGS: {
-    APP_EXAMPLE_PORT: import.meta.env.VITE_EXAMPLE_PORT || '5001',
+  APPS: {
+    example: {
+      basename: "/app/example",
+      settings: {
+        port: import.meta.env.VITE_EXAMPLE_PORT || '5001'
+      }
+    }
   },
   STORES: {
     exampleStore: {

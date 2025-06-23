@@ -7,8 +7,9 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
+  base: env.APPS.example.basename,
   server: {
-    port: Number(env.APPS_SETTINGS.APP_EXAMPLE_PORT) || 5010,
+    port: Number(env.APPS.example.settings.port) || 5010,
     open: true,
   },
   build: {

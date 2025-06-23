@@ -64,7 +64,6 @@ defmodule RephiWeb.Plugs.FrontendAppPlug do
     |> Plug.Conn.fetch_query_params()
     
     csrf_token = Controller.get_csrf_token()
-    app = conn.assigns[:app] || get_app_from_path(conn.request_path)
     
     html_content = File.read!(file_path)
     
@@ -79,24 +78,13 @@ defmodule RephiWeb.Plugs.FrontendAppPlug do
     """
     
     # Inject both the meta tag and script before closing head tag
-    # Also rewrite asset paths to include the app prefix
     modified_html = html_content
     |> String.replace("</head>", "#{csrf_meta_tag}\n#{csrf_script}\n</head>")
-    |> String.replace("src=\"/assets/", "src=\"/app/#{app}/assets/")
-    |> String.replace("href=\"/assets/", "href=\"/app/#{app}/assets/")
-    |> String.replace("href=\"/favicon", "href=\"/app/#{app}/favicon")
     
     conn
     |> put_resp_content_type("text/html")
     |> send_resp(200, modified_html)
     |> halt()
-  end
-  
-  defp get_app_from_path(path) do
-    case String.split(path, "/", parts: 4) do
-      ["", "app", app | _] -> app
-      _ -> "unknown"
-    end
   end
 
   defp serve_static_file(conn, file_path) do
