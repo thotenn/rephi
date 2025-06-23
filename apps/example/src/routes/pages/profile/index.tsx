@@ -1,4 +1,4 @@
-import { useAuthStore } from "~/stores/auth.store";
+import { useAuthStore } from "@rephi/shared-components";
 import Layout from "~/components/bedrock/Layout";
 import UserInfo from "~/components/UserInfo";
 

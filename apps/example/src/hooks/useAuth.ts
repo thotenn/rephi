@@ -1,9 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import api from "~/modules/api/api";
-import PhoenixSocket from "~/modules/api/socket";
-import { useAuthStore } from "~/stores/auth.store";
-import { getRedirectPath, clearRedirectPath } from "~/components/bedrock/routes/routes_utils";
+import { PhoenixSocket, api, useAuthStore, getRedirectPath, clearRedirectPath } from "@rephi/shared-components";
 import type {
   AuthResponse,
   LoginCredentials,

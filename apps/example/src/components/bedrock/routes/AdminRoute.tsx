@@ -1,7 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { AccessDenied } from "~/components/commons";
 import { ROUTE_PATHS } from "~/config/routes";
-import { useAuthStore } from "~/stores/auth.store";
+import { useAuthStore } from "@rephi/shared-components";
 import { isAdmin } from "~/utils/auth";
 
 interface AdminRouteProps {

@@ -2,7 +2,7 @@ import { ReactNode, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { channelsProps } from "~/env";
 import Header from "./Header";
-import { useChannel } from "~/hooks/useChannel";
+import { useChannel } from "@rephi/shared-components";
 
 interface LayoutProps {
   children: ReactNode;

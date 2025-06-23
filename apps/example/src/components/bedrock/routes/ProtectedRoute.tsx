@@ -1,7 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuthStore } from "~/stores/auth.store";
 import { ROUTES } from "~/config/routes";
-import { setRedirectPath } from "~/components/bedrock/routes/routes_utils";
+import { useAuthStore, setRedirectPath } from "@rephi/shared-components";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

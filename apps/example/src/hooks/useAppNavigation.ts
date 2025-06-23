@@ -1,7 +1,7 @@
-import { useNavigate, useLocation } from "react-router-dom";
 import { useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ROUTES } from "~/config/routes";
-import { useAuthStore } from "~/stores/auth.store";
+import { useAuthStore } from "@rephi/shared-components";
 
 interface NavigationOptions {
   replace?: boolean;

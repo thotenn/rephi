@@ -1,5 +1,5 @@
 import { Navigate } from "react-router-dom";
-import { useAuthStore } from "~/stores/auth.store";
+import { useAuthStore } from "@rephi/shared-components";
 import { ROUTES } from "~/config/routes";
 
 interface PublicRouteProps {

@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
-import PhoenixSocket from "~/modules/api/socket";
-import { useAuthStore } from "~/stores/auth.store";
+import { PhoenixSocket, useAuthStore } from "@rephi/shared-components";
 
 export default function App() {
   const { isAuthenticated } = useAuthStore();

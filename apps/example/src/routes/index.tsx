@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { urls } from "~/env";
-import { useAuthStore } from "~/stores/auth.store";
+import { useAuthStore } from "@rephi/shared-components";
 
 export default function Index() {
   const navigate = useNavigate();

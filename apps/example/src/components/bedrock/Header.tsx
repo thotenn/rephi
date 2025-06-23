@@ -1,9 +1,9 @@
-import { Link, useLocation } from "react-router-dom";
-import { useLogout } from "~/hooks/useAuth";
-import { urls } from "~/env";
-import { useAuthStore } from "~/stores/auth.store";
-import { isAdmin } from "~/utils/auth";
 import { useState, useEffect, useRef } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { urls } from "~/env";
+import { useLogout } from "~/hooks/useAuth";
+import { useAuthStore } from "@rephi/shared-components";
+import { isAdmin } from "~/utils/auth";
 
 interface HeaderProps {
   title?: string;

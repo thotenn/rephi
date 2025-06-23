@@ -1,94 +1,60 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { Channel } from 'phoenix';
-import { usePhoenix } from '@/components/PhoenixProvider';
+import { useEffect, useState } from "react";
+import { Channel } from "phoenix";
+import PhoenixSocket from "@/controllers/api/socket";
 
-interface UseChannelOptions {
-  onJoin?: () => void;
-  onError?: (error: any) => void;
-  onClose?: () => void;
-}
-
-export const useChannel = (
-  topic: string,
-  params: object = {},
-  options: UseChannelOptions = {}
-) => {
-  const { channel: createChannel, connected } = usePhoenix();
+export function useChannel(channelName: string, params = {}) {
   const [channel, setChannel] = useState<Channel | null>(null);
-  const [joined, setJoined] = useState(false);
-  const channelRef = useRef<Channel | null>(null);
-
-  const join = useCallback(() => {
-    if (!connected || channelRef.current) return;
-
-    const newChannel = createChannel(topic, params);
-    if (!newChannel) return;
-
-    channelRef.current = newChannel;
-    setChannel(newChannel);
-
-    newChannel
-      .join()
-      .receive('ok', () => {
-        console.log(`Joined channel: ${topic}`);
-        setJoined(true);
-        options.onJoin?.();
-      })
-      .receive('error', (resp) => {
-        console.error(`Failed to join channel: ${topic}`, resp);
-        options.onError?.(resp);
-      });
-
-    newChannel.onClose(() => {
-      console.log(`Channel closed: ${topic}`);
-      setJoined(false);
-      options.onClose?.();
-    });
-  }, [connected, topic, JSON.stringify(params)]);
-
-  const leave = useCallback(() => {
-    if (channelRef.current) {
-      channelRef.current.leave();
-      channelRef.current = null;
-      setChannel(null);
-      setJoined(false);
-    }
-  }, []);
-
-  const push = useCallback((event: string, payload: object = {}) => {
-    if (!channelRef.current || !joined) {
-      console.warn(`Cannot push to channel ${topic}: not joined`);
-      return null;
-    }
-    return channelRef.current.push(event, payload);
-  }, [joined, topic]);
-
-  const on = useCallback((event: string, callback: (payload: any) => void) => {
-    if (!channelRef.current) {
-      console.warn(`Cannot listen to channel ${topic}: not created`);
-      return () => {};
-    }
-
-    const ref = channelRef.current.on(event, callback);
-    return () => channelRef.current?.off(event, ref);
-  }, [topic]);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (connected) {
-      join();
-    }
+    let ch: Channel | null = null;
+
+    const connectChannel = () => {
+      const socket = PhoenixSocket.getSocket();
+
+      if (!socket) {
+        console.error("Socket not connected. Please logout and log back in.");
+        setConnected(false);
+        return;
+      }
+      ch = socket.channel(channelName, params);
+
+      ch.join()
+        .receive("ok", (resp) => {
+          if (process.env.NODE_ENV === "development") {
+            console.log(`Successfully joined ${channelName}`, resp);
+          }
+          setConnected(true);
+        })
+        .receive("error", ({ reason }) => {
+          console.error(`Failed to join ${channelName}:`, reason);
+          setConnected(false);
+        })
+        .receive("timeout", () => {
+          if (process.env.NODE_ENV === "development") {
+            console.warn(`Timeout joining ${channelName}`);
+          }
+          setConnected(false);
+        });
+
+      setChannel(ch);
+    };
+
+    // Small delay to ensure socket is connected
+    const timer = setTimeout(connectChannel, 100);
 
     return () => {
-      leave();
+      clearTimeout(timer);
+      if (ch) {
+        if (process.env.NODE_ENV === "development") {
+          console.log(`Leaving channel ${channelName}`);
+        }
+        ch.leave();
+        setConnected(false);
+      }
     };
-  }, [connected, join]);
+  }, [channelName]); // channelName should be in dependencies
 
-  return {
-    channel,
-    joined,
-    join,
-    leave,
-    push,
-    on
-  };
-};
+  return { channel, connected };
+}
+export default useChannel;

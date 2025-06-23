@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { useAuthStore } from "../stores/auth.store";
-import { useChannel } from "../hooks/useChannel";
+import { api, useAuthStore, useChannel } from "@rephi/shared-components";
 import { toast } from "react-hot-toast";
-import api from "../modules/api/api";
-import Layout from "../components/bedrock/Layout";
-import UserInfo from "../components/UserInfo";
-import { apisUrl, channelsProps } from "../env";
+import Layout from "~/components/bedrock/Layout";
+import UserInfo from "~/components/UserInfo";
+import { apisUrl, channelsProps } from "~/env";
 
 export default function Home() {
   const { user } = useAuthStore();

@@ -1,4 +1,4 @@
-import api from "./api";
+import { api } from "@rephi/shared-components";
 import type {
   Role,
   Permission,

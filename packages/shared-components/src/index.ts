@@ -4,12 +4,20 @@ export { AuthGuard } from './components/AuthGuard';
 export { PermissionGuard } from './components/PermissionGuard';
 
 // Hooks
-export { useChannel } from './hooks/useChannel';
+export { useChannel } from './hooks';
 export { usePermissions } from './hooks/usePermissions';
 
 // Utils
-export { filterRoutesByPermissions, createProtectedRoute } from './utils/routes';
-export type { RouteConfig } from './utils/routes';
+export { 
+  setRedirectPath,
+  getRedirectPath,
+  clearRedirectPath,
+  filterRoutesByPermissions,
+  createProtectedRoute
+} from './utils/routes';
+export type {
+  RouteConfig
+} from './utils/routes';
 
 // Environment
 export { env } from './env';
@@ -17,7 +25,9 @@ export type { Env } from './env';
 
 export {
   getCsrfToken,
-  setCsrfHeader
+  setCsrfHeader,
+  api,
+  PhoenixSocket
 } from './controllers';
 
 // Types
@@ -32,3 +42,6 @@ export type {
   LoginCredentials,
   RegisterCredentials
 } from './types';
+
+// Stores
+export { useAuthStore } from './stores';
