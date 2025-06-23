@@ -10,10 +10,11 @@
   ],
   "scripts": {
     "dev": "yarn workspaces foreach --all --parallel --interlaced run dev",
-    "build": "yarn workspaces foreach --all --topological run build",
+    "build": "yarn workspaces foreach --all --topological run build && yarn postbuild",
+    "postbuild": "node scripts/copy-builds.js",
     "lint": "yarn workspaces foreach --all --parallel run lint",
     "typecheck": "yarn workspaces foreach --all --parallel run typecheck",
-    "clean": "yarn workspaces foreach --all --parallel run clean",
+    "clean": "yarn workspaces foreach --all --parallel run clean && rm -rf priv/static/apps",
     "example:dev": "yarn workspace rephi-example dev",
     "example:build": "yarn workspace rephi-example build",
     "shared:build": "yarn workspace @rephi/shared-components build"

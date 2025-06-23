@@ -11,4 +11,8 @@ export default defineConfig({
     port: Number(env.APPS_SETTINGS.APP_EXAMPLE_PORT) || 5010,
     open: true,
   },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
 });
