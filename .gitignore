@@ -9,6 +9,8 @@
 # The directory Mix downloads your dependencies sources to.
 /deps/
 
+
+
 # Where 3rd-party dependencies like ExDoc and Swagger output generated docs.
 /doc/
 /priv/static/swagger.json
@@ -29,6 +31,7 @@ erl_crash.dump
 rephi-*.tar
 
 mix.lock
+package-lock.json
 
 .claude/
 CLAUDE.md
@@ -38,6 +41,8 @@ CLAUDE.md
 .env
 .env.local
 .env.*.local
+.yarn/
+yarn.lock
 
 # Frontend builds
 /priv/static/dashboard/
@@ -57,3 +62,10 @@ CLAUDE.md
 *.swo
 *~
 .DS_Store
+pending.txt
+
+
+# Ignore node_modules in shared components
+/node_modules/
+/packages/shared-components/node_modules/
+/packages/shared-components/dist/

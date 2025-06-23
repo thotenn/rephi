@@ -6,11 +6,11 @@
     # Mix tasks
     rephi: 1,
     rephi: 2,
-    
+
     # Plugs
     plug: 1,
     plug: 2,
-    
+
     # Phoenix
     action_fallback: 1,
     render: 2,

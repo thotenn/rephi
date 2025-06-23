@@ -160,7 +160,12 @@ defmodule Rephi.MixProject do
       },
       maintainers: @maintainers,
       files: ~w(lib priv/repo config mix.exs README* LICENSE* CHANGELOG* apps/shared),
-      exclude_patterns: ["priv/static/dashboard", "priv/static/admin", "priv/static/ecommerce", "priv/static/landing"]
+      exclude_patterns: [
+        "priv/static/dashboard",
+        "priv/static/admin",
+        "priv/static/ecommerce",
+        "priv/static/landing"
+      ]
     ]
   end
 
