@@ -68,25 +68,8 @@ defmodule RephiWeb.Router do
   # Frontend apps with CSRF token injection
   scope "/app" do
     pipe_through :static
-    
+
     forward "/example", RephiWeb.Plugs.FrontendAppPlug, app: "example"
-  end
-
-  # SPA routes
-  scope "/", RephiWeb do
-    pipe_through :browser
-
-    get "/dashboard", AppController, :serve_app, app: "dashboard"
-    get "/dashboard/*path", AppController, :serve_app, app: "dashboard"
-
-    get "/admin", AppController, :serve_app, app: "admin"
-    get "/admin/*path", AppController, :serve_app, app: "admin"
-
-    get "/ecommerce", AppController, :serve_app, app: "ecommerce"
-    get "/ecommerce/*path", AppController, :serve_app, app: "ecommerce"
-
-    get "/", AppController, :serve_app, app: "landing"
-    get "/*path", AppController, :serve_app, app: "landing"
   end
 
   def swagger_info do
@@ -126,5 +109,16 @@ defmodule RephiWeb.Router do
       live_dashboard "/metrics", metrics: RephiWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
+  end
+
+  # SPA routes - must be at the end due to catch-all
+  scope "/", RephiWeb do
+    pipe_through :browser
+
+    get "/dashboard", AppController, :serve_app, app: "dashboard"
+    get "/dashboard/*path", AppController, :serve_app, app: "dashboard"
+
+    get "/", AppController, :serve_app, app: "landing"
+    get "/*path", AppController, :serve_app, app: "landing"
   end
 end
