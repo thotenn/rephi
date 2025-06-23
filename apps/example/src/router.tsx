@@ -1,5 +1,6 @@
-import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { Suspense } from "react";
+import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { env } from "@rephi/shared-components";
 import App from "./App";
 import { allRoutes, type RouteConfig } from "./config/routes";
 import { ProtectedRoute } from "./components/bedrock/routes/ProtectedRoute";
@@ -70,4 +71,6 @@ export const router = createBrowserRouter([
     errorElement: <ErrorBoundary />,
     children: processRoutes(allRoutes),
   },
-]);
+], {
+  basename: env.APPS.example.basename,
+});

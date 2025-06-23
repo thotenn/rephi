@@ -14,6 +14,10 @@ defmodule RephiWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :static do
+    plug :put_secure_browser_headers
+  end
+
   pipeline :authenticated do
     plug RephiWeb.Auth.Pipeline
     plug Guardian.Plug.EnsureAuthenticated
@@ -59,6 +63,13 @@ defmodule RephiWeb.Router do
   scope "/api/swagger" do
     pipe_through :api
     get "/swagger.json", RephiWeb.SwaggerController, :index
+  end
+
+  # Frontend apps with CSRF token injection
+  scope "/app" do
+    pipe_through :static
+    
+    forward "/example", RephiWeb.Plugs.FrontendAppPlug, app: "example"
   end
 
   # SPA routes

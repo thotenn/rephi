@@ -69,3 +69,4 @@ pending.txt
 /node_modules/
 /packages/shared-components/node_modules/
 /packages/shared-components/dist/
+/priv/static/apps/
