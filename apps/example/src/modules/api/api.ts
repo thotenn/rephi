@@ -1,8 +1,8 @@
 import axios from "axios";
 import { useAuthStore } from "~/stores/auth.store";
 import { API_URL } from "~/env";
-import type { ApiError } from "~/types/api.types";
-import { setCsrfHeader } from "./csrf";
+import type { ApiError } from "@rephi/shared-components";
+import { setCsrfHeader } from "@rephi/shared-components";
 
 const api = axios.create({
   baseURL: API_URL,

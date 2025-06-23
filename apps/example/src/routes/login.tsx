@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLogin } from "../hooks/useAuth";
 import { urls } from "../env";
-import type { LoginCredentials } from "../types/auth.types";
+import type { LoginCredentials } from "@rephi/shared-components";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),

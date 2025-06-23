@@ -1,11 +1,11 @@
-import type { User } from "~/types/auth.types";
+import type { User, Role, Permission } from "@rephi/shared-components";
 
 /**
  * Check if user has admin role
  */
 export const isAdmin = (user: User | null): boolean => {
   if (!user || !user.roles) return false;
-  return user.roles.some(role => role.slug === "admin");
+  return user.roles.some((role: Role) => role.slug === "admin");
 };
 
 /**
@@ -13,7 +13,7 @@ export const isAdmin = (user: User | null): boolean => {
  */
 export const hasRole = (user: User | null, roleSlug: string): boolean => {
   if (!user || !user.roles) return false;
-  return user.roles.some(role => role.slug === roleSlug);
+  return user.roles.some((role: Role) => role.slug === roleSlug);
 };
 
 /**
@@ -21,7 +21,7 @@ export const hasRole = (user: User | null, roleSlug: string): boolean => {
  */
 export const hasPermission = (user: User | null, permissionSlug: string): boolean => {
   if (!user || !user.permissions) return false;
-  return user.permissions.some(permission => permission.slug === permissionSlug);
+  return user.permissions.some((permission: Permission) => permission.slug === permissionSlug);
 };
 
 /**
@@ -29,7 +29,7 @@ export const hasPermission = (user: User | null, permissionSlug: string): boolea
  */
 export const hasAnyRole = (user: User | null, roleSlugs: string[]): boolean => {
   if (!user || !user.roles) return false;
-  return user.roles.some(role => roleSlugs.includes(role.slug));
+  return user.roles.some((role: Role) => roleSlugs.includes(role.slug));
 };
 
 /**
@@ -37,5 +37,5 @@ export const hasAnyRole = (user: User | null, roleSlugs: string[]): boolean => {
  */
 export const hasAnyPermission = (user: User | null, permissionSlugs: string[]): boolean => {
   if (!user || !user.permissions) return false;
-  return user.permissions.some(permission => permissionSlugs.includes(permission.slug));
+  return user.permissions.some((permission: Permission) => permissionSlugs.includes(permission.slug));
 };

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRegister } from "../hooks/useAuth";
 import { urls } from "../env";
-import type { RegisterCredentials } from "../types/auth.types";
+import type { RegisterCredentials } from "@rephi/shared-components";
 
 type RegisterFormData = RegisterCredentials;
 

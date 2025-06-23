@@ -8,7 +8,7 @@ import type {
   AuthResponse,
   LoginCredentials,
   RegisterCredentials,
-} from "~/types/auth.types";
+} from "@rephi/shared-components";
 import { apisUrl, urls } from "~/env";
 
 export function useLogin() {

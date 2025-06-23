@@ -1,4 +1,4 @@
-import { User } from "~/types/auth.types";
+import type { User } from "@rephi/shared-components";
 
 interface UserInfoProps {
   user: User | null;

@@ -74,7 +74,7 @@ defmodule RephiWeb.Endpoint do
   plug Plug.Session, @session_options
 
   plug CORSPlug,
-    origin: ["http://localhost:3000", "http://localhost:5173"],
+    origin: ["http://localhost:3000", "http://localhost:5173", "http://localhost:5010"],
     credentials: true
 
   plug RephiWeb.Router

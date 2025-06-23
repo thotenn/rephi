@@ -6,16 +6,40 @@ Shared components library for Rephi multi-frontend applications.
 
 This package is part of the Rephi monorepo and is automatically available to apps within the workspace.
 
+## Environment Variables
+
+The library exposes environment variables from the root `.env` file:
+
+```tsx
+import { env } from '@rephi/shared-components';
+
+// Available environment variables
+console.log(env.SERVER_API_URL); // http://localhost:4000/api
+console.log(env.WS_URL);         // ws://localhost:4000/socket
+console.log(env.NODE_ENV);       // development/production
+console.log(env.IS_DEV);         // boolean
+console.log(env.IS_PROD);        // boolean
+```
+
+### Required Environment Variables
+
+Add these to your root `.env` file:
+
+```env
+# API Configuration
+VITE_SERVER_API_URL=http://localhost:4000/api
+VITE_WS_URL=ws://localhost:4000/socket
+```
+
 ## Components
 
 ### PhoenixProvider
-Provider component for Phoenix WebSocket connections.
+Provider component for Phoenix WebSocket connections. Uses `env.WS_URL` by default.
 
 ```tsx
 import { PhoenixProvider } from '@rephi/shared-components';
 
 <PhoenixProvider 
-  socketUrl="ws://localhost:4000/socket"
   autoConnect={true}
   token={authToken}
 >
@@ -89,6 +113,22 @@ import { filterRoutesByPermissions, createProtectedRoute } from '@rephi/shared-c
 const protectedRoute = createProtectedRoute('/admin', {
   permissions: ['admin:access'],
   roles: ['admin']
+});
+```
+
+## Using in Your App
+
+Example of using the environment variables in an Axios configuration:
+
+```tsx
+import axios from 'axios';
+import { env } from '@rephi/shared-components';
+
+const api = axios.create({
+  baseURL: env.SERVER_API_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 ```
 

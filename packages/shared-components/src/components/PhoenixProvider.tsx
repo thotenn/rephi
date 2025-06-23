@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Socket, Channel } from 'phoenix';
+import { env } from '../env';
 
 interface PhoenixContextType {
   socket: Socket | null;
@@ -20,7 +21,7 @@ interface PhoenixProviderProps {
 
 export const PhoenixProvider: React.FC<PhoenixProviderProps> = ({
   children,
-  socketUrl = 'ws://localhost:4000/socket',
+  socketUrl = env.WS_URL,
   autoConnect = false,
   token
 }) => {

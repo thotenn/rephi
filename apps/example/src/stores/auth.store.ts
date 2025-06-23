@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { storeNames } from "~/env";
-import { User } from "~/types/auth.types";
+import { env } from "@rephi/shared-components";
+import type { User } from "@rephi/shared-components";
+
+const storeNames = env.STORES.exampleStore;
 
 interface AuthState {
   user: User | null;
