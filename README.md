@@ -36,8 +36,8 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
 - **Elixir** 1.14 or higher
 - **Erlang** 24 or higher
 - **PostgreSQL** 12 or higher
-- **Node.js** 18 or higher
-- **npm** or **yarn**
+- **Node.js** 20 or higher
+- **Yarn** 4.x (included via corepack)
 
 ## Features
 
@@ -57,33 +57,53 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
    cd rephi
    ```
 
-2. **Install dependencies**
+2. **Run the setup script** (recommended)
    ```bash
-   mix deps.get
+   ./setup.sh
    ```
 
-3. **Configure database**
-   ```bash
-   mix ecto.create
-   mix ecto.migrate
-   ```
+   This script will:
+   - Check all required dependencies
+   - Copy `.env.example` to `.env` if needed
+   - Install Elixir and Node.js dependencies
+   - Setup the database with migrations and seeds
+   - Build the shared-components package
+   - Generate API documentation
 
-   Or use the complete setup command:
+3. **Start the application**
    ```bash
-   mix setup
-   ```
-
-4. **Start Phoenix server**
-   ```bash
+   # Terminal 1: Backend
    mix phx.server
-   ```
-   
-   Or with interactive shell:
-   ```bash
-   iex -S mix phx.server
+
+   # Terminal 2: Frontend
+   yarn example:dev
    ```
 
-   Backend will be available at `http://localhost:4000`
+   - Backend API: `http://localhost:4000/api`
+   - Frontend (dev): `http://localhost:5001`
+   - Swagger UI: `http://localhost:4000/api/swagger`
+
+#### Alternative: Step-by-step setup
+
+If you prefer to run each step manually:
+
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env with your database credentials
+
+# 2. Backend setup
+mix deps.get
+mix ecto.setup
+
+# 3. Frontend setup
+yarn install
+yarn shared:build
+
+# 4. Start servers
+mix phx.server        # Terminal 1
+yarn example:dev      # Terminal 2
+```
 
 ## Frontend Development
 
@@ -94,6 +114,9 @@ The project uses a Yarn workspace monorepo structure with multiple frontend appl
 ```bash
 # Install dependencies for all apps
 yarn install
+
+# IMPORTANT: Build shared-components first (required before running any app)
+yarn shared:build
 
 # Start a specific app in development mode
 yarn example:dev
@@ -106,6 +129,8 @@ yarn build
 yarn lint
 yarn typecheck
 ```
+
+> **Note:** The `shared-components` package must be built before running any frontend app, as apps import from the compiled `dist/` folder.
 
 ### Creating a New Frontend App
 

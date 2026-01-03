@@ -1,9 +1,19 @@
 defmodule RephiWeb.AppController do
   use RephiWeb, :controller
 
-  @apps [:dashboard, :landing, :ecommerce, :admin]
+  @apps [:dashboard, :landing, :ecommerce, :admin, :example]
 
   def serve_app(conn, %{"app" => app}) when is_binary(app) do
+    serve_app_by_name(conn, app)
+  end
+
+  def serve_app(conn, _params) do
+    # Get app from route options (Phoenix 1.8+)
+    app = conn.private[:phoenix_route_options][:app] || "landing"
+    serve_app_by_name(conn, app)
+  end
+
+  defp serve_app_by_name(conn, app) when is_binary(app) do
     app_atom = String.to_existing_atom(app)
 
     if app_atom in @apps do

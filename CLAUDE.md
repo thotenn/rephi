@@ -4,507 +4,135 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Rephi is a Phoenix/Elixir backend with a Remix React frontend, featuring JWT authentication, RBAC (Role-Based Access Control) authorization system, and real-time WebSocket communication.
+Rephi is a Phoenix/Elixir backend with multi-frontend React SPAs (Yarn workspaces), featuring JWT authentication, RBAC authorization, and real-time WebSocket communication.
 
 ## Environment Setup
 
-1. **Copy environment file**:
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+# Quick setup (recommended)
+./setup.sh
 
-2. **Update `.env` with your configuration**:
-   - Database credentials
-   - Secret keys (generate with `mix phx.gen.secret`)
-   - Port and host settings
-   - Other environment-specific values
+# Or manually:
+cp .env.example .env  # Configure database, secrets (use `mix phx.gen.secret`), ports
+```
 
-3. **Environment variables are loaded automatically** in dev/test environments from the `.env` file.
+Environment variables are loaded automatically in dev/test from `.env`.
 
-## Common Development Commands
+## Common Commands
 
 ### Backend (Phoenix/Elixir)
 ```bash
-# Setup
-mix setup              # Install deps and setup database
-mix deps.get          # Install dependencies only
-mix ecto.create       # Create database
-mix ecto.migrate      # Run migrations
-mix ecto.reset        # Drop and recreate database with migrations
-
-# Development
-mix phx.server        # Start Phoenix server (port 4000)
-iex -S mix phx.server # Start with interactive shell
-
-# Testing & Code Quality
-mix test              # Run all tests
-mix format            # Format Elixir code
-
-# API Documentation
-mix phx.swagger.generate  # Generate Swagger JSON documentation
+mix setup                    # Full setup: deps, database, seed data
+mix phx.server               # Start server (port 4000)
+iex -S mix phx.server        # Start with interactive shell
+mix test                     # Run all tests
+mix test path/to/test.exs    # Run specific test file
+mix test path/to/test.exs:42 # Run specific test at line
+mix format                   # Format code
+mix phx.swagger.generate     # Regenerate Swagger docs
+mix docs                     # Generate ExDoc documentation
+mix ecto.reset               # Drop and recreate database with seeds
 ```
 
-### Frontend (Remix/React)
+### Frontend (Yarn Workspaces)
 ```bash
-# Navigate to frontend directory first
-cd front/rephi-front
-
-# Development
-npm run dev           # Start development server
-npm run build         # Build for production
-npm start             # Start production server
-
-# Code Quality
-npm run lint          # Run ESLint
-npm run typecheck     # Run TypeScript type checking
+yarn install                 # Install all workspace dependencies
+yarn shared:build            # Build shared-components (required first!)
+yarn example:dev             # Start example app dev server
+yarn build                   # Build all apps (copies to priv/static/apps/)
+yarn lint                    # Lint all apps
+yarn typecheck               # TypeScript check all apps
+mix rephi.gen.frontend NAME  # Generate new frontend app
 ```
 
-## Architecture Overview
+> **Important:** Run `yarn shared:build` before `yarn example:dev` - apps depend on the compiled shared-components package.
 
-### Authentication & Authorization Flow
-1. **Frontend → Backend**: Login/register sends credentials to `/api/users/{login|register}`
-2. **Token Storage**: JWT stored in both Zustand (persisted) and localStorage
-3. **JWT Enhancement**: Tokens include user roles and permissions for client-side authorization
-4. **API Requests**: Axios interceptor adds `Authorization: Bearer {token}` header automatically
-5. **Authorization**: Server-side plugs verify permissions before allowing access to protected endpoints
-6. **WebSocket**: Token passed as connection param but **NOT currently validated** (security issue)
+## Architecture
 
-### RBAC Authorization System
-- **Hierarchical Roles**: `admin` → `manager` → `user` with inheritance
-- **Granular Permissions**: Categorized by domain (`users:*`, `roles:*`, `permissions:*`, `system:*`)
-- **Flexible Checks**: Support for single permission, multiple permissions (any/all), role-based checks
-- **Database Schema**: 6 tables for complete RBAC implementation
-- **API Endpoints**: Full CRUD for roles and permissions with assignment capabilities
+### Backend Structure
+```
+lib/rephi/                   # Core business logic
+├── accounts/                # User management (Accounts context)
+└── authorization/           # RBAC system (Authorization context)
+    ├── role.ex, permission.ex
+    ├── user_role.ex, user_permission.ex
+    └── role_permission.ex, role_role.ex
 
-### Key Architectural Decisions
-- **Backend API**: All API routes under `/api/*` with JSON responses
-- **Frontend SPA**: Remix in SPA mode (no SSR) with client-side routing
-- **State Management**: Zustand with localStorage persistence for auth state
-- **Authorization**: Context-based with plugs for controller protection
-- **Real-time**: Phoenix Channels for WebSocket communication (user-specific channels)
-- **Forms**: React Hook Form + Zod for validation
-- **Styling**: Tailwind CSS v4 with custom configuration
+lib/rephi_web/               # Web layer
+├── auth/                    # Authentication (Guardian, Pipeline, AuthorizationPlug)
+├── controllers/             # API controllers
+├── channels/                # WebSocket (UserSocket, UserChannel)
+└── plugs/                   # Custom plugs (FrontendAppPlug)
+```
 
-### Important Security Note
-WebSocket connections in `UserSocket.connect/3` currently accept all connections without validating the token parameter. This needs to be fixed to properly authenticate WebSocket connections.
+### Frontend Structure
+```
+apps/                        # Frontend applications (Vite + React)
+├── example/                 # Template app
+└── [generated-apps]/
 
-## Testing Approach
-- **Backend**: ExUnit tests in `/test` directory, run with `mix test`
-- **Frontend**: No test framework currently configured
-- **Database**: Test database automatically created/migrated when running tests
+packages/
+└── shared-components/       # Common React components, hooks, utilities
 
-## Development Workflow
-1. Start PostgreSQL
-2. Run backend: `mix phx.server` (port 4000)
-3. In another terminal, run frontend: `cd front/rephi-front && npm run dev`
-4. Backend API available at `http://localhost:4000/api`
-5. WebSocket connection at `ws://localhost:4000/socket`
-6. Swagger UI available at `http://localhost:4000/api/swagger`
-7. Swagger JSON available at `http://localhost:4000/api/swagger/swagger.json`
+priv/static/apps/            # Built frontends served by Phoenix
+```
 
-## API Documentation with Swagger
+### Key Files
+- `lib/rephi_web/router.ex` - All API routes under `/api/*`, frontend routes at `/app/*`
+- `lib/rephi/authorization.ex` - Main RBAC context with `can?/2`, `has_role?/2`
+- `lib/rephi_web/auth/authorization_plug.ex` - Controller authorization
+- `priv/repo/seeds.exs` - Default roles, permissions, admin user
 
-### Overview
-The project uses Phoenix Swagger to automatically generate API documentation. All endpoints are documented with request/response schemas, examples, and security requirements.
+### Authentication Flow
+1. Login/register: `POST /api/users/{login|register}` returns JWT
+2. JWT includes user roles and permissions for client-side authorization
+3. Frontend stores token in Zustand (persisted) + localStorage
+4. Axios interceptor adds `Authorization: Bearer {token}` header
+5. Protected routes use `RephiWeb.Auth.Pipeline` + `Guardian.Plug.EnsureAuthenticated`
 
-### Adding Documentation to New Endpoints
-
-When creating new endpoints, follow these steps:
-
-1. **Import required modules** in your controller:
+### Authorization Usage
 ```elixir
-use PhoenixSwagger
-alias PhoenixSwagger.Schema
-```
-
-2. **Document the endpoint** using `swagger_path` before the function:
-```elixir
-swagger_path :action_name do
-  get("/api/path")
-  summary("Brief description")
-  description("Detailed description")
-  produces("application/json")
-  
-  # For authenticated endpoints
-  security([%{Bearer: []}])
-  
-  # Define parameters
-  parameters do
-    param_name(:query, :string, "Parameter description", required: true)
-  end
-  
-  # Define responses
-  response(200, "Success", Schema.ref(:ResponseSchema))
-  response(401, "Unauthorized")
-end
-```
-
-3. **Define schemas** in `swagger_definitions/0`:
-```elixir
-def swagger_definitions do
-  %{
-    ResponseSchema: %{
-      type: :object,
-      title: "Response Title",
-      description: "Response description",
-      properties: %{
-        field: %{type: :string, description: "Field description"}
-      },
-      required: [:field],
-      example: %{
-        field: "example value"
-      }
-    }
-  }
-end
-```
-
-4. **Generate documentation** after adding/modifying endpoints:
-```bash
-mix phx.swagger.generate
-```
-
-## Testing Requirements for New Endpoints
-
-**IMPORTANT**: For every new endpoint created, you MUST also create corresponding test files in the `/test` directory. This ensures code quality and prevents regressions.
-
-### Creating Tests for New Endpoints
-
-1. **Create a test file** in `test/rephi_web/controllers/`:
-```elixir
-defmodule RephiWeb.YourControllerTest do
-  use RephiWeb.ConnCase
-  
-  # Import auth helpers if needed
-  import Rephi.AuthTestHelpers
-  
-  describe "your_action/2" do
-    test "successful case", %{conn: conn} do
-      # Test implementation
-    end
-    
-    test "error case", %{conn: conn} do
-      # Test implementation
-    end
-  end
-end
-```
-
-2. **Test all scenarios**:
-   - ✅ Success cases with valid data
-   - ❌ Error cases with invalid data
-   - 🔐 Authentication/authorization scenarios
-   - 🚫 Missing or malformed parameters
-   - 📝 Validation errors
-
-3. **Use test helpers** from `test/support/auth_test_helpers.ex`:
-   - `create_user/1` - Create test users
-   - `create_user_with_token/1` - Create authenticated users
-   - `authenticate_conn/2` - Add auth headers
-   - `valid_user_attrs/1` - Generate valid test data
-
-4. **Run tests** to ensure they pass:
-```bash
-mix test                           # Run all tests
-mix test test/path/to/test.exs    # Run specific test file
-```
-
-### Test File Structure Example
-
-```elixir
-# For a new endpoint POST /api/items
-# Create: test/rephi_web/controllers/item_controller_test.exs
-
-defmodule RephiWeb.ItemControllerTest do
-  use RephiWeb.ConnCase
-
-  @valid_attrs %{"name" => "Test Item", "description" => "Test Description"}
-  @invalid_attrs %{"name" => nil}
-
-  describe "create/2" do
-    setup %{conn: conn} do
-      # Authenticate if endpoint requires it
-      conn = authenticate_user(conn)
-      {:ok, conn: conn}
-    end
-
-    test "creates item with valid data", %{conn: conn} do
-      conn = post(conn, ~p"/api/items", @valid_attrs)
-      assert %{"id" => id, "name" => "Test Item"} = json_response(conn, 201)
-    end
-
-    test "returns errors with invalid data", %{conn: conn} do
-      conn = post(conn, ~p"/api/items", @invalid_attrs)
-      assert %{"errors" => errors} = json_response(conn, 422)
-    end
-  end
-end
-```
-
-### Integration Tests
-
-For complex flows, create integration tests in `test/rephi_web/integration/`:
-- Test complete user journeys
-- Verify multiple endpoints work together
-- Ensure data consistency across operations
-
-### Current API Documentation
-
-- **Authentication Endpoints** (`/api/users/*`): User registration, login, and profile
-- **Authorization Endpoints** (`/api/roles/*`, `/api/permissions/*`): Full RBAC management
-- **Role Assignment** (`/api/users/:id/roles/*`): Assign/remove roles from users
-- **Permission Assignment** (`/api/roles/:id/permissions/*`): Assign/remove permissions from roles
-- All endpoints return JSON responses
-- Authentication uses JWT tokens in Authorization header
-- Authorization uses permission-based access control
-- See Swagger UI for interactive documentation and testing
-
-## Authorization System Implementation
-
-### Context Module: `Rephi.Authorization`
-Main functions for role and permission management:
-
-**Role Management:**
-- `list_roles/0`, `get_role/1`, `get_role_by_slug/1`
-- `create_role/1`, `update_role/2`, `delete_role/1`
-- `assign_role_to_user/3`, `remove_role_from_user/2`
-
-**Permission Management:**
-- `list_permissions/0`, `get_permission/1`, `get_permission_by_slug/1`
-- `create_permission/1`, `update_permission/2`, `delete_permission/1`
-- `assign_permission_to_role/3`, `remove_permission_from_role/2`
-
-**Authorization Checks:**
-- `can?/2` - Check if user has specific permission
-- `has_role?/2` - Check if user has specific role
-- `get_user_roles/1`, `get_user_permissions/1`, `get_role_permissions/1`
-- `can_by?/1` - Flexible authorization with options
-
-### Authorization Plugs
-Located in `RephiWeb.Auth.AuthorizationPlug`:
-
-**Usage in Controllers:**
-```elixir
+# In controllers - use plugs
 plug AuthorizationPlug, {:permission, "users:edit"}
 plug AuthorizationPlug, {:role, "admin"}
 plug AuthorizationPlug, {:any_permission, ["users:create", "users:edit"]}
-plug AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
+
+# In code - use helpers
+if can?(conn, "users:edit"), do: # ...
+if Authorization.has_role?(user, "admin"), do: # ...
 ```
 
-### Authorization Helpers
-Available in all controllers via `RephiWeb.Auth.AuthorizationHelpers`:
-- `can?/2`, `has_role?/2`, `can_any?/2`, `can_all?/2`
-- `current_user_roles/1`, `current_user_permissions/1`
-- `authorize/2` - Flexible authorization function
-
-### Database Schema
-Six tables support the RBAC system:
-1. `roles` - Role definitions with hierarchy support
-2. `permissions` - Permission definitions with hierarchy support  
-3. `user_roles` - User-role assignments
-4. `user_permissions` - Direct user-permission assignments
-5. `role_permissions` - Role-permission assignments
-6. `role_roles` - Role hierarchy (parent-child relationships)
-
-### Seed Data
-Default roles and permissions created automatically:
+### Default Seed Data
 - **Roles**: admin (inherits manager), manager (inherits user), user
-- **Permissions**: 17 permissions across users, roles, permissions, and system domains
-- **Admin User**: admin@admin.com / password123!! with admin role
+- **Permissions**: 17 permissions across `users:*`, `roles:*`, `permissions:*`, `system:*`
+- **Admin**: admin@admin.com / password123!!
 
-### Testing Authorization
-When testing endpoints with authorization:
-1. Use `RephiWeb.AuthTestHelpers` for auth setup
-2. Test both authorized and unauthorized scenarios
-3. Test different permission/role combinations
-4. Verify proper HTTP status codes (401 Unauthorized, 403 Forbidden)
+## API Documentation
 
-## Documentation Requirements with ExDoc
+- Swagger UI: `http://localhost:4000/api/swagger`
+- Swagger JSON: `http://localhost:4000/api/swagger/swagger.json`
 
-**IMPORTANT**: This project uses ExDoc for comprehensive API documentation. For every new function, module, or significant code addition, you MUST provide proper documentation following these guidelines.
+When adding endpoints, use `swagger_path` macro and define schemas in `swagger_definitions/0`, then run `mix phx.swagger.generate`.
 
-### Documentation Standards
+## Testing
 
-1. **All public modules** must have a `@moduledoc` with:
-   - Clear description of the module's purpose
-   - Usage examples
-   - Important notes or warnings
-   - Related modules or concepts
-
-2. **All public functions** must have a `@doc` with:
-   - Description of what the function does
-   - Parameter documentation with types and descriptions
-   - Return value documentation
-   - At least one practical example
-   - Any side effects or important behavior
-
-3. **Schema modules** should document:
-   - Field descriptions and types
-   - Validation rules and constraints
-   - Association explanations
-   - Changeset examples
-
-### Documentation Template for Functions
+Tests use ExUnit in `/test`. For authenticated endpoints, use helpers from `test/support/auth_test_helpers.ex`:
 
 ```elixir
-@doc """
-Brief description of what the function does.
+import Rephi.AuthTestHelpers
 
-Longer explanation if needed, including any important behavior,
-side effects, or integration points.
-
-## Parameters
-
-  * `param1` - Description of first parameter with type info
-  * `param2` - Description of second parameter
-
-## Examples
-
-    iex> ModuleName.function_name(param1, param2)
-    expected_return_value
-
-    iex> ModuleName.function_name(invalid_input)
-    {:error, :reason}
-
-## Returns
-
-  * `{:ok, result}` - Success case description
-  * `{:error, reason}` - Error case description
-
-"""
-def function_name(param1, param2) do
-  # implementation
-end
+# In tests
+{user, token} = create_user_with_token()
+conn = authenticate_conn(conn, token)
+# or
+conn = authenticate_user(conn)  # creates user + authenticates in one step
 ```
 
-### Documentation Template for Modules
+## Development Workflow
 
-```elixir
-defmodule MyApp.ModuleName do
-  @moduledoc """
-  Brief description of the module's purpose.
-
-  Longer explanation of what this module provides, how it fits
-  into the application architecture, and any important concepts.
-
-  ## Key Features
-
-  - Feature 1 with brief explanation
-  - Feature 2 with brief explanation
-  - Feature 3 with brief explanation
-
-  ## Usage
-
-      # Basic usage example
-      result = ModuleName.main_function(params)
-
-      # Advanced usage example
-      ModuleName.advanced_function(complex_params)
-
-  ## Integration
-
-  This module integrates with:
-  - Other.Module - for specific functionality
-  - Another.Module - for other functionality
-
-  ## Important Notes
-
-  Any warnings, constraints, or important behavioral notes.
-
-  """
-
-  # Module implementation...
-end
-```
-
-### Authorization System Documentation Examples
-
-When working with the authorization system, follow these patterns:
-
-**Context Functions:**
-```elixir
-@doc """
-Checks if a user has a specific permission.
-
-Verifies both direct permissions and permissions inherited through
-roles and role hierarchy.
-
-## Parameters
-
-  * `user` - The user struct to check permissions for
-  * `permission` - Permission slug (string) or Permission struct
-
-## Examples
-
-    iex> Authorization.can?(user, "users:edit")
-    true
-
-    iex> Authorization.can?(user, %Permission{slug: "users:delete"})
-    false
-
-## Returns
-
-  * `true` - User has the permission
-  * `false` - User lacks the permission or is invalid
-
-"""
-```
-
-**Controller Documentation:**
-```elixir
-@moduledoc """
-Controller for managing [resource] with authorization.
-
-This controller provides REST API endpoints for [resource] management.
-All actions are protected by appropriate permission checks.
-
-## Endpoints
-
-  * `GET /api/resource` - List resources (requires "resource:view")
-  * `POST /api/resource` - Create resource (requires "resource:create")
-
-## Permission Requirements
-
-All actions require authentication and specific permissions:
-- View actions: `resource:view`
-- Create actions: `resource:create`
-
-"""
-```
-
-### Generating Documentation
-
-After adding or modifying documentation:
-
-```bash
-# Generate HTML and EPUB documentation
-mix docs
-
-# View generated documentation
-open doc/index.html
-```
-
-### Documentation Quality Checklist
-
-Before submitting code, ensure:
-
-- [ ] All new public functions have `@doc` with examples
-- [ ] All new modules have comprehensive `@moduledoc`
-- [ ] Examples are realistic and practical
-- [ ] Parameter and return types are documented
-- [ ] Integration points are explained
-- [ ] `mix docs` generates without warnings
-- [ ] Documentation follows project conventions
-
-### Special Considerations for Authorization Code
-
-When documenting authorization-related code:
-
-1. **Always include permission requirements** in controller docs
-2. **Document security implications** of functions
-3. **Provide role hierarchy examples** when relevant
-4. **Show both success and failure cases** in examples
-5. **Explain integration with JWT tokens** when applicable
-6. **Document helper function usage in views** and controllers
-
-This documentation standard ensures that the codebase remains maintainable and that new developers can quickly understand and work with the authorization system.
+1. Start PostgreSQL
+2. Run backend: `mix phx.server` (port 4000)
+3. Run frontend: `yarn example:dev` (or other app)
+4. API: `http://localhost:4000/api`
+5. WebSocket: `ws://localhost:4000/socket`
+6. Frontend apps: `http://localhost:4000/app/{app_name}`

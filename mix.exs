@@ -43,28 +43,28 @@ defmodule Rephi.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:bandit, "~> 1.7.0"},
+      {:bandit, "~> 1.10.0"},
       {:bcrypt_elixir, "~> 3.3.2"},
       {:cors_plug, "~> 3.0.3"},
-      {:dns_cluster, "~> 0.1.1"},
-      {:ecto_sql, "~> 3.12.1"},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true},
+      {:dns_cluster, "~> 0.2.0"},
+      {:ecto_sql, "~> 3.13.4"},
+      {:ex_doc, "~> 0.39.1", only: :dev, runtime: false, warn_if_outdated: true},
       {:ex_json_schema, "~> 0.5"},
-      {:finch, "~> 0.19.0"},
+      {:finch, "~> 0.20.0"},
       {:gettext, "~> 0.26.2"},
-      {:guardian, "~> 2.3.2"},
+      {:guardian, "~> 2.4.0"},
       {:jason, "~> 1.4.4"},
-      {:phoenix, "~> 1.7.21"},
-      {:phoenix_ecto, "~> 4.6.4"},
+      {:phoenix, "~> 1.8.3"},
+      {:phoenix_ecto, "~> 4.7.0"},
       {:phoenix_live_dashboard, "~> 0.8.7"},
       {:phoenix_swagger, "~> 0.8.3"},
-      {:plug, "~> 1.18"},
+      {:plug, "~> 1.18.1"},
       {:plug_cowboy, "~> 2.7.3"},
       {:poison, "~> 3.0"},
-      {:postgrex, ">= 0.20.0"},
-      {:swoosh, "~> 1.19.1"},
+      {:postgrex, ">= 0.19.0"},
+      {:swoosh, "~> 1.20.0"},
       {:telemetry_metrics, "~> 1.1.0"},
-      {:telemetry_poller, "~> 1.2.0"}
+      {:telemetry_poller, "~> 1.3.0"}
     ]
   end
 
