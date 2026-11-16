@@ -6,30 +6,35 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
 
 ### Create a new project using Rephi
 
-1. **Install the Rephi project generator**
+1. **Install the project generator** (a Mix archive built from the `installer/`
+   directory of this repository; it is not published on Hex)
    ```bash
-   mix archive.install hex rephi_new
+   mix archive.install github thotenn/rephi --sparse installer
    ```
 
-2. **Create your new project**
+2. **Create your project**
    ```bash
    mix rephi.new my_app
    cd my_app
    ```
 
-3. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your database credentials and configuration
-   ```
+   It clones the template, renames the application and its modules (`my_app` / `MyApp`),
+   gives the project its own secrets and signing salts, fetches the dependencies and creates
+   a Git repository with an initial commit. See `mix help rephi.new` for `--app`, `--module`,
+   `--no-install` and `--no-git`.
 
-4. **Setup and run**
+3. **Set it up and run it**
    ```bash
-   mix setup
+   ./setup.sh
    mix phx.server
    ```
 
-   Visit [`localhost:4000`](http://localhost:4000) from your browser.
+   Open [`localhost:4000/app/example/`](http://localhost:4000/app/example/) (the example
+   frontend) and [`localhost:4000/api/swagger`](http://localhost:4000/api/swagger) (the API
+   documentation). `./setup.sh` prints the development administrator to log in with.
+
+To work on the generator itself, build and install the archive from a clone:
+`cd installer && mix archive.build && mix archive.install rephi_new-*.ez`.
 
 ### Prerequisites
 
@@ -45,7 +50,7 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
 - **🔐 JWT Authentication**: Secure token-based authentication system
 - **👮 RBAC Authorization**: Complete Role-Based Access Control with hierarchical permissions
 - **🔌 WebSocket Support**: Real-time communication via Phoenix Channels
-- **⚛️ Multi-Frontend Architecture**: Support for multiple React SPAs (dashboard, admin, e-commerce, landing)
+- **⚛️ Multi-Frontend Architecture**: Any number of React SPAs served by Phoenix under `/app/<name>/`, generated with `mix rephi.gen.frontend`
 - **🚀 Astro Example**: The same example app as a static Astro site, ready for Cloudflare Pages
 - **📚 API Documentation**: Auto-generated Swagger/OpenAPI documentation
 - **🏗️ Production Ready**: Configured for scalability and best practices
@@ -59,30 +64,29 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
    cd rephi
    ```
 
-2. **Run the setup script** (recommended)
+2. **Run the setup script**
    ```bash
    ./setup.sh
    ```
 
-   This script will:
-   - Check all required dependencies
-   - Copy `.env.example` to `.env` if needed
-   - Install Elixir and Node.js dependencies
-   - Setup the database with migrations and seeds
-   - Build the shared-components package
-   - Generate API documentation
+   It stops at the first error, works from any directory and can be run again after a pull.
+   It:
+   - checks Elixir and Erlang/OTP (the versions in `.tool-versions` are the minimums), Node.js
+     (`engines` in `package.json`), Yarn 4 through Corepack and that PostgreSQL answers;
+   - writes a git-ignored `.env` with a new `SECRET_KEY_BASE` and `GUARDIAN_SECRET_KEY` for
+     development (`elixir scripts/dev_env.exs`; existing values are kept);
+   - runs `mix setup`: dependencies, database, migrations, seeds and `swagger.json`;
+   - runs `yarn install`, `yarn shared:build` and `yarn build`, which copies the apps into
+     `priv/static/apps/`.
 
 3. **Start the application**
    ```bash
-   # Terminal 1: Backend
-   mix phx.server
-
-   # Terminal 2: Frontend
-   yarn example:dev
+   mix phx.server        # Terminal 1
+   yarn example:dev      # Terminal 2 (optional: the Vite dev server)
    ```
 
-   - Backend API: `http://localhost:4000/api`
-   - Frontend (dev): `http://localhost:5001`
+   - Example app served by Phoenix: `http://localhost:4000/app/example/`
+   - Example app dev server: `http://localhost:5001/app/example/`
    - Swagger UI: `http://localhost:4000/api/swagger`
 
    The Astro version of the example runs with `yarn example-astro:dev` on
@@ -90,25 +94,18 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
 
 #### Alternative: Step-by-step setup
 
-If you prefer to run each step manually:
+`mix setup` prepares the Phoenix side only; the frontends are built with Yarn:
 
 ```bash
-# 1. Configure environment
-cp .env.example .env
-# Edit .env with your database credentials
-
-# 2. Backend setup
-mix deps.get
-mix ecto.setup
-
-# 3. Frontend setup
+mix setup                 # deps, database, migrations, seeds, swagger.json
 yarn install
-yarn shared:build
-
-# 4. Start servers
-mix phx.server        # Terminal 1
-yarn example:dev      # Terminal 2
+yarn shared:build         # required before any app
+yarn build                # every app, copied to priv/static/apps/
+mix phx.server
 ```
+
+Without a `.env`, development uses the defaults in `config/dev.exs`; `.env.example` lists every
+setting.
 
 ## Frontend Development
 
@@ -126,7 +123,6 @@ yarn shared:build
 # Start a specific app in development mode
 yarn example:dev
 yarn example-astro:dev
-yarn dashboard:dev
 
 # Build all apps
 yarn build
@@ -140,38 +136,31 @@ yarn typecheck
 
 ### Creating a New Frontend App
 
-Use the Mix generator to create a new frontend application:
-
 ```bash
-# Generate a new frontend app based on the example template
-mix rephi.gen.frontend APP_NAME
-
-# Example
-mix rephi.gen.frontend dashboard
-mix rephi.gen.frontend admin_panel
+mix rephi.gen.frontend dashboard                          # a Vite SPA copied from apps/example
+mix rephi.gen.frontend admin-panel --port 5020            # choose the dev server port
+mix rephi.gen.frontend site --template example-astro      # a static Astro site
 ```
 
-This command will:
-1. Copy the example app as a template
-2. Update all configuration files with the new app name
-3. Add the route to Phoenix router (`/app/APP_NAME`)
-4. Configure the shared environment settings
-5. Add workspace scripts to the root package.json
+Names use lowercase letters, digits, `_` and `-` (the names Phoenix serves under
+`/app/<name>/`). The generator checks everything before writing anything, so a refused run
+changes nothing. It creates `apps/NAME/` (package `rephi-NAME`), adds the `NAME:dev` and
+`NAME:build` scripts to `package.json`, picks a free dev port and adds its origin to the
+development CORS list in `config/dev.exs`. A Vite app also gets its entry in
+`packages/shared-components/src/env.ts` (base path and port). The router does not change:
+Phoenix serves every directory of `priv/static/apps/`.
 
-After generating a new app:
+Then:
+
 ```bash
-# Install dependencies
 yarn install
-
-# Start the development server
-yarn APP_NAME:dev
-
-# Build for production
-yarn build
-
-# Access your app at
-http://localhost:4000/app/APP_NAME
+yarn shared:build          # the app reads its base path and port from the shared package
+yarn NAME:dev              # dev server (restart `mix phx.server` first: config/dev.exs changed)
+yarn build                 # served by Phoenix at http://localhost:4000/app/NAME/
 ```
+
+An Astro site keeps `"rephi": { "copyToPhoenix": false }`: it is meant for a static host, and the
+generator prints how to build it for Phoenix instead. See `mix help rephi.gen.frontend`.
 
 ### Frontend Architecture
 
@@ -272,6 +261,9 @@ mix phx.swagger.generate
 ```bash
 # Run tests
 mix test
+
+# Everything CI checks: format, warnings as errors, unused deps, tests
+mix precommit
 
 # Format code
 mix format
@@ -450,40 +442,53 @@ WebSocket connection is established at `ws://localhost:4000/socket` with user-sp
 ## Testing
 
 ```bash
-# Run backend tests
-mix test
-
-# Run with coverage
-mix test --cover
+mix test              # backend tests
+mix test --cover      # with coverage (fails under the threshold in mix.exs)
+mix precommit         # what CI runs for the backend
 ```
+
+CI (`.github/workflows/ci.yml`) runs `mix precommit` against PostgreSQL, the installer's tests,
+and `yarn install --immutable`, `yarn shared:build`, `yarn typecheck`, `yarn lint` and
+`yarn build`.
 
 ## Deployment
 
-### Building for Production
+The `Dockerfile` builds a release that includes the frontends (`priv/static/apps`) and
+`swagger.json`; the apps call the API on the origin that serves them (`/api`, `/socket`).
 
 ```bash
-# Backend
+docker build -t my_app .
+
+# Every variable is described in .env.example; these four are required.
+export DATABASE_URL=ecto://USER:PASS@HOST/DATABASE
+export SECRET_KEY_BASE="$(mix phx.gen.secret)"
+export GUARDIAN_SECRET_KEY="$(mix guardian.gen.secret)"
+export PHX_HOST=api.example.com
+
+docker run --rm -e DATABASE_URL -e SECRET_KEY_BASE -e GUARDIAN_SECRET_KEY -e PHX_HOST my_app bin/migrate
+docker run --rm -e DATABASE_URL -e SECRET_KEY_BASE -e GUARDIAN_SECRET_KEY -e PHX_HOST \
+  -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD=... my_app bin/seed
+docker run -p 4000:4000 -e DATABASE_URL -e SECRET_KEY_BASE -e GUARDIAN_SECRET_KEY -e PHX_HOST my_app
+```
+
+Without Docker, build the same release by hand:
+
+```bash
+# shared-components inlines the API and socket URLs when it is built
+export VITE_SERVER_API_URL=/api VITE_WS_URL=/socket
+yarn install --immutable && yarn shared:build && yarn build
+MIX_ENV=prod mix deps.get --only prod
 MIX_ENV=prod mix compile
-MIX_ENV=prod mix assets.deploy
+MIX_ENV=prod mix phx.swagger.generate
+MIX_ENV=prod mix release
 
-# Frontends
-mix frontends.build
+_build/prod/rel/my_app/bin/migrate     # Ecto migrations (Rephi.Release.migrate/0)
+_build/prod/rel/my_app/bin/seed        # roles, permissions, first admin (Rephi.Release.seed/0)
+_build/prod/rel/my_app/bin/server      # starts the endpoint (PHX_SERVER=true)
 ```
 
-### Docker Support
-
-```bash
-docker build -t rephi .
-docker run -p 4000:4000 rephi
-```
-
-## Publishing to Hex.pm
-
-1. Update the version in `mix.exs`
-2. Update `CHANGELOG.md` with release notes
-3. Ensure tests pass: `mix test`
-4. Create git tag: `git tag -a v0.1.0 -m "Release v0.1.0"`
-5. Publish: `mix hex.publish`
+`bin/seed` is idempotent: run it after the first migration (with `ADMIN_EMAIL` and
+`ADMIN_PASSWORD`) and after upgrades that add default roles or permissions.
 
 ## Contributing
 

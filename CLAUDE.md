@@ -9,20 +9,17 @@ Rephi is a Phoenix/Elixir backend with multi-frontend React SPAs (Yarn workspace
 ## Environment Setup
 
 ```bash
-# Quick setup (recommended)
-./setup.sh
-
-# Or manually:
-cp .env.example .env  # Configure database, secrets (use `mix phx.gen.secret`), ports
+./setup.sh   # checks the toolchain, writes .env secrets, mix setup, builds the frontends
 ```
 
-Environment variables are loaded automatically in dev/test from `.env`.
+`.env` (git-ignored) is loaded in development only; `.env.example` lists every variable.
 
 ## Common Commands
 
 ### Backend (Phoenix/Elixir)
 ```bash
-mix setup                    # Full setup: deps, database, seed data
+mix setup                    # Phoenix only: deps, database, seeds, swagger.json
+mix precommit                # What CI runs: format check, warnings, unused deps, tests
 mix phx.server               # Start server (port 4000)
 iex -S mix phx.server        # Start with interactive shell
 mix test                     # Run all tests
@@ -44,7 +41,7 @@ yarn example-astro:build     # Static build -> apps/example-astro/dist (not copi
 yarn build                   # Build all apps (copies to priv/static/apps/)
 yarn lint                    # Lint all apps
 yarn typecheck               # TypeScript check all apps
-mix rephi.gen.frontend NAME  # Generate new frontend app
+mix rephi.gen.frontend NAME  # New app (--template example|example-astro, --port N)
 ```
 
 > **Important:** Run `yarn shared:build` before `yarn example:dev`, `yarn typecheck` or `yarn lint` - apps resolve the shared-components package from its compiled `dist/`.
