@@ -2,7 +2,7 @@
 export { configureRephi, getRephiConfig } from './config';
 export type { RephiConfig } from './config';
 
-// HTTP client, auth calls, administration calls and pagination
+// HTTP client, auth calls and pagination
 export {
   addRoleParent,
   api,

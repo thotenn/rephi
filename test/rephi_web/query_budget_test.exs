@@ -79,7 +79,6 @@ defmodule RephiWeb.QueryBudgetTest do
     # + user + direct grants + permissions through roles (whole hierarchy)
     assert cost(fn -> get(conn, ~p"/api/users/#{admin}/permissions") end) == @authenticated + 3
 
-    # ... whatever the number of grants or the depth of the hierarchy
     roles = for _ <- 1..5, do: create_role()
 
     for [parent, child] <- Enum.chunk_every(roles, 2, 1, :discard) do

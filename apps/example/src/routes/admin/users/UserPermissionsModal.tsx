@@ -10,13 +10,6 @@ interface UserPermissionsModalProps {
   onClose: () => void;
 }
 
-/**
- * What a user may do: the permissions granted to it directly (granted and
- * revoked here with `permissions:assign`) and every effective permission with
- * where it comes from (read-only: those come from roles). The server refuses,
- * and this shows why, granting a permission the signed-in user does not hold
- * (403) or revoking one the user only holds through a role (409).
- */
 export default function UserPermissionsModal({ user, onClose }: UserPermissionsModalProps) {
   const queryClient = useQueryClient();
   const { can } = usePermissions();
@@ -116,7 +109,7 @@ export default function UserPermissionsModal({ user, onClose }: UserPermissionsM
                   value={selected}
                   onChange={(event) => setSelected(event.target.value)}
                   disabled={!catalog.isSuccess}
-                  className="flex-1 border rounded px-2 py-1 text-gray-900"
+                  className="flex-1 min-w-0 border rounded px-2 py-1 text-gray-900"
                   data-testid="grant-permission-select"
                 >
                   <option value="">{catalog.isError ? "Could not load permissions" : "Grant a permission..."}</option>

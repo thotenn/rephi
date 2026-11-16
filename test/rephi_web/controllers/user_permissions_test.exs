@@ -8,7 +8,6 @@ defmodule RephiWeb.UserPermissionsTest do
 
   alias Rephi.{Authorization, Seeds}
 
-  # users:view on manager; permissions:assign on admin only.
   setup %{conn: conn} do
     {:ok, _} = Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
     {admin, admin_token} = create_user_with_token_and(roles: ["admin"])
@@ -60,7 +59,6 @@ defmodule RephiWeb.UserPermissionsTest do
       assert {id, admin_id} == {ctx.roles_view.id, ctx.admin.id}
       assert %{"slug" => "roles:view", "direct" => true, "roles" => []} = effective
 
-      # manager grants users:view and inherits nothing else from `user`
       %{"direct" => [_], "effective" => effective} = permissions(ctx.as_admin, user)
       by_slug = Map.new(effective, &{&1["slug"], &1})
 
@@ -100,7 +98,6 @@ defmodule RephiWeb.UserPermissionsTest do
       assert {user_id, permission_id, assigned_by} ==
                {ctx.target.id, ctx.roles_view.id, ctx.admin.id}
 
-      # the same token: access is loaded per request
       assert ctx.as_target |> get(~p"/api/roles") |> json_response(200)
 
       assert %{"permissions" => [%{"slug" => "roles:view"}]} =

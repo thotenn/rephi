@@ -46,7 +46,6 @@ defmodule RephiWeb.PasswordResetTest do
       assert {id, email} == {manager.id, manager.email}
       assert [%{"slug" => "manager"}] = user["roles"]
 
-      # sockets closed, every token revoked
       assert_receive %Phoenix.Socket.Broadcast{event: "disconnect"}
 
       for revoked <- [ctx.manager_token, other_device] do
@@ -54,7 +53,6 @@ defmodule RephiWeb.PasswordResetTest do
                  "Invalid or expired token"
       end
 
-      # the old password is gone, the temporary one signs in
       assert login(manager.email, "password123") |> error_detail(401)
 
       assert %{"token" => _, "user" => %{"must_change_password" => true}} =
@@ -73,7 +71,6 @@ defmodule RephiWeb.PasswordResetTest do
 
       as_reset = authenticate_conn(build_conn(), token)
 
-      # the manager holds users:view and roles:view, but not for now
       for path <- [~p"/api/users", ~p"/api/roles", "/api/users/#{manager.id}/permissions"] do
         assert as_reset |> get(path) |> error_detail(403) ==
                  "Your password was reset: set a new one with PUT /api/me/password before continuing"
@@ -82,7 +79,6 @@ defmodule RephiWeb.PasswordResetTest do
       assert %{"must_change_password" => true} =
                as_reset |> get(~p"/api/me") |> json_response(200) |> get_in(["data", "user"])
 
-      # a wrong current password is still a 422
       assert %{"errors" => %{"current_password" => _}} =
                as_reset
                |> put(~p"/api/me/password", %{

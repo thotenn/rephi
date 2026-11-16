@@ -1,16 +1,7 @@
 defmodule Rephi.Repo.Migrations.AddLinkAttributesToRoleRoles do
   @moduledoc """
-  The links of the role hierarchy get what the other grants already have:
-
-    * `assigned_by` - who linked the parent (a reference to `users`, cleared
-      when that user is deleted) and `notes`;
-    * `is_system` - the link is part of the seeded hierarchy
-      (`Rephi.Seeds`): it cannot be removed, like a system role cannot be
-      deleted. Seeding marks the links it makes.
-
-  Existing links between two system roles are marked as system links here,
-  so a database that is not seeded again after the upgrade is already
-  protected.
+  `assigned_by`, `notes` and `is_system` on hierarchy links. Links between two
+  system roles are marked system links, so the upgrade is protected before seeding.
   """
   use Ecto.Migration
 

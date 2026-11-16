@@ -17,9 +17,6 @@ defmodule RephiWeb.Router do
     plug RephiWeb.Auth.Pipeline
   end
 
-  # After :authenticated, on every route but the ones an account whose
-  # password was reset needs to set a new one. See
-  # `RephiWeb.Auth.PasswordChangeGate`.
   pipeline :password_settled do
     plug RephiWeb.Auth.PasswordChangeGate
   end
@@ -62,8 +59,7 @@ defmodule RephiWeb.Router do
     put "/me/password", AuthController, :change_password
     post "/users/logout", AuthController, :logout
 
-    # Everything below is refused (403) while the user must change a
-    # password an administrator reset.
+    # A route a user with a reset password must still reach goes above this line.
     pipe_through :password_settled
 
     post "/notifications/broadcast", NotificationController, :broadcast
@@ -73,8 +69,6 @@ defmodule RephiWeb.Router do
     get "/roles/:id/permissions", RoleController, :get_role_permissions
     post "/users/:user_id/roles/:role_id", RoleController, :assign_to_user
     delete "/users/:user_id/roles/:role_id", RoleController, :remove_from_user
-
-    # Role hierarchy (roles:view / roles:edit)
     get "/roles/:id/parents", RoleController, :get_role_parents
     get "/roles/:id/children", RoleController, :get_role_children
     post "/roles/:role_id/parents/:parent_id", RoleController, :add_parent

@@ -8,7 +8,6 @@ interface UsersTableProps {
   canManageRoles: boolean;
   canEdit: boolean;
   canDelete: boolean;
-  /** `users:reset_password`; never offered on the signed-in user's own row. */
   canResetPassword: boolean;
   onManageRoles: (user: UserWithGrants) => void;
   onViewPermissions: (user: UserWithGrants) => void;

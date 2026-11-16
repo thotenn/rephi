@@ -1,9 +1,6 @@
 defmodule Rephi.Repo.Migrations.AddMustChangePasswordToUsers do
   @moduledoc """
-  Marks the accounts whose password was reset by an administrator
-  (`Rephi.Accounts.reset_password/1`). Until the user sets a new password
-  with `PUT /api/me/password`, the API only lets them read `/api/me`, change
-  the password and log out.
+  Flags accounts whose password an administrator reset (`Rephi.Accounts.reset_password/1`).
   """
   use Ecto.Migration
 

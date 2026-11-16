@@ -77,8 +77,6 @@ defmodule Rephi.Seeds do
     {"users:create", "Create Users", "Create new user accounts", ["manager"]},
     {"users:edit", "Edit Users", "Edit user information", ["manager"]},
     {"users:delete", "Delete Users", "Delete user accounts", []},
-    # Hands out a password: admins only, like every other right over accounts
-    # that can lock someone out.
     {"users:reset_password", "Reset User Passwords",
      "Give another user a temporary password, ending their sessions", []},
     {"roles:view", "View Roles", "View roles and their permissions", ["manager"]},
@@ -220,8 +218,6 @@ defmodule Rephi.Seeds do
     |> Enum.reject(&MapSet.member?(seeded, &1))
   end
 
-  # `system: true` (the hierarchy) marks the links `is_system`, the ones that
-  # already existed too.
   defp link!(table, left, right, pairs, opts \\ []) do
     now = NaiveDateTime.utc_now(:second)
 

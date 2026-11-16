@@ -10,12 +10,6 @@ interface ResetPasswordModalProps {
   onClose: () => void;
 }
 
-/**
- * Resets another user's password (`users:reset_password`). The server makes
- * up a temporary password and returns it once: it is shown here, with a copy
- * button, and forgotten when the modal closes. The user's sessions end, and
- * after signing in with it the user must choose a new password.
- */
 export default function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +28,7 @@ export default function ResetPasswordModal({ user, onClose }: ResetPasswordModal
       await navigator.clipboard.writeText(temporaryPassword);
       setCopied("yes");
     } catch {
-      // No clipboard access (plain HTTP, permission denied): select it instead.
+      // No clipboard on plain HTTP or without permission: select it instead.
       inputRef.current?.select();
       setCopied("manual");
     }

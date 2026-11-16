@@ -43,7 +43,6 @@ export const rolesApi = {
     api.post(`/roles/${roleId}/permissions/${permissionId}`).then(() => undefined),
   removePermission: (roleId: number, permissionId: number): Promise<void> =>
     api.delete(`/roles/${roleId}/permissions/${permissionId}`).then(() => undefined),
-  /** The roles it inherits from directly, and the ones that inherit from it. */
   parents: fetchRoleParents,
   children: fetchRoleChildren,
   addParent: (roleId: number, parentId: number) => addRoleParent(roleId, parentId),
@@ -75,11 +74,9 @@ export const usersApi = {
     api.post(`/users/${userId}/roles/${roleId}`).then(() => undefined),
   removeRole: (userId: number, roleId: number): Promise<void> =>
     api.delete(`/users/${userId}/roles/${roleId}`).then(() => undefined),
-  /** Direct permissions, and the effective ones with their source. */
   permissions: fetchUserPermissions,
   grantPermission: (userId: number, permissionId: number) => grantUserPermission(userId, permissionId),
   revokePermission: revokeUserPermission,
-  /** A temporary password for another user, shown once. */
   resetPassword: resetUserPassword,
 };
 
@@ -93,7 +90,7 @@ export const adminKeys = {
   rolesPage: (page: number) => ["admin", "roles", "page", page] as const,
   allRoles: ["admin", "roles", "all"] as const,
   role: (id: number) => ["admin", "roles", "detail", id] as const,
-  /** Parents and children of every role: a link changes both ends. */
+  /** A link changes both ends: invalidate the whole prefix. */
   hierarchy: ["admin", "roles", "hierarchy"] as const,
   roleParents: (id: number) => ["admin", "roles", "hierarchy", id, "parents"] as const,
   roleChildren: (id: number) => ["admin", "roles", "hierarchy", id, "children"] as const,

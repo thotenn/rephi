@@ -161,8 +161,6 @@ defmodule Rephi.Accounts do
   connections are closed; the returned user carries the new
   `token_version`, to sign a fresh token with.
 
-  It also clears `must_change_password` (set by `reset_password/1`).
-
   Returns `{:ok, user}` or `{:error, changeset}` (a wrong current password is
   an error on `:current_password`).
   """
@@ -186,25 +184,8 @@ defmodule Rephi.Accounts do
   end
 
   @doc """
-  Replaces the password of a user with a random temporary one, for an
-  administrator to hand over (`POST /api/users/:id/password`).
-
-  The temporary password is returned once and only its hash is stored. The
-  account is marked `must_change_password`: until the user sets a password
-  of its own with `change_password/3`, the API only lets it read `/api/me`,
-  change the password and log out (`RephiWeb.Auth.PasswordChangeGate`).
-  Every token of the user is revoked and its WebSocket connections are
-  closed, as with a password change.
-
-  Who may reset whose password is the caller's business (the controller
-  checks the permission and `Rephi.Authorization.can_manage_user?/2`).
-
-  Returns `{:ok, user, temporary_password}` or `{:error, :not_found}` if the
-  user no longer exists.
-
-      iex> reset_password(user)
-      {:ok, %User{must_change_password: true}, "kJ3r..."}
-
+  Sets a random temporary password (returned, never stored in clear), flags
+  `must_change_password` and ends every session of the user.
   """
   @spec reset_password(User.t()) :: {:ok, User.t(), String.t()} | {:error, :not_found}
   def reset_password(%User{id: id} = user) do
@@ -215,8 +196,7 @@ defmodule Rephi.Accounts do
         changeset =
           user
           |> User.password_changeset(%{password: password})
-          # The version is incremented in the database, so a concurrent
-          # logout cannot leave a token alive.
+          # Incremented in SQL: a concurrent logout must not leave a token alive.
           |> Ecto.Changeset.delete_change(:token_version)
           |> Ecto.Changeset.put_change(:must_change_password, true)
 
@@ -231,16 +211,13 @@ defmodule Rephi.Accounts do
         end
       end)
 
-    # After the commit: a client that reacts to the disconnect by checking
-    # its token must find it revoked.
+    # After the commit, or a client re-checking its token on disconnect still finds it valid.
     with {:ok, updated} <- result do
       disconnect_sockets(updated)
       {:ok, updated, password}
     end
   end
 
-  # 24 URL-safe characters (144 random bits): well within the password rules
-  # (8 characters, 72 bytes), and easy to copy.
   defp temporary_password do
     18 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
   end

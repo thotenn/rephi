@@ -7,10 +7,7 @@ defmodule Rephi.Authorization.RoleRole do
   `Rephi.Authorization.assign_parent_role/3`, which is the only supported way
   to insert rows.
 
-  `assigned_by` is the user who linked the parent (cleared if that user is
-  deleted). `is_system` marks the links of the seeded hierarchy
-  (`Rephi.Seeds`): they cannot be removed. It cannot be set through the
-  changeset.
+  `is_system` marks the seeded links, which cannot be removed.
   """
   use Ecto.Schema
   import Ecto.Changeset

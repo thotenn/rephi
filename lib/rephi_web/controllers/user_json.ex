@@ -22,9 +22,7 @@ defmodule RephiWeb.UserJSON do
   end
 
   @doc """
-  Renders the permissions of a user: the ones granted to it directly (with
-  the grant) and the effective ones with their source (see
-  `Rephi.Authorization.get_user_permission_sources/1`).
+  Renders the direct permissions of a user and the effective ones with their source.
   """
   def permissions(%{sources: %{direct: direct, effective: effective}}) do
     %{

@@ -243,8 +243,6 @@ defmodule RephiWeb.SwaggerContractTest do
        end},
       {"delete", "/api/users/{user_id}/roles/{role_id}", 409,
        fn -> call(:delete, "/api/users/#{ctx.admin.id}/roles/#{admin_role.id}", token) end},
-
-      # Role hierarchy
       {"get", "/api/roles/{id}/parents", 200,
        fn -> call(:get, "/api/roles/#{ctx.child.id}/parents", token) end},
       {"get", "/api/roles/{id}/children", 200,
@@ -360,8 +358,6 @@ defmodule RephiWeb.SwaggerContractTest do
        fn -> call(:post, "/api/users/#{create_user().id}/password", token) end},
       {"post", "/api/users/{id}/password", 409,
        fn -> call(:post, "/api/users/#{ctx.admin.id}/password", token) end},
-
-      # Direct user permissions
       {"post", "/api/users/{user_id}/permissions/{permission_id}", 201,
        fn ->
          path = "/api/users/#{create_user().id}/permissions/#{system_permission.id}"

@@ -56,12 +56,7 @@ function Notifications({ userId }: { userId: number }) {
   return null;
 }
 
-/**
- * Keeps a user whose password an administrator reset (`must_change_password`)
- * on the profile page, where the password form is, until a new password is
- * set: the API refuses everything else meanwhile. Checked when the flag
- * changes and after every navigation (this island survives them).
- */
+// This island persists across navigations, hence the astro:page-load listener.
 function usePasswordChangeRedirect(mustChangePassword: boolean) {
   useEffect(() => {
     if (!mustChangePassword || isEmbedded) return;
@@ -80,8 +75,7 @@ function usePasswordChangeRedirect(mustChangePassword: boolean) {
 
 /**
  * App-wide runtime: owns the Phoenix socket, the notification channels, the
- * reaction to a lost session, the forced password change and the toast
- * container.
+ * reaction to a lost session and the toast container.
  *
  * It is rendered once in the base layout with `transition:persist`, so Astro's
  * client router carries this island (and its open socket) from page to page

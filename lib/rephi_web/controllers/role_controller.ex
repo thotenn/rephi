@@ -15,11 +15,8 @@ defmodule RephiWeb.RoleController do
     * `DELETE /api/roles/:id` - Delete role (requires "roles:delete")
     * `POST /api/users/:user_id/roles/:role_id` - Assign role to user (requires "roles:assign")
     * `DELETE /api/users/:user_id/roles/:role_id` - Remove role from user (requires "roles:assign")
-    * `GET /api/roles/:id/parents` - The direct parent roles (requires "roles:view")
-    * `GET /api/roles/:id/children` - The roles that inherit from it directly (requires "roles:view")
-    * `POST /api/roles/:role_id/parents/:parent_id` - Make a role inherit from another
-      (requires "roles:edit")
-    * `DELETE /api/roles/:role_id/parents/:parent_id` - Remove a parent (requires "roles:edit")
+    * `GET /api/roles/:id/parents`, `GET /api/roles/:id/children` (requires "roles:view")
+    * `POST/DELETE /api/roles/:role_id/parents/:parent_id` (requires "roles:edit")
 
   `POST` and `PUT` accept the role attributes flat or wrapped under `"role"`.
   An id that is not the id of an existing record (unknown, not a number, out
@@ -39,10 +36,7 @@ defmodule RephiWeb.RoleController do
       a role that inherits from it or by unlinking such a role from it,
       answers `409`.
     * Linking or unlinking a parent requires holding both roles, or being an
-      admin (`403`, `Rephi.Authorization.can_link_roles?/3`). A link that
-      would make a role inherit from itself (`409`), a parent already linked
-      (`409`) and removing a link of the seeded hierarchy (`409`, system
-      links) are refused.
+      admin (`403`); cycles, duplicates and system links are `409`.
 
   ## Permission Requirements
 
@@ -52,7 +46,7 @@ defmodule RephiWeb.RoleController do
   - Update actions: `roles:edit`
   - Delete actions: `roles:delete`
   - Assignment actions: `roles:assign`
-  - Hierarchy changes: `roles:edit` (they change what a role grants)
+  - Hierarchy changes: `roles:edit`
 
   """
   use RephiWeb, :controller
@@ -456,8 +450,7 @@ defmodule RephiWeb.RoleController do
     end
   end
 
-  # A cycle is a rule of the data, not an invalid field of the request (the
-  # ids come from the path): 409, like a duplicate link.
+  # The ids come from the path, so a cycle is a 409 like a duplicate, not a 422.
   defp conflict_if_cycle({:error, %Ecto.Changeset{errors: errors}} = result) do
     cycle? =
       Enum.any?(errors, fn {_field, {_message, opts}} ->

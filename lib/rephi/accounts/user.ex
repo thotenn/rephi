@@ -11,9 +11,7 @@ defmodule Rephi.Accounts.User do
     * `token_version` - counter embedded in every JWT of the user. A token is
       only valid while its version matches, so incrementing it revokes every
       token issued before (see `Rephi.Accounts.revoke_tokens/1`)
-    * `must_change_password` - an administrator reset the password
-      (`Rephi.Accounts.reset_password/1`); the user must set a new one
-      before using the API. No changeset casts it.
+    * `must_change_password` - set by `Rephi.Accounts.reset_password/1`
 
   The three password fields are redacted, so they never show up when a user
   is inspected or logged.

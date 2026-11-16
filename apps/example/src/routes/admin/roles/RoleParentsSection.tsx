@@ -29,13 +29,6 @@ function LinkedRole({ link, children }: { link: RoleLink; children?: React.React
   );
 }
 
-/**
- * The hierarchy around a role: the roles it inherits from (its parents, which
- * `roles:edit` can add and remove) and the roles that inherit from it (read
- * only). The server decides what is allowed: a cycle, a link of the default
- * hierarchy or the last admins' path to the admin role are refused, and its
- * message is shown as is.
- */
 export default function RoleParentsSection({ role }: RoleParentsSectionProps) {
   const queryClient = useQueryClient();
   const { can } = usePermissions();
@@ -115,7 +108,7 @@ export default function RoleParentsSection({ role }: RoleParentsSectionProps) {
                 id={`add-parent-${role.id}`}
                 value={selected}
                 onChange={(event) => setSelected(event.target.value)}
-                className="flex-1 border rounded px-2 py-1 text-gray-900"
+                className="flex-1 min-w-0 border rounded px-2 py-1 text-gray-900"
                 data-testid="add-parent-select"
               >
                 <option value="">Add a parent role...</option>

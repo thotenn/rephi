@@ -7,16 +7,11 @@ defmodule RephiWeb.UserController do
     * `GET /api/users` - List users, paginated (`users:view`)
     * `GET /api/users/:id` - Get a user (`users:view`)
     * `GET /api/users/:id/roles` - The roles assigned to a user (`users:view`)
-    * `GET /api/users/:id/permissions` - The permissions granted to a user
-      directly, and everything it may do with where each comes from
-      (`users:view`)
+    * `GET /api/users/:id/permissions` - Direct and effective permissions (`users:view`)
     * `PUT /api/users/:id` - Change the email of a user (`users:edit`)
     * `DELETE /api/users/:id` - Delete a user (`users:delete`)
-    * `POST /api/users/:id/password` - Reset the password of another user
+    * `POST /api/users/:id/password` - Reset another user's password
       (`users:reset_password`)
-
-  Granting and revoking direct permissions is
-  `RephiWeb.PermissionController` (`/api/users/:user_id/permissions/...`).
 
   ## Rules
 
@@ -30,17 +25,6 @@ defmodule RephiWeb.UserController do
     * Nobody can delete their own account (`409`) nor reset their own
       password (`409`) here, and the last user holding the admin role cannot
       be deleted (`409`).
-
-  ## Password reset
-
-  The server generates a random temporary password and returns it once, in
-  that response only (with `cache-control: no-store`); it is never stored
-  in clear nor logged. Every session of the user ends (tokens revoked,
-  sockets closed) and the account is marked `must_change_password`: it can
-  sign in with the temporary password, but every route except `GET
-  /api/me`, `PUT /api/me/password` and logout answers `403` until it sets a
-  password of its own. The administrator never chooses (and so never knows
-  for good) the user's password. See `Rephi.Accounts.reset_password/1`.
 
   An `:id` that is not the id of an existing user (unknown, not a number, out
   of range) answers `404`. Lists accept `page` and `page_size` (see

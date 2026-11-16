@@ -8,8 +8,6 @@ defmodule RephiWeb.RoleHierarchyTest do
 
   alias Rephi.{Authorization, Seeds}
 
-  # admin -> manager -> user (system links); roles:view on manager,
-  # roles:edit on admin only.
   setup %{conn: conn} do
     {:ok, _} = Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
     {admin, admin_token} = create_user_with_token_and(roles: ["admin"])
@@ -142,7 +140,6 @@ defmodule RephiWeb.RoleHierarchyTest do
       assert ctx.as_admin |> post(link_path(a, a)) |> error_detail(409) ==
                "The role would inherit from itself"
 
-      # the seeded hierarchy too: user -> admin would close admin -> manager -> user
       assert ctx.as_admin |> post(link_path(ctx.user_role, ctx.admin_role)) |> error_detail(409) ==
                "The role would inherit from itself"
 
@@ -184,11 +181,8 @@ defmodule RephiWeb.RoleHierarchyTest do
       conn = authenticate_conn(conn, token)
       escalation = "You can only grant or revoke roles and permissions you hold"
 
-      # granting what it does not hold to a role it holds
       assert conn |> post(link_path(held, not_held)) |> error_detail(403) == escalation
-      # reshaping a role it does not hold
       assert conn |> post(link_path(not_held, held)) |> error_detail(403) == escalation
-      # making the admin role inherit, or itself inherit admin
       admin_role = Authorization.get_role_by_slug("admin")
       assert conn |> post(link_path(admin_role, held)) |> error_detail(403) == escalation
       assert conn |> post(link_path(held, admin_role)) |> error_detail(403) == escalation
@@ -258,14 +252,12 @@ defmodule RephiWeb.RoleHierarchyTest do
 
       {_u, token} = create_user_with_token_and(roles: [held.slug], permissions: ["roles:edit"])
 
-      # holding the child through it does not count as holding the parent:
-      # `held` inherits from `not_held`, so the user does hold it...
+      # `held` inherits from `not_held`, so the user holds both.
       assert conn
              |> authenticate_conn(token)
              |> delete(link_path(held, not_held))
              |> response(204)
 
-      # ...but not a role outside its reach.
       other = create_role()
       {:ok, _} = Authorization.assign_parent_role(other, held)
 

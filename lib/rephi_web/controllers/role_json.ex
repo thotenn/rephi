@@ -56,8 +56,7 @@ defmodule RephiWeb.RoleJSON do
   end
 
   @doc """
-  Renders the parents or the children of a role (`[{%Role{}, %RoleRole{}}]`),
-  each with the attributes of its link.
+  Renders the parents or the children of a role, each with its link.
   """
   def links(%{links: links}) do
     %{

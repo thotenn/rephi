@@ -14,10 +14,8 @@ defmodule RephiWeb.PermissionController do
       to a role (requires "permissions:assign")
     * `DELETE /api/roles/:role_id/permissions/:permission_id` - Remove a permission
       from a role (requires "permissions:assign")
-    * `POST /api/users/:user_id/permissions/:permission_id` - Grant a permission
-      to a user directly (requires "permissions:assign")
-    * `DELETE /api/users/:user_id/permissions/:permission_id` - Revoke a permission
-      granted directly to a user (requires "permissions:assign")
+    * `POST/DELETE /api/users/:user_id/permissions/:permission_id` - Grant or revoke
+      a permission of a user directly (requires "permissions:assign")
 
   `POST` and `PUT` accept the permission attributes flat or wrapped under
   `"permission"`. An id that is not the id of an existing record (unknown, not
@@ -34,12 +32,8 @@ defmodule RephiWeb.PermissionController do
     * Granting or revoking a permission requires holding it, or being an
       admin (`403` otherwise, `Rephi.Authorization.can_grant_permission?/2`).
     * Revoking from a role a permission it only inherits from a parent role
-      answers `409`: revoke it from that role. Likewise, revoking from a user
-      a permission it only holds through a role answers `409`.
-    * Granting a permission to a user directly follows the same rule as
-      assigning a role: the caller must hold it (or be an admin); the user's
-      own roles do not matter (`GET /api/users/:id/permissions` lists what
-      the user may do and why).
+      answers `409`: revoke it from that role. Likewise for a user and a
+      permission it only holds through a role.
   """
   use RephiWeb, :controller
   use PhoenixSwagger

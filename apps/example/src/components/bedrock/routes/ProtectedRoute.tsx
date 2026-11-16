@@ -13,10 +13,6 @@ interface ProtectedRouteProps {
  * A visitor who arrives signed out is sent back here after logging in (the
  * location travels in the navigation state). When the session ends on this
  * page (logout, expired token) the login starts fresh instead.
- *
- * A user whose password an administrator reset (`must_change_password`) is
- * kept on the profile page, where the password form is, until a new password
- * is set: the API refuses everything else meanwhile.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
@@ -31,6 +27,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to={ROUTE_PATHS.auth.login} replace state={state} />;
   }
 
+  // After an admin reset, the API refuses everything but the password change.
   if (mustChangePassword && location.pathname !== ROUTE_PATHS.pages.profile) {
     return <Navigate to={ROUTE_PATHS.pages.profile} replace />;
   }

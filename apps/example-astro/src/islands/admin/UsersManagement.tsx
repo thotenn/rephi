@@ -99,10 +99,7 @@ function UsersManagementScreen() {
   );
 }
 
-/**
- * Users list (paginated) with role assignment, direct permissions, email edit,
- * password reset and deletion.
- */
+/** Users list (paginated) with roles, permissions, email edit, password reset and deletion. */
 export default function UsersManagement() {
   return (
     <IslandProviders>

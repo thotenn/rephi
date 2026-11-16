@@ -344,11 +344,9 @@ defmodule Rephi.Authorization do
   end
 
   @doc """
-  Revokes a permission granted directly to a user.
-
-  Returns `:ok`, `{:error, :escalation}`, `{:error, :granted_through_role}`
-  when the user does not have it directly but holds it through one of its
-  roles (revoke it there, or remove the role), or `{:error, :not_found}`.
+  Revokes a permission granted directly to a user. Returns `:ok`,
+  `{:error, :not_found}`, `{:error, :escalation}` or
+  `{:error, :granted_through_role}` (held only through a role).
   """
   def remove_permission_from_user(user, permission, opts \\ [])
 
@@ -431,22 +429,8 @@ defmodule Rephi.Authorization do
   ## Hierarchy
 
   @doc """
-  Makes `child` inherit every permission of `parent`.
-
-  Returns `{:ok, %RoleRole{}}`, `{:error, :escalation}` (see
-  `can_link_roles?/3`) or `{:error, changeset}`: already linked (unique
-  constraint), unknown role or assigner, notes too long, or a cycle - it
-  would make a role its own ancestor (`child == parent`, or `child` is
-  already an ancestor of `parent`); a cycle error on `:parent_role_id`
-  carries `validation: :cycle`.
-
-  The check and the insert run in one transaction holding a lock on
-  `role_roles`, so two concurrent calls cannot close a cycle between them.
-  Accepts the "Assignment options".
-
-      iex> Authorization.assign_parent_role(editor, author, actor: current_access)
-      {:ok, %RoleRole{}}
-
+  Makes `child` inherit every permission of `parent`. Accepts the
+  "Assignment options"; a cycle is a changeset error tagged `validation: :cycle`.
   """
   def assign_parent_role(%Role{} = child, %Role{} = parent, opts \\ []) do
     with :ok <- check_actor(opts, &can_link_roles?(&1, child, parent)) do
@@ -458,6 +442,7 @@ defmodule Rephi.Authorization do
           notes: opts[:notes]
         })
 
+      # The lock keeps two concurrent links from closing a cycle between them.
       Repo.transact(fn ->
         Repo.query!("LOCK TABLE role_roles IN SHARE ROW EXCLUSIVE MODE")
 
@@ -477,12 +462,8 @@ defmodule Rephi.Authorization do
   end
 
   @doc """
-  Removes a parent from a role.
-
-  Returns `:ok`, `{:error, :not_found}` (not linked), `{:error, :escalation}`
-  (with `:actor`, see `can_link_roles?/3`), `{:error, :system_link}` (a link
-  of the seeded hierarchy) or `{:error, :last_admin}` (the link was how the
-  last admins held the role).
+  Removes a parent from a role: `:ok`, `{:error, :not_found}`, `:escalation`,
+  `:system_link` or `:last_admin`.
   """
   def remove_parent_role(child, parent, opts \\ [])
 
@@ -495,7 +476,6 @@ defmodule Rephi.Authorization do
     with :ok <- check_actor(opts, &can_link_roles?(&1, child, parent)),
          {:ok, :removed} <-
            preserving_admins(fn ->
-             # A single DELETE that skips system links, as in `delete_one/1`.
              case Repo.delete_all(where(link, [rr], not rr.is_system)) do
                {0, _} ->
                  if Repo.exists?(link), do: {:error, :system_link}, else: {:error, :not_found}
@@ -511,8 +491,7 @@ defmodule Rephi.Authorization do
   def remove_parent_role(_child, _parent, _opts), do: {:error, :not_found}
 
   @doc """
-  The direct parents of a role (not their ancestors), ordered by slug, each
-  with its link: `[{%Role{}, %RoleRole{}}]`. One query.
+  The direct parents of a role as `[{%Role{}, %RoleRole{}}]`, by slug.
   """
   def list_parent_roles(%Role{id: role_id}) when is_integer(role_id) do
     Repo.all(
@@ -528,8 +507,7 @@ defmodule Rephi.Authorization do
   def list_parent_roles(_role), do: []
 
   @doc """
-  The direct children of a role (the roles that inherit from it directly),
-  ordered by slug, each with its link: `[{%Role{}, %RoleRole{}}]`. One query.
+  The direct children of a role as `[{%Role{}, %RoleRole{}}]`, by slug.
   """
   def list_child_roles(%Role{id: role_id}) when is_integer(role_id) do
     Repo.all(
@@ -774,13 +752,8 @@ defmodule Rephi.Authorization do
   def can_grant_permission?(_actor, _permission), do: false
 
   @doc """
-  Whether `actor` may link `parent` to `child` in the hierarchy, or unlink
-  it: it is an admin, or it holds both roles (assigned or inherited).
-
-  Linking hands every holder of `child` the permissions of `parent`, so the
-  actor must be able to grant `parent`; and it changes what `child` grants,
-  so the actor must hold `child` too - a non-admin cannot reshape a role
-  above its own reach (the admin role, for one).
+  Whether `actor` may link or unlink `parent` and `child`: an admin, or a
+  holder of both roles, so nobody reshapes a role above its own reach.
   """
   @spec can_link_roles?(subject(), Role.t(), Role.t()) :: boolean()
   def can_link_roles?(actor, %Role{} = child, %Role{} = parent),
@@ -816,18 +789,8 @@ defmodule Rephi.Authorization do
   def get_user_permissions(_user), do: []
 
   @doc """
-  The permissions of a user split by where they come from, in two queries:
-
-    * `direct` - granted to the user itself, as `[%UserPermission{}]` with
-      `permission` loaded (who granted it, notes, when), the ones
-      `remove_permission_from_user/3` can revoke;
-    * `effective` - everything the user may do (what `load_access/1`
-      computes), as `[%{permission: %Permission{}, direct: boolean, roles:
-      [%{id, name, slug}]}]`: `direct` when it is granted to the user itself,
-      and `roles` the roles that grant it, assigned to the user or inherited
-      through the hierarchy (the role the permission is assigned to).
-
-  Both are ordered by slug (`roles` too). A `nil` or unsaved user has none.
+  `%{direct: [%UserPermission{}], effective: [%{permission, direct, roles}]}`
+  by slug, in two queries; `roles` are the roles the permission is assigned to.
   """
   def get_user_permission_sources(%User{id: user_id}) when is_integer(user_id) do
     direct =
