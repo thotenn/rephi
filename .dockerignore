@@ -1,0 +1,43 @@
+# Keeps the Docker build context small and free of local state: dependencies
+# and build output are produced inside the image, and local secrets never
+# leave this machine.
+
+.dockerignore
+.git
+.github
+.elixir_ls
+.vscode
+.idea
+.claude
+
+# Local configuration and secrets
+**/.env
+**/.env.local
+**/.env.*.local
+**/.dev.vars
+
+# Development and test artifacts
+/cover/
+/doc/
+/test/
+/tmp/
+/installer/
+erl_crash.dump
+*.ez
+
+# Mix artifacts
+/_build/
+/deps/
+
+# Node.js artifacts, rebuilt in the image
+node_modules
+.yarn
+/apps/*/dist/
+/apps/*/.astro/
+/apps/*/.vite/
+/apps/*/.wrangler/
+/packages/*/dist/
+
+# Build-time output, generated in the image
+/priv/static/apps/
+/priv/static/swagger.json
