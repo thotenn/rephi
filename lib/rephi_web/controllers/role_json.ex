@@ -1,30 +1,43 @@
 defmodule RephiWeb.RoleJSON do
   @moduledoc """
   Renders roles, their permissions and user-role assignments.
+
+  The permissions of a role come from
+  `Rephi.Authorization.get_role_permission_sources/1`: the ones assigned to
+  the role itself, and the ones it only inherits from its parent roles.
   """
 
-  alias Rephi.Accounts.UserRole
-  alias Rephi.Authorization.Role
+  alias Rephi.Authorization.{Role, UserRole}
+  alias RephiWeb.PaginationJSON
 
   @doc """
-  Renders a list of roles.
+  Renders a page of roles: `{"data": [...], "meta": {...}}`.
   """
-  def index(%{roles: roles}) do
-    %{data: for(role <- roles, do: data(role))}
+  def index(%{page: page}), do: PaginationJSON.render(page, &data/1)
+
+  @doc """
+  Renders a role with `permissions` (assigned to it) and
+  `inherited_permissions` (inherited only, each with `inherited_from`).
+  """
+  def show(%{role: role, sources: %{direct: direct, inherited: inherited}}) do
+    %{
+      data:
+        role
+        |> data()
+        |> Map.put(:permissions, Enum.map(direct, &permission/1))
+        |> Map.put(:inherited_permissions, Enum.map(inherited, &inherited_permission/1))
+    }
   end
 
   @doc """
-  Renders a single role.
+  Renders every permission a role grants, each flagged `inherited` (not
+  assigned to the role) with the roles it is `inherited_from`, by slug.
   """
-  def show(%{role: role, permissions: permissions}) do
-    %{data: data(role, permissions)}
-  end
+  def permissions(%{sources: %{direct: direct, inherited: inherited}}) do
+    direct = Enum.map(direct, &Map.merge(permission(&1), %{inherited: false, inherited_from: []}))
+    inherited = Enum.map(inherited, &Map.put(inherited_permission(&1), :inherited, true))
 
-  @doc """
-  Renders role permissions.
-  """
-  def permissions(%{permissions: permissions}) do
-    %{data: render_permissions(permissions)}
+    %{data: Enum.sort_by(direct ++ inherited, & &1.slug)}
   end
 
   @doc """
@@ -48,25 +61,24 @@ defmodule RephiWeb.RoleJSON do
       name: role.name,
       slug: role.slug,
       description: role.description,
+      is_system: role.is_system,
       inserted_at: role.inserted_at,
       updated_at: role.updated_at
     }
   end
 
-  defp data(%Role{} = role, permissions) do
-    role
-    |> data()
-    |> Map.put(:permissions, render_permissions(permissions))
+  defp permission(permission) do
+    %{
+      id: permission.id,
+      name: permission.name,
+      slug: permission.slug,
+      description: permission.description
+    }
   end
 
-  defp render_permissions(permissions) do
-    for permission <- permissions do
-      %{
-        id: permission.id,
-        name: permission.name,
-        slug: permission.slug,
-        description: permission.description
-      }
-    end
+  defp inherited_permission({permission, sources}) do
+    permission
+    |> permission()
+    |> Map.put(:inherited_from, Enum.map(sources, &Map.take(&1, [:id, :name, :slug])))
   end
 end

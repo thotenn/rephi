@@ -4,13 +4,12 @@ defmodule RephiWeb.PermissionJSON do
   """
 
   alias Rephi.Authorization.{Permission, RolePermission}
+  alias RephiWeb.PaginationJSON
 
   @doc """
-  Renders a list of permissions.
+  Renders a page of permissions: `{"data": [...], "meta": {...}}`.
   """
-  def index(%{permissions: permissions}) do
-    %{data: for(permission <- permissions, do: data(permission))}
-  end
+  def index(%{page: page}), do: PaginationJSON.render(page, &data/1)
 
   @doc """
   Renders a single permission.
@@ -41,6 +40,7 @@ defmodule RephiWeb.PermissionJSON do
       slug: permission.slug,
       description: permission.description,
       parent_id: permission.parent_id,
+      is_system: permission.is_system,
       inserted_at: permission.inserted_at,
       updated_at: permission.updated_at
     }

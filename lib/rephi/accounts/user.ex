@@ -17,8 +17,7 @@ defmodule Rephi.Accounts.User do
   """
   use Ecto.Schema
   import Ecto.Changeset
-  alias Rephi.Authorization.{Role, Permission}
-  alias Rephi.Accounts.{UserRole, UserPermission}
+  alias Rephi.Authorization.{Permission, Role, UserPermission, UserRole}
 
   # bcrypt only looks at the first 72 bytes of a password.
   @max_password_bytes 72
@@ -31,28 +30,65 @@ defmodule Rephi.Accounts.User do
     field :hashed_password, :string, redact: true
     field :token_version, :integer, default: 0
 
-    many_to_many :roles, Role, join_through: UserRole
-    many_to_many :permissions, Permission, join_through: UserPermission
+    # Assigned roles and direct permissions only. What a user is allowed to
+    # do (inherited roles, permissions through roles) is
+    # `Rephi.Authorization.load_access/1`.
+    many_to_many :roles, Role, join_through: UserRole, preload_order: [asc: :slug]
+
+    many_to_many :permissions, Permission,
+      join_through: UserPermission,
+      preload_order: [asc: :slug]
 
     timestamps(type: :utc_datetime)
   end
 
   @doc """
-  Validates an email and a password and hashes the password.
-
-  Changing the password of an existing user also increments `token_version`,
-  which revokes the tokens issued with the previous password.
+  Changeset to register a user: email and password, both required.
   """
-  def changeset(user, attrs) do
+  def registration_changeset(user, attrs) do
     user
     |> cast(attrs, [:email, :password, :password_confirmation])
     |> validate_required([:email, :password])
+    |> validate_email()
+    |> validate_password()
+  end
+
+  @doc """
+  Changeset to change the email of a user. Nothing else can be changed with
+  it: a `password` in `attrs` is ignored.
+  """
+  def email_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:email])
+    |> validate_required([:email])
+    |> validate_email()
+  end
+
+  @doc """
+  Changeset to set a new password.
+
+  It increments `token_version`, which revokes every token issued with the
+  previous password (see `Rephi.Accounts.change_password/3`).
+  """
+  def password_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:password, :password_confirmation])
+    |> validate_required([:password])
+    |> validate_password()
+  end
+
+  defp validate_email(changeset) do
+    changeset
     |> update_change(:email, &normalize_email/1)
     |> validate_format(:email, ~r/\A[^@,;\s]+@[^@,;\s]+\z/,
       message: "must have the @ sign and no spaces"
     )
     |> validate_length(:email, max: 160)
     |> unique_constraint(:email)
+  end
+
+  defp validate_password(changeset) do
+    changeset
     |> validate_length(:password, min: @min_password_length)
     |> validate_length(:password, max: @max_password_bytes, count: :bytes)
     |> validate_confirmation(:password, message: "passwords do not match")

@@ -46,8 +46,9 @@ defmodule Rephi.RepoTest do
     test "Accounts.get_user/1 and fetch_user/1" do
       user = create_user()
 
-      assert %User{roles: [], permissions: []} = Accounts.get_user(user.id)
-      assert {:ok, %User{roles: [], permissions: []}} = Accounts.fetch_user("#{user.id}")
+      id = user.id
+      assert %User{id: ^id} = Accounts.get_user(user.id)
+      assert {:ok, %User{id: ^id}} = Accounts.fetch_user("#{user.id}")
 
       for id <- invalid_ids() do
         assert Accounts.get_user(id) == nil

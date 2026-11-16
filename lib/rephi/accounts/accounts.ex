@@ -16,14 +16,14 @@ defmodule Rephi.Accounts do
   """
 
   import Ecto.Query, warn: false
-  alias Rephi.Repo
+  alias Rephi.{Authorization, Pagination, Repo}
   alias Rephi.Accounts.User
 
   @doc """
-  Gets a user by id with roles and permissions preloaded.
+  Gets a user by id, or `nil`.
 
-  Returns `nil` when the user does not exist or `id` is not a valid id; it
-  never raises on malformed input.
+  Never raises: an id that cannot be a primary key (`"abc"`, out of range) is
+  not found. Associations are not loaded; see `preload_grants/1`.
   """
   def get_user(id) do
     case fetch_user(id) do
@@ -36,19 +36,15 @@ defmodule Rephi.Accounts do
   Like `get_user/1`, but returns `{:ok, user}` or `{:error, :not_found}` so it
   can be chained in a `with` and handled by `RephiWeb.FallbackController`.
   """
-  def fetch_user(id) do
-    with {:ok, user} <- Repo.fetch(User, id) do
-      {:ok, Repo.preload(user, [:roles, :permissions])}
-    end
-  end
+  def fetch_user(id), do: Repo.fetch(User, id)
 
   @doc """
-  Gets a user by id, raising `Ecto.NoResultsError` if it does not exist.
+  Loads the roles assigned to the user and the permissions granted to it
+  directly (`user.roles`, `user.permissions`), ordered by slug. What the user
+  is allowed to do overall is `Rephi.Authorization.load_access/1`.
   """
-  def get_user!(id) do
-    User
-    |> Repo.get!(id)
-    |> Repo.preload([:roles, :permissions])
+  def preload_grants(user_or_users) do
+    Repo.preload(user_or_users, [:roles, :permissions], force: true)
   end
 
   @doc """
@@ -63,10 +59,48 @@ defmodule Rephi.Accounts do
 
   def get_user_by_email(_email), do: nil
 
+  @doc """
+  Creates a user from an email and a password. Assigns no role: that is
+  `register_user/1`.
+  """
   def create_user(attrs \\ %{}) do
     %User{}
-    |> User.changeset(attrs)
+    |> User.registration_changeset(attrs)
     |> Repo.insert()
+  end
+
+  @doc """
+  Signs a user up: creates it and assigns it the default role, in one
+  transaction (if the role cannot be assigned, no user is created).
+
+  The default role is `config :rephi, Rephi.Accounts, default_role: "user"`
+  (the default). `nil` assigns none; a slug with no role behind it is
+  skipped.
+  """
+  def register_user(attrs) do
+    Repo.transact(fn ->
+      with {:ok, user} <- create_user(attrs),
+           :ok <- assign_default_role(user) do
+        {:ok, user}
+      end
+    end)
+  end
+
+  @doc """
+  The slug of the role new users get (`register_user/1`), or `nil`.
+  """
+  def default_role_slug do
+    :rephi |> Application.get_env(__MODULE__, []) |> Keyword.get(:default_role, "user")
+  end
+
+  defp assign_default_role(user) do
+    case Authorization.get_role_by_slug(default_role_slug()) do
+      nil ->
+        :ok
+
+      role ->
+        with {:ok, _user_role} <- Authorization.assign_role_to_user(user, role), do: :ok
+    end
   end
 
   @doc """
@@ -96,39 +130,51 @@ defmodule Rephi.Accounts do
   def authenticate_user(_email, _password), do: {:error, :invalid_credentials}
 
   @doc """
-  Returns a list of all users with their roles and permissions preloaded.
-
-  ## Examples
-
-      iex> list_users()
-      [%User{email: "user@example.com", ...}, ...]
-
+  Returns one page of users, ordered by id, with their assigned roles and
+  direct permissions loaded. See `Rephi.Pagination`.
   """
-  def list_users do
-    User
-    |> Repo.all()
-    |> Repo.preload([:roles, :permissions])
+  def paginate_users(params \\ %{}) do
+    from(u in User, order_by: [asc: u.id], preload: [:roles, :permissions])
+    |> Pagination.paginate(params)
   end
 
   @doc """
-  Updates a user.
+  Changes the email of a user. Only the email: anything else in `attrs`
+  (a `password`, for instance) is ignored. See `change_password/3`.
 
-  Changing the password revokes the tokens of the user and closes its open
-  WebSocket connections.
-
-  ## Examples
-
-      iex> update_user(user, %{field: new_value})
+      iex> update_user(user, %{email: "new@example.com"})
       {:ok, %User{}}
-
-      iex> update_user(user, %{field: bad_value})
-      {:error, %Ecto.Changeset{}}
 
   """
   def update_user(%User{} = user, attrs) do
-    with {:ok, updated} <- user |> User.changeset(attrs) |> Repo.update() do
-      if updated.token_version != user.token_version, do: disconnect_sockets(updated)
-      {:ok, updated}
+    user
+    |> User.email_changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Sets a new password for a user who proves the current one.
+
+  `attrs` holds `password` (and optionally `password_confirmation`). On
+  success every token issued before is revoked and the user's WebSocket
+  connections are closed; the returned user carries the new
+  `token_version`, to sign a fresh token with.
+
+  Returns `{:ok, user}` or `{:error, changeset}` (a wrong current password is
+  an error on `:current_password`).
+  """
+  def change_password(%User{} = user, current_password, attrs) do
+    if is_binary(current_password) and
+         User.verify_password(current_password, user.hashed_password) do
+      with {:ok, updated} <- user |> User.password_changeset(attrs) |> Repo.update() do
+        disconnect_sockets(updated)
+        {:ok, updated}
+      end
+    else
+      {:error,
+       user
+       |> Ecto.Changeset.change()
+       |> Ecto.Changeset.add_error(:current_password, "is not valid")}
     end
   end
 
@@ -136,19 +182,16 @@ defmodule Rephi.Accounts do
   Deletes a user.
 
   Its tokens stop working (there is no user to load any more) and its open
-  WebSocket connections are closed.
-
-  ## Examples
+  WebSocket connections are closed. Returns `{:error, :last_admin}`, and
+  deletes nothing, if it is the last user holding the admin role (see
+  `Rephi.Authorization.preserving_admins/1`).
 
       iex> delete_user(user)
       {:ok, %User{}}
 
-      iex> delete_user(user)
-      {:error, %Ecto.Changeset{}}
-
   """
   def delete_user(%User{} = user) do
-    with {:ok, deleted} <- Repo.delete(user) do
+    with {:ok, deleted} <- Authorization.preserving_admins(fn -> Repo.delete(user) end) do
       disconnect_sockets(deleted)
       {:ok, deleted}
     end

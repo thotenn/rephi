@@ -50,4 +50,13 @@ defmodule RephiWeb.FallbackControllerTest do
     assert error_detail(conn, 403) == "Forbidden"
     assert get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
   end
+
+  test "domain errors have their own status and message", %{conn: conn} do
+    for {reason, {status, message}} <- RephiWeb.FallbackController.domain_errors() do
+      conn = RephiWeb.FallbackController.call(conn, {:error, reason})
+
+      assert conn.status == Plug.Conn.Status.code(status), "#{reason}"
+      assert Jason.decode!(conn.resp_body) == %{"errors" => %{"detail" => message}}
+    end
+  end
 end

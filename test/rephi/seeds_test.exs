@@ -119,6 +119,59 @@ defmodule Rephi.SeedsTest do
     end
   end
 
+  describe "RBAC-04 / RBAC-07" do
+    test "every seeded role and permission is a system record" do
+      {:ok, _} = Seeds.run(@admin)
+
+      assert Repo.all(from r in Role, where: not r.is_system) == []
+      assert Repo.all(from p in Permission, where: not p.is_system) == []
+    end
+
+    test "rows that already existed with a seeded slug are marked too, and nothing else changes" do
+      {:ok, role} = Authorization.create_role(%{name: "Members", slug: "user"})
+      {:ok, custom} = Authorization.create_role(%{name: "Custom", slug: "custom"})
+      refute role.is_system
+
+      {:ok, _} = Seeds.run(@admin)
+
+      assert %Role{is_system: true, name: "Members"} = Authorization.get_role_by_slug("user")
+      refute Authorization.get_role(custom.id).is_system
+    end
+
+    test "the user role holds no permission over other users" do
+      {:ok, _} = Seeds.run(@admin)
+
+      granted =
+        for slug <- ~w(users:view users:create users:edit users:delete),
+            role <- ~w(user manager admin),
+            Authorization.role_has_permission?(Authorization.get_role_by_slug(role), slug),
+            do: {role, slug}
+
+      refute Enum.any?(granted, &match?({"user", _}, &1))
+      assert {"manager", "users:view"} in granted
+      assert {"admin", "users:delete"} in granted
+      refute {"manager", "users:delete"} in granted
+    end
+
+    test "grants the seed no longer makes are reported, never revoked" do
+      {:ok, %{stale_grants: []}} = Seeds.run(@admin)
+
+      # What an older seed did: user -> users:view
+      {:ok, _} =
+        Authorization.assign_permission_to_role(
+          Authorization.get_role_by_slug("user"),
+          Authorization.get_permission_by_slug("users:view")
+        )
+
+      assert {:ok, %{stale_grants: [{"user", "users:view"}]}} = Seeds.run(@admin)
+
+      assert Authorization.role_has_permission?(
+               Authorization.get_role_by_slug("user"),
+               "users:view"
+             )
+    end
+  end
+
   test "only one of the two variables is an error" do
     assert {:error, "set both ADMIN_EMAIL and ADMIN_PASSWORD, or neither"} =
              Seeds.run(admin_email: "owner@example.com", admin_password: nil)

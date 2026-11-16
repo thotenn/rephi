@@ -3,11 +3,12 @@
 #     mix run priv/repo/seeds.exs
 #
 # Safe to run again: nothing is duplicated and nothing that exists is
-# changed. The administrator comes from ADMIN_EMAIL / ADMIN_PASSWORD, which
+# changed, except that seeded roles and permissions are marked as system
+# records. The administrator comes from ADMIN_EMAIL / ADMIN_PASSWORD, which
 # are required outside development. See `Rephi.Seeds` for the details.
 
 case Rephi.Seeds.run() do
-  {:ok, %{admin: admin}} ->
+  {:ok, %{admin: admin, stale_grants: stale_grants}} ->
     IO.puts("Seeded the default roles and permissions.")
 
     case admin do
@@ -33,6 +34,30 @@ case Rephi.Seeds.run() do
 
       :skipped ->
         IO.puts("No administrator seeded (ADMIN_EMAIL / ADMIN_PASSWORD are not set).")
+    end
+
+    if stale_grants != [] do
+      grants =
+        Enum.map_join(stale_grants, "\n", fn {role, permission} ->
+          "  #{role} -> #{permission}"
+        end)
+
+      IO.puts(
+        :stderr,
+        IO.ANSI.format([
+          :yellow,
+          """
+
+          NOTICE: these roles hold permissions the default seed no longer grants them
+          (an older seed did, or someone granted them on purpose). Seeding never
+          revokes anything; review them and revoke the ones you do not want, with
+          `DELETE /api/roles/:role_id/permissions/:permission_id` or
+          `Rephi.Authorization.remove_permission_from_role/2`:
+
+          #{grants}
+          """
+        ])
+      )
     end
 
   {:error, message} ->

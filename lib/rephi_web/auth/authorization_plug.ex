@@ -1,109 +1,80 @@
 defmodule RephiWeb.Auth.AuthorizationPlug do
   @moduledoc """
-  Phoenix plugs for authorization checks in controllers.
+  Protects controller actions by permission or role.
 
-  This module provides various plugs to protect controller actions based on
-  user permissions and roles. The plugs integrate with the authorization
-  system to check user permissions before allowing access to protected actions.
-
-  ## Usage
-
-  Add authorization plugs to your controller:
-
-      defmodule MyAppWeb.UserController do
+      defmodule MyAppWeb.ReportController do
         use MyAppWeb, :controller
 
-        # Protect specific actions
-        plug AuthorizationPlug, {:permission, "users:edit"} when action in [:edit, :update]
-        plug AuthorizationPlug, {:role, "admin"} when action in [:delete]
-
-        # Multiple permission checks
-        plug AuthorizationPlug, {:any_permission, ["users:create", "users:edit"]}
-        plug AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
-
-        # Your controller actions...
+        plug AuthorizationPlug, {:permission, "reports:view"} when action in [:index, :show]
+        plug AuthorizationPlug, {:any_permission, ["reports:create", "reports:edit"]}
+        plug AuthorizationPlug, {:all_permissions, ["reports:edit", "reports:publish"]}
+        plug AuthorizationPlug, {:role, "manager"}
       end
 
-  ## Response Codes
+  `{:role, slug}` follows the role hierarchy, like
+  `Rephi.Authorization.has_role?/2`: an `admin` passes `{:role, "manager"}`.
+  Prefer permissions: a role check hard-codes who may do something, a
+  permission can be granted to any role later.
 
-  - `401 Unauthorized` - User is not authenticated
-  - `403 Forbidden` - User is authenticated but lacks required permissions
+  The checks read `conn.assigns.current_access`, loaded once per request by
+  `RephiWeb.Auth.Pipeline`, so they cost no query. If the conn has a
+  `current_user` but no access (a pipeline of your own), it is loaded and
+  assigned on the first check.
 
-  Both are rendered by `RephiWeb.FallbackController`, so they use the same
-  error envelope as the rest of the API: `{"errors": {"detail": "Forbidden"}}`.
+  ## Responses
 
+    * `401` - nobody is signed in
+    * `403` - the user lacks the permission or role
+
+  Both are rendered by `RephiWeb.FallbackController`, in the API error
+  envelope: `{"errors": {"detail": "Forbidden"}}`.
   """
 
   import Plug.Conn
 
   alias Rephi.Authorization
+  alias Rephi.Authorization.Access
   alias RephiWeb.FallbackController
 
-  @doc """
-  Ensures the current user has the specified permission.
+  @doc false
+  def init({kind, _} = opts)
+      when kind in [:permission, :role, :any_permission, :all_permissions],
+      do: opts
 
-  Returns 401 if user is not authenticated, 403 if user lacks the permission.
+  def call(conn, {:permission, slug}), do: authorize(conn, &Authorization.can?(&1, slug))
+  def call(conn, {:role, slug}), do: authorize(conn, &Authorization.has_role?(&1, slug))
 
-  ## Parameters
+  def call(conn, {:any_permission, slugs}),
+    do: authorize(conn, &Authorization.can_any?(&1, slugs))
 
-    * `conn` - The Plug.Conn struct
-    * `permission_slug` - The permission slug to check (e.g., "users:edit")
-
-  ## Examples
-
-      # Direct function call (not recommended)
-      conn = require_permission(conn, "users:edit")
-
-      # Use as plug (recommended)
-      plug AuthorizationPlug, {:permission, "users:edit"}
-  """
-  def require_permission(conn, permission_slug) when is_binary(permission_slug) do
-    authorize(conn, &Authorization.can?(&1, permission_slug))
-  end
+  def call(conn, {:all_permissions, slugs}),
+    do: authorize(conn, &Authorization.can_all?(&1, slugs))
 
   @doc """
-  Ensures the current user has the specified role.
-
-  ## Examples
-
-      # In a controller
-      plug RephiWeb.Auth.AuthorizationPlug, {:role, "admin"}
+  Returns the conn with `current_access` assigned for its `current_user`
+  (loading it if needed), or the conn untouched when nobody is signed in.
   """
-  def require_role(conn, role_slug) when is_binary(role_slug) do
-    authorize(conn, &Authorization.has_role?(&1, role_slug))
+  def ensure_access(conn) do
+    case conn.assigns do
+      %{current_user: %{id: id}, current_access: %Access{user_id: id}} ->
+        conn
+
+      %{current_user: %{} = user} ->
+        assign(conn, :current_access, Authorization.load_access(user))
+
+      _ ->
+        conn
+    end
   end
 
-  @doc """
-  Ensures the current user has any of the specified permissions.
+  # Lets the request through when `allowed?` holds for the current access.
+  # Otherwise halts it with a 401 (nobody is signed in) or a 403.
+  defp authorize(conn, allowed?) do
+    conn = ensure_access(conn)
 
-  ## Examples
-
-      # In a controller
-      plug RephiWeb.Auth.AuthorizationPlug, {:any_permission, ["users:edit", "users:create"]}
-  """
-  def require_any_permission(conn, permission_slugs) when is_list(permission_slugs) do
-    authorize(conn, fn user -> Enum.any?(permission_slugs, &Authorization.can?(user, &1)) end)
-  end
-
-  @doc """
-  Ensures the current user has all of the specified permissions.
-
-  ## Examples
-
-      # In a controller
-      plug RephiWeb.Auth.AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
-  """
-  def require_all_permissions(conn, permission_slugs) when is_list(permission_slugs) do
-    authorize(conn, fn user -> Enum.all?(permission_slugs, &Authorization.can?(user, &1)) end)
-  end
-
-  # Lets the request through when `allowed?` returns true for the current user.
-  # Otherwise halts it with a 401 (nobody is signed in) or a 403 (the user is
-  # not allowed), in the API error envelope.
-  defp authorize(conn, allowed?) when is_function(allowed?, 1) do
-    case conn.assigns[:current_user] do
+    case conn.assigns[:current_access] do
       nil -> deny(conn, {:error, :unauthorized, "Authentication required"})
-      user -> if allowed?.(user), do: conn, else: deny(conn, {:error, :forbidden})
+      access -> if allowed?.(access), do: conn, else: deny(conn, {:error, :forbidden})
     end
   end
 
@@ -111,35 +82,5 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
     conn
     |> FallbackController.call(error)
     |> halt()
-  end
-
-  @doc """
-  Plug to use in controllers for authorization.
-  Call with :init_options set to {:permission, "permission:slug"} or {:role, "role_slug"}
-
-  ## Examples
-
-      # In a controller
-      plug RephiWeb.Auth.AuthorizationPlug, {:permission, "users:edit"}
-      plug RephiWeb.Auth.AuthorizationPlug, {:role, "admin"}
-      plug RephiWeb.Auth.AuthorizationPlug, {:any_permission, ["users:edit", "users:create"]}
-      plug RephiWeb.Auth.AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
-  """
-  def init(opts), do: opts
-
-  def call(conn, {:permission, permission_slug}) do
-    require_permission(conn, permission_slug)
-  end
-
-  def call(conn, {:role, role_slug}) do
-    require_role(conn, role_slug)
-  end
-
-  def call(conn, {:any_permission, permission_slugs}) do
-    require_any_permission(conn, permission_slugs)
-  end
-
-  def call(conn, {:all_permissions, permission_slugs}) do
-    require_all_permissions(conn, permission_slugs)
   end
 end

@@ -1,5 +1,6 @@
 defmodule RephiWeb.AuthControllerTest do
-  use RephiWeb.ConnCase
+  # One test changes the application environment
+  use RephiWeb.ConnCase, async: false
 
   alias Rephi.Accounts
   alias RephiWeb.Auth.Guardian
@@ -315,6 +316,114 @@ defmodule RephiWeb.AuthControllerTest do
 
     test "requires a token", %{conn: conn} do
       assert error_detail(post(conn, ~p"/api/users/logout"), 401) == "Authentication required"
+    end
+  end
+
+  describe "register/2 assigns the default role (RBAC-12)" do
+    setup do
+      {:ok, _} = Rephi.Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
+      :ok
+    end
+
+    test "the new user has the user role, and it shows in the session and /api/me", %{conn: conn} do
+      conn = post(conn, ~p"/api/users/register", @valid_user_attrs)
+
+      assert %{
+               "data" => %{"user" => %{"roles" => [%{"slug" => "user"}]} = user, "token" => token}
+             } =
+               json_response(conn, 201)
+
+      # The seeded user role grants no permission over other users
+      assert user["permissions"] == []
+
+      {:ok, claims} = Guardian.decode_and_verify(token)
+      assert claims["roles"] == ["user"]
+
+      assert %{"data" => %{"user" => %{"roles" => [%{"slug" => "user"}]}}} =
+               build_conn() |> authenticate_conn(token) |> get(~p"/api/me") |> json_response(200)
+
+      assert build_conn() |> authenticate_conn(token) |> get(~p"/api/users") |> response(403)
+    end
+
+    test "no role when the default role is disabled", %{conn: conn} do
+      put_app_env(Rephi.Accounts, default_role: nil)
+
+      assert %{"data" => %{"user" => %{"roles" => []}}} =
+               conn |> post(~p"/api/users/register", @valid_user_attrs) |> json_response(201)
+    end
+
+    test "registration works when the default role does not exist", %{conn: conn} do
+      put_app_env(Rephi.Accounts, default_role: "missing")
+
+      assert %{"data" => %{"user" => %{"roles" => []}}} =
+               conn |> post(~p"/api/users/register", @valid_user_attrs) |> json_response(201)
+    end
+  end
+
+  describe "change_password/2 (RBAC-06)" do
+    setup %{conn: conn} do
+      {user, token} = create_user_with_token()
+      {:ok, user: user, token: token, as_user: authenticate_conn(conn, token)}
+    end
+
+    test "with the current password: new session, old tokens revoked", ctx do
+      conn =
+        put(ctx.as_user, ~p"/api/me/password", %{
+          current_password: "password123",
+          password: "a-new-passphrase",
+          password_confirmation: "a-new-passphrase"
+        })
+
+      assert %{"data" => %{"token" => new_token, "user" => %{"id" => id}}} =
+               json_response(conn, 200)
+
+      assert id == ctx.user.id
+
+      assert build_conn() |> authenticate_conn(ctx.token) |> get(~p"/api/me") |> response(401)
+      assert build_conn() |> authenticate_conn(new_token) |> get(~p"/api/me") |> response(200)
+      assert {:ok, _} = Accounts.authenticate_user(ctx.user.email, "a-new-passphrase")
+      assert {:error, _} = Accounts.authenticate_user(ctx.user.email, "password123")
+    end
+
+    test "a wrong or missing current password changes nothing", ctx do
+      for body <- [
+            %{current_password: "wrong-password", password: "a-new-passphrase"},
+            %{password: "a-new-passphrase"},
+            %{current_password: 123, password: "a-new-passphrase"}
+          ] do
+        assert ctx.as_user |> put(~p"/api/me/password", body) |> json_response(422) == %{
+                 "errors" => %{"current_password" => ["is not valid"]}
+               }
+      end
+
+      assert {:ok, _} = Accounts.authenticate_user(ctx.user.email, "password123")
+      assert ctx.as_user |> get(~p"/api/me") |> response(200)
+    end
+
+    test "the new password follows the password rules", ctx do
+      conn =
+        put(ctx.as_user, ~p"/api/me/password", %{
+          user: %{current_password: "password123", password: "short"}
+        })
+
+      assert json_response(conn, 422) == %{
+               "errors" => %{"password" => ["should be at least 8 character(s)"]}
+             }
+
+      conn =
+        put(ctx.as_user, ~p"/api/me/password", %{
+          current_password: "password123",
+          password: "a-new-passphrase",
+          password_confirmation: "different"
+        })
+
+      assert %{"errors" => %{"password_confirmation" => ["passwords do not match"]}} =
+               json_response(conn, 422)
+    end
+
+    test "requires a token", %{conn: conn} do
+      assert conn |> put(~p"/api/me/password", %{}) |> error_detail(401) ==
+               "Authentication required"
     end
   end
 end

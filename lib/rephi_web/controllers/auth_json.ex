@@ -2,8 +2,9 @@ defmodule RephiWeb.AuthJSON do
   @moduledoc """
   Renders the responses of `RephiWeb.AuthController`.
 
-  Register, login and "me" all describe the signed-in user the same way (with
-  its roles and effective permissions), so a client can build its session from
+  Register, login, "me" and a password change all describe the signed-in user
+  the same way (the roles assigned to it and its effective permissions, from
+  its `Rephi.Authorization.Access`), so a client can build its session from
   any of them.
   """
 
@@ -21,12 +22,12 @@ defmodule RephiWeb.AuthJSON do
     %{data: %{user: user(assigns)}}
   end
 
-  defp user(%{user: user, roles: roles, permissions: permissions}) do
+  defp user(%{user: user, access: access}) do
     %{
       id: user.id,
       email: user.email,
-      roles: Enum.map(roles, &summary/1),
-      permissions: Enum.map(permissions, &summary/1)
+      roles: Enum.map(access.roles, &summary/1),
+      permissions: Enum.map(access.permissions, &summary/1)
     }
   end
 

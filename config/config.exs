@@ -80,6 +80,15 @@ config :rephi, RephiWeb.Plugs.RateLimit,
 # environment says otherwise (config/dev.exs, config/test.exs). See `Rephi.Seeds`.
 config :rephi, Rephi.Seeds, admin: :required
 
+# Authorization. `admin_role` names the administrator role: at least one user
+# always keeps it, and its holders can grant any role or permission. See
+# `Rephi.Authorization`.
+config :rephi, Rephi.Authorization, admin_role: "admin"
+
+# The role every new account gets on registration (`nil`: none). See
+# `Rephi.Accounts.register_user/1`.
+config :rephi, Rephi.Accounts, default_role: "user"
+
 # Swagger UI and swagger.json are served only where this is true (dev and
 # test). SWAGGER_ENABLED overrides it at runtime.
 config :rephi, :swagger_enabled, false

@@ -1,188 +1,66 @@
 defmodule RephiWeb.Auth.AuthorizationHelpers do
   @moduledoc """
-  Helper functions for authorization checks in controllers and views.
+  Authorization checks for the body of a controller action, imported by
+  `use RephiWeb, :controller`.
 
-  These helpers provide a convenient way to check user permissions and roles
-  within controller actions and view templates. They automatically handle
-  cases where no user is authenticated.
+  They read `conn.assigns.current_access`, loaded once per request by
+  `RephiWeb.Auth.Pipeline`, so they cost no query. Without a signed-in user
+  every check is `false`.
 
-  ## Usage in Controllers
-
-      defmodule MyAppWeb.UserController do
-        use MyAppWeb, :controller  # Automatically imports these helpers
-
-        def show(conn, %{"id" => id}) do
-          # Errors are rendered by RephiWeb.FallbackController in the API
-          # error envelope
-          with true <- can?(conn, "users:view") || {:error, :forbidden},
-               {:ok, user} <- Accounts.fetch_user(id) do
-            render(conn, :show, user: user)
-          end
+      def show(conn, %{"id" => id}) do
+        with {:ok, report} <- Reports.fetch_report(id) do
+          render(conn, :show, report: report, can_edit: can?(conn, "reports:edit"))
         end
       end
 
-  ## Usage in Views/Templates
+      def publish(conn, params) do
+        with true <- can_all?(conn, ["reports:edit", "reports:publish"]) || {:error, :forbidden},
+             ... do
+        end
+      end
 
-      # In a template (EEx)
-      <%= if can?(@conn, "users:edit") do %>
-        <button>Edit User</button>
-      <% end %>
-
-      <%= if has_role?(@conn, "admin") do %>
-        <div class="admin-panel">Admin Tools</div>
-      <% end %>
-
-  ## Safe Defaults
-
-  All functions return `false` when no user is authenticated, making them
-  safe to use without additional nil checks.
-
+  To guard a whole action, use `RephiWeb.Auth.AuthorizationPlug` instead.
   """
 
   alias Rephi.Authorization
+  alias Rephi.Authorization.Access
 
   @doc """
-  Checks if the current user has a specific permission.
+  The `Rephi.Authorization.Access` of the signed-in user, or `nil`.
 
-  Returns `false` if no user is authenticated or if the user lacks the permission.
-
-  ## Parameters
-
-    * `conn` - The Plug.Conn struct containing user information
-    * `permission_slug` - The permission slug to check (e.g., "users:edit")
-
-  ## Examples
-
-      # In a controller action
-      if can?(conn, "users:edit") do
-        # User can edit users
-      end
-
-      # In a view template
-      <%= if can?(@conn, "roles:create") do %>
-        <a href="/roles/new">Create Role</a>
-      <% end %>
-
-  ## Returns
-
-    * `true` - User is authenticated and has the permission
-    * `false` - User is not authenticated or lacks the permission
-
+  It comes from the conn when the pipeline loaded it; otherwise it is loaded
+  (one query, not stored: the helpers return booleans, not a conn).
   """
-  def can?(conn, permission_slug) do
-    case conn.assigns[:current_user] do
-      nil -> false
-      user -> Authorization.can?(user, permission_slug)
+  @spec current_access(Plug.Conn.t()) :: Access.t() | nil
+  def current_access(conn) do
+    case conn.assigns do
+      %{current_user: %{id: id}, current_access: %Access{user_id: id} = access} -> access
+      %{current_user: %{} = user} -> Authorization.load_access(user)
+      _ -> nil
     end
   end
 
   @doc """
-  Checks if the current user has a specific role.
-
-  Returns `false` if no user is authenticated or if the user doesn't have the role.
-
-  ## Parameters
-
-    * `conn` - The Plug.Conn struct containing user information
-    * `role_slug` - The role slug to check (e.g., "admin", "manager")
-
-  ## Examples
-
-      # In a controller action
-      if has_role?(conn, "admin") do
-        # User is an admin
-      end
-
-      # In a view template
-      <%= if has_role?(@conn, "manager") do %>
-        <div class="manager-tools">Manager Dashboard</div>
-      <% end %>
-
-  ## Returns
-
-    * `true` - User is authenticated and has the role
-    * `false` - User is not authenticated or doesn't have the role
-
+  Whether the signed-in user holds the permission (see
+  `Rephi.Authorization.can?/2`).
   """
-  def has_role?(conn, role_slug) do
-    case conn.assigns[:current_user] do
-      nil -> false
-      user -> Authorization.has_role?(user, role_slug)
-    end
-  end
+  def can?(conn, permission_slug), do: Authorization.can?(current_access(conn), permission_slug)
 
   @doc """
-  Checks if the current user has any of the given permissions.
+  Whether the signed-in user holds the role, assigned or inherited (see
+  `Rephi.Authorization.has_role?/2`).
   """
-  def can_any?(conn, permission_slugs) when is_list(permission_slugs) do
-    case conn.assigns[:current_user] do
-      nil -> false
-      user -> Enum.any?(permission_slugs, &Authorization.can?(user, &1))
-    end
-  end
+  def has_role?(conn, role_slug), do: Authorization.has_role?(current_access(conn), role_slug)
 
   @doc """
-  Checks if the current user has all of the given permissions.
+  Whether the signed-in user holds at least one of the permissions.
   """
-  def can_all?(conn, permission_slugs) when is_list(permission_slugs) do
-    case conn.assigns[:current_user] do
-      nil -> false
-      user -> Enum.all?(permission_slugs, &Authorization.can?(user, &1))
-    end
-  end
+  def can_any?(conn, permission_slugs),
+    do: Authorization.can_any?(current_access(conn), permission_slugs)
 
   @doc """
-  Gets the current user's roles.
+  Whether the signed-in user holds every one of the permissions.
   """
-  def current_user_roles(conn) do
-    case conn.assigns[:current_user] do
-      nil -> []
-      user -> Authorization.get_user_roles(user)
-    end
-  end
-
-  @doc """
-  Gets the current user's permissions.
-  """
-  def current_user_permissions(conn) do
-    case conn.assigns[:current_user] do
-      nil -> []
-      user -> Authorization.get_user_permissions(user)
-    end
-  end
-
-  @doc """
-  Returns the current user or nil.
-  """
-  def current_user(conn) do
-    conn.assigns[:current_user]
-  end
-
-  @doc """
-  Authorize action with flexible options.
-
-  ## Examples
-
-      authorize(conn, permission: "users:edit")
-      authorize(conn, role: "admin")
-      authorize(conn, any_permission: ["users:edit", "users:create"])
-  """
-  def authorize(conn, opts) do
-    cond do
-      opts[:permission] ->
-        can?(conn, opts[:permission])
-
-      opts[:role] ->
-        has_role?(conn, opts[:role])
-
-      opts[:any_permission] ->
-        can_any?(conn, opts[:any_permission])
-
-      opts[:all_permissions] ->
-        can_all?(conn, opts[:all_permissions])
-
-      true ->
-        false
-    end
-  end
+  def can_all?(conn, permission_slugs),
+    do: Authorization.can_all?(current_access(conn), permission_slugs)
 end

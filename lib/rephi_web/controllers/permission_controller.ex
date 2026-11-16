@@ -16,7 +16,20 @@ defmodule RephiWeb.PermissionController do
 
   `POST` and `PUT` accept the permission attributes flat or wrapped under
   `"permission"`. An id that is not the id of an existing record (unknown, not
-  a number, out of range) answers `404`.
+  a number, out of range) answers `404`. `GET /api/permissions` is paginated
+  (`page`, `page_size`, see `Rephi.Pagination`).
+
+  ## Rules
+
+    * `parent_id` only groups permissions for display; holding a parent
+      grants none of its children. Deleting a parent clears it on its
+      children.
+    * System permissions (`is_system`) cannot be deleted (`409`) and their
+      slug cannot change (`422`).
+    * Granting or revoking a permission requires holding it, or being an
+      admin (`403` otherwise, `Rephi.Authorization.can_grant_permission?/2`).
+    * Revoking from a role a permission it only inherits from a parent role
+      answers `409`: revoke it from that role.
   """
   use RephiWeb, :controller
   use PhoenixSwagger
@@ -38,18 +51,25 @@ defmodule RephiWeb.PermissionController do
   swagger_path :index do
     get("/api/permissions")
     summary("List all permissions")
-    description("Returns a list of all available permissions in the system")
+    description("One page of permissions, ordered by slug")
     produces("application/json")
     security([%{Bearer: []}])
 
+    parameters do
+      page(:query, :integer, "Page, from 1 (default 1)", required: false)
+      page_size(:query, :integer, "Entries per page (default 50, at most 100)", required: false)
+    end
+
     response(200, "Success", Schema.ref(:PermissionsResponse))
+    response(422, "Invalid page or page_size", Schema.ref(:ValidationErrors))
     response(401, "Unauthorized")
     response(403, "Forbidden - requires permissions:view permission")
   end
 
-  def index(conn, _params) do
-    permissions = Authorization.list_permissions()
-    render(conn, :index, permissions: permissions)
+  def index(conn, params) do
+    with {:ok, page} <- Authorization.paginate_permissions(params) do
+      render(conn, :index, page: page)
+    end
   end
 
   swagger_path :show do
@@ -153,6 +173,7 @@ defmodule RephiWeb.PermissionController do
     response(401, "Unauthorized")
     response(403, "Forbidden - requires permissions:delete permission")
     response(404, "Permission not found")
+    response(409, "System permission")
   end
 
   def delete(conn, %{"id" => id}) do
@@ -183,13 +204,18 @@ defmodule RephiWeb.PermissionController do
     )
 
     response(401, "Unauthorized")
-    response(403, "Forbidden - requires permissions:assign permission")
+
+    response(
+      403,
+      "Forbidden - requires permissions:assign, and holding the permission (or being an admin)"
+    )
+
     response(404, "Role or permission not found")
     response(409, "Permission already assigned to role")
   end
 
   def assign_to_role(conn, %{"role_id" => role_id, "permission_id" => permission_id} = params) do
-    opts = %{assigned_by: conn.assigns.current_user.id, notes: params["notes"]}
+    opts = [actor: current_access(conn), notes: params["notes"]]
 
     with {:ok, role} <- Authorization.fetch_role(role_id),
          {:ok, permission} <- Authorization.fetch_permission(permission_id),
@@ -217,14 +243,23 @@ defmodule RephiWeb.PermissionController do
 
     response(204, "Permission removed successfully")
     response(401, "Unauthorized")
-    response(403, "Forbidden - requires permissions:assign permission")
-    response(404, "Role or permission not found")
+
+    response(
+      403,
+      "Forbidden - requires permissions:assign, and holding the permission (or being an admin)"
+    )
+
+    response(404, "Role or permission not found, or the role does not grant it")
+    response(409, "The role only inherits the permission from a parent role")
   end
 
   def remove_from_role(conn, %{"role_id" => role_id, "permission_id" => permission_id}) do
     with {:ok, role} <- Authorization.fetch_role(role_id),
          {:ok, permission} <- Authorization.fetch_permission(permission_id),
-         {:ok, _role_permission} <- Authorization.remove_permission_from_role(role, permission) do
+         :ok <-
+           Authorization.remove_permission_from_role(role, permission,
+             actor: current_access(conn)
+           ) do
       send_resp(conn, :no_content, "")
     end
   end
@@ -241,19 +276,26 @@ defmodule RephiWeb.PermissionController do
           name: %{type: :string, description: "Permission display name"},
           slug: %{type: :string, description: "Permission slug (unique identifier)"},
           description: %{type: :string, description: "Permission description"},
-          category: %{type: :string, description: "Permission category"},
-          parent_id: %{type: :integer, description: "Parent permission ID", nullable: true},
-          inserted_at: %{type: :string, format: :datetime, description: "Creation timestamp"},
-          updated_at: %{type: :string, format: :datetime, description: "Last update timestamp"}
+          parent_id: %{
+            type: :integer,
+            description: "Parent permission ID, for grouping only (grants nothing)",
+            nullable: true
+          },
+          is_system: %{
+            type: :boolean,
+            description: "Part of the application: cannot be deleted, slug cannot change"
+          },
+          inserted_at: %{type: :string, format: :"date-time", description: "Creation timestamp"},
+          updated_at: %{type: :string, format: :"date-time", description: "Last update timestamp"}
         },
-        required: [:id, :name, :slug],
+        required: [:id, :name, :slug, :is_system],
         example: %{
           id: 1,
           name: "View Users",
           slug: "users:view",
           description: "Allows viewing user profiles and listings",
-          category: "users",
           parent_id: nil,
+          is_system: true,
           inserted_at: "2025-01-03T10:00:00Z",
           updated_at: "2025-01-03T10:00:00Z"
         }
@@ -263,31 +305,40 @@ defmodule RephiWeb.PermissionController do
         title: "Permission Input",
         description: "Permission creation/update data",
         properties: %{
-          name: %{type: :string, description: "Permission display name"},
-          slug: %{type: :string, description: "Permission slug (unique identifier)"},
-          description: %{type: :string, description: "Permission description"},
-          category: %{type: :string, description: "Permission category"},
-          parent_id: %{type: :integer, description: "Parent permission ID", nullable: true}
+          name: %{type: :string, maxLength: 255, description: "Permission display name"},
+          slug: %{
+            type: :string,
+            maxLength: 100,
+            pattern: "^[a-z0-9]+([_-][a-z0-9]+)*(:[a-z0-9]+([_-][a-z0-9]+)*)+$",
+            description:
+              "category:action (unique identifier); cannot change on a system permission"
+          },
+          description: %{type: :string, maxLength: 2000, description: "Permission description"},
+          parent_id: %{
+            type: :integer,
+            description: "Parent permission ID, for grouping only",
+            nullable: true
+          }
         },
         required: [:name, :slug],
         example: %{
           name: "Create Reports",
           slug: "reports:create",
-          description: "Allows creating new reports",
-          category: "reports"
+          description: "Allows creating new reports"
         }
       },
       PermissionsResponse: %{
         type: :object,
         title: "Permissions Response",
-        description: "List of permissions",
+        description: "One page of permissions",
         properties: %{
           data: %{
             type: :array,
             items: Schema.ref(:Permission)
-          }
+          },
+          meta: Schema.ref(:PageMeta)
         },
-        required: [:data]
+        required: [:data, :meta]
       },
       PermissionResponse: %{
         type: :object,

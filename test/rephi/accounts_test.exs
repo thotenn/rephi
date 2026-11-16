@@ -101,7 +101,7 @@ defmodule Rephi.AccountsTest do
 
     test "never show up when a user or a changeset is inspected" do
       changeset =
-        User.changeset(%User{}, %{
+        User.registration_changeset(%User{}, %{
           email: "redact@example.com",
           password: "a-secret-password",
           password_confirmation: "a-secret-password"
@@ -147,7 +147,7 @@ defmodule Rephi.AccountsTest do
     test "a password change bumps token_version and disconnects the user's sockets",
          %{user: user} do
       {:ok, updated} =
-        Accounts.update_user(user, %{email: user.email, password: "another-password"})
+        Accounts.change_password(user, "password123", %{password: "another-password"})
 
       assert updated.token_version == user.token_version + 1
       assert_receive %Phoenix.Socket.Broadcast{event: "disconnect", topic: "user_socket:" <> _}
@@ -164,8 +164,10 @@ defmodule Rephi.AccountsTest do
       assert_receive %Phoenix.Socket.Broadcast{event: "disconnect"}
     end
 
-    test "an update that fails validation neither bumps nor disconnects", %{user: user} do
-      assert {:error, _} = Accounts.update_user(user, %{email: user.email, password: "short"})
+    test "a password change that fails validation neither bumps nor disconnects",
+         %{user: user} do
+      assert {:error, _} = Accounts.change_password(user, "password123", %{password: "short"})
+      assert {:error, _} = Accounts.change_password(user, "wrong", %{password: "long-enough"})
       assert Accounts.get_user(user.id).token_version == 0
       refute_receive %Phoenix.Socket.Broadcast{event: "disconnect"}
     end

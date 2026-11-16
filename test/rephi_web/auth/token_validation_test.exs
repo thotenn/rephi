@@ -81,8 +81,7 @@ defmodule RephiWeb.Auth.TokenValidationTest do
     test "a password change revokes the tokens issued before it", %{conn: conn, user: user} do
       {:ok, old_token, _claims} = Guardian.encode_and_sign(user)
 
-      {:ok, user} =
-        Accounts.update_user(user, %{email: user.email, password: "a-new-password"})
+      {:ok, user} = Accounts.change_password(user, "password123", %{password: "a-new-password"})
 
       assert user.token_version == 1
       assert error_detail(me(conn, old_token), 401) == "Invalid or expired token"

@@ -7,7 +7,9 @@ defmodule RephiWeb.PermissionControllerTest do
                   permissions:assign)
 
   setup %{conn: conn} do
-    {user, token} = create_user_with_token_and(permissions: @permissions)
+    # An admin: it may grant any role or permission (RBAC-05 is tested below
+    # with users that are not).
+    {user, token} = create_user_with_token_and(permissions: @permissions, roles: ["admin"])
     {:ok, conn: authenticate_conn(conn, token), user: user}
   end
 
@@ -187,6 +189,80 @@ defmodule RephiWeb.PermissionControllerTest do
         assert error_detail(conn, 404) == "Not Found",
                "unexpected response for #{method} #{path}"
       end
+    end
+  end
+
+  describe "pagination (RBAC-18)" do
+    test "ordered by slug, with meta", %{conn: conn} do
+      for slug <- ~w(zz:last aa:first mm:middle), do: create_permission(%{slug: slug})
+
+      assert %{"data" => permissions, "meta" => %{"total" => total, "page_size" => 50}} =
+               conn |> get(~p"/api/permissions") |> json_response(200)
+
+      slugs = Enum.map(permissions, & &1["slug"])
+      assert slugs == Enum.sort(slugs)
+      assert total == length(permissions)
+    end
+  end
+
+  describe "parent_id (RBAC-09)" do
+    test "deleting a parent is not a 500: its children lose the parent", %{conn: conn} do
+      parent = create_permission()
+      child = create_permission(%{parent_id: parent.id})
+
+      assert conn |> delete(~p"/api/permissions/#{parent}") |> response(204)
+      assert Authorization.get_permission(child.id).parent_id == nil
+    end
+
+    test "a permission cannot be its own parent", %{conn: conn} do
+      permission = create_permission()
+
+      assert conn
+             |> put(~p"/api/permissions/#{permission}", %{parent_id: permission.id})
+             |> json_response(422) == %{
+               "errors" => %{"parent_id" => ["cannot be the permission itself"]}
+             }
+    end
+  end
+
+  describe "system permissions (RBAC-04)" do
+    test "cannot be deleted nor renamed by slug", %{conn: conn} do
+      {:ok, _} = Rephi.Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
+      permission = Authorization.get_permission_by_slug("roles:view")
+
+      assert conn |> delete(~p"/api/permissions/#{permission}") |> error_detail(409) ==
+               "System permissions cannot be deleted"
+
+      assert %{"errors" => %{"slug" => [_]}} =
+               conn
+               |> put(~p"/api/permissions/#{permission}", %{slug: "roles:read"})
+               |> json_response(422)
+
+      assert %{"data" => %{"is_system" => true, "slug" => "roles:view"}} =
+               conn |> get(~p"/api/permissions/#{permission}") |> json_response(200)
+    end
+  end
+
+  describe "no escalation (RBAC-05)" do
+    test "permissions:assign alone cannot grant a permission the caller does not hold", %{
+      conn: conn
+    } do
+      {user, token} = create_user_with_token_and(permissions: ["permissions:assign"])
+      own_role = grant_role(user, "helpdesk")
+      roles_delete = create_permission(%{slug: "roles:delete"})
+      conn = authenticate_conn(conn, token)
+
+      assert conn
+             |> post(~p"/api/roles/#{own_role.id}/permissions/#{roles_delete.id}")
+             |> error_detail(403) =~ "you hold"
+
+      refute Authorization.can?(user, "roles:delete")
+
+      assign = Authorization.get_permission_by_slug("permissions:assign")
+
+      assert conn
+             |> post(~p"/api/roles/#{own_role.id}/permissions/#{assign.id}")
+             |> json_response(201)
     end
   end
 

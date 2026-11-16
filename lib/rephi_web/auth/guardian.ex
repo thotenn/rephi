@@ -10,8 +10,10 @@ defmodule RephiWeb.Auth.Guardian do
 
   In addition to standard JWT claims, tokens include:
   - `ver` - The `token_version` of the user when the token was issued
-  - `roles` - Array of role slugs the user has assigned
-  - `permissions` - Array of all permission slugs the user has (direct + via roles)
+  - `roles` - Array of the slugs of the roles assigned to the user (not the
+    inherited ones)
+  - `permissions` - Array of the slugs of every effective permission (direct,
+    through roles, inherited)
 
   `roles` and `permissions` are a convenience for clients. The server never
   trusts them: every request is authorized against the database.
@@ -89,43 +91,22 @@ defmodule RephiWeb.Auth.Guardian do
   def verify_claims(_claims, _opts), do: {:error, :invalid_claims}
 
   @doc """
-  Builds additional claims: the token version, roles and permissions.
+  Adds the token version, the assigned role slugs and the effective
+  permission slugs to the claims of a new token.
 
-  This function is automatically called by Guardian when generating tokens.
-  It enriches the standard JWT claims with the user's current roles and
-  permissions, enabling client-side authorization checks.
-
-  ## Parameters
-
-    * `claims` - The base JWT claims map
-    * `resource` - The user struct to generate claims for
-    * `_opts` - Additional options (unused)
-
-  ## Returns
-
-    * `{:ok, enhanced_claims}` - Claims map with roles and permissions added
-
-  ## Example
-
-      # Before: %{"sub" => "123", "exp" => 1640995200}
-      # After:  %{
-      #   "sub" => "123",
-      #   "exp" => 1640995200,
-      #   "ver" => 0,
-      #   "roles" => ["admin"],
-      #   "permissions" => ["users:view", "users:create", "roles:manage"]
-      # }
-
+  Called by Guardian when a token is signed. Pass the user's
+  `Rephi.Authorization.Access` as the `:access` option of
+  `encode_and_sign/3` when it is already loaded; otherwise it is loaded here
+  (one query).
   """
-  def build_claims(claims, %User{} = resource, _opts) do
-    roles = Authorization.get_user_roles(resource)
-    permissions = Authorization.get_user_permissions(resource)
+  def build_claims(claims, %User{} = resource, opts) do
+    access = Keyword.get(opts, :access) || Authorization.load_access(resource)
 
     claims =
       claims
       |> Map.put("ver", resource.token_version)
-      |> Map.put("roles", Enum.map(roles, & &1.slug))
-      |> Map.put("permissions", Enum.map(permissions, & &1.slug))
+      |> Map.put("roles", Enum.map(access.roles, & &1.slug))
+      |> Map.put("permissions", Enum.map(access.permissions, & &1.slug))
 
     {:ok, claims}
   end

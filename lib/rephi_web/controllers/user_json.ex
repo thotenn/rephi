@@ -1,19 +1,18 @@
 defmodule RephiWeb.UserJSON do
   @moduledoc """
-  View module for rendering user data.
-
-  This module handles the JSON rendering of user resources,
-  including their associated roles and permissions.
+  Renders users: the roles assigned to them and the permissions granted to
+  them directly (`Rephi.Accounts.preload_grants/1`). What a user may do
+  overall is not part of this view; the signed-in user gets it from
+  `GET /api/me`.
   """
 
   alias Rephi.Accounts.User
+  alias RephiWeb.PaginationJSON
 
   @doc """
-  Renders a list of users.
+  Renders a page of users: `{"data": [...], "meta": {...}}`.
   """
-  def index(%{users: users}) do
-    %{data: for(user <- users, do: data(user))}
-  end
+  def index(%{page: page}), do: PaginationJSON.render(page, &data/1)
 
   @doc """
   Renders a single user.
@@ -33,8 +32,8 @@ defmodule RephiWeb.UserJSON do
     %{
       id: user.id,
       email: user.email,
-      roles: render_roles(user.roles || []),
-      permissions: render_permissions(user.permissions || []),
+      roles: grants(user.roles),
+      permissions: grants(user.permissions),
       inserted_at: user.inserted_at,
       updated_at: user.updated_at
     }
@@ -49,23 +48,10 @@ defmodule RephiWeb.UserJSON do
     }
   end
 
-  defp render_roles(roles) do
-    for role <- roles do
-      %{
-        id: role.id,
-        name: role.name,
-        slug: role.slug
-      }
-    end
+  defp grants(grants) when is_list(grants) do
+    for grant <- grants, do: %{id: grant.id, name: grant.name, slug: grant.slug}
   end
 
-  defp render_permissions(permissions) do
-    for permission <- permissions do
-      %{
-        id: permission.id,
-        name: permission.name,
-        slug: permission.slug
-      }
-    end
-  end
+  # Not loaded: render nothing rather than guess.
+  defp grants(%Ecto.Association.NotLoaded{}), do: []
 end

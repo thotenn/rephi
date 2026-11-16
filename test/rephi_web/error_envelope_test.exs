@@ -92,15 +92,15 @@ defmodule RephiWeb.ErrorEnvelopeTest do
     end
 
     test "FallbackController: resource not found", %{conn: conn} do
-      {_user, token} = create_user_with_token_and(roles: ["admin"])
+      {_user, token} = create_user_with_token_and(permissions: ["users:view"])
       conn = conn |> authenticate_conn(token) |> get("/api/users/999999")
 
       assert error_detail(conn, 404) == "Not Found"
     end
 
     test "FallbackController: conflict", %{conn: conn} do
-      {user, token} = create_user_with_token_and(permissions: ["roles:assign"])
-      role = grant_role(user, "editor")
+      {user, token} = create_user_with_token_and(permissions: ["roles:assign"], roles: ["editor"])
+      role = Rephi.Authorization.get_role_by_slug("editor")
 
       conn = conn |> authenticate_conn(token) |> post("/api/users/#{user.id}/roles/#{role.id}")
 

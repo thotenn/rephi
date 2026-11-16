@@ -6,7 +6,9 @@ defmodule RephiWeb.RoleControllerTest do
   @permissions ~w(roles:view roles:create roles:edit roles:delete roles:assign)
 
   setup %{conn: conn} do
-    {user, token} = create_user_with_token_and(permissions: @permissions)
+    # An admin: it may grant any role or permission (RBAC-05 is tested below
+    # with users that are not).
+    {user, token} = create_user_with_token_and(permissions: @permissions, roles: ["admin"])
     {:ok, conn: authenticate_conn(conn, token), user: user}
   end
 
@@ -241,6 +243,142 @@ defmodule RephiWeb.RoleControllerTest do
         assert error_detail(conn, 404) == "Not Found",
                "unexpected response for #{method} #{path}"
       end
+    end
+  end
+
+  describe "pagination and shape (RBAC-18, RBAC-21)" do
+    test "ordered by slug, with meta; is_system and UTC timestamps", %{conn: conn} do
+      for slug <- ~w(zeta alpha mid), do: create_role(%{slug: slug})
+
+      assert %{"data" => roles, "meta" => meta} =
+               conn |> get(~p"/api/roles?page_size=2") |> json_response(200)
+
+      slugs = Enum.map(roles, & &1["slug"])
+      assert slugs == Enum.sort(slugs)
+      assert length(roles) == 2
+      assert %{"page" => 1, "page_size" => 2, "total" => total} = meta
+      assert total >= 4
+
+      assert %{"is_system" => false, "inserted_at" => at} = hd(roles)
+      assert at =~ ~r/Z\z/
+    end
+  end
+
+  describe "direct and inherited permissions (RBAC-16)" do
+    setup do
+      parent = create_role(%{slug: "parent"})
+      child = create_role(%{slug: "child"})
+      {:ok, _} = Authorization.assign_parent_role(child, parent)
+      inherited = create_permission(%{slug: "posts:view"})
+      own = create_permission(%{slug: "posts:edit"})
+      {:ok, _} = Authorization.assign_permission_to_role(parent, inherited)
+      {:ok, _} = Authorization.assign_permission_to_role(child, own)
+      {:ok, parent: parent, child: child, inherited: inherited, own: own}
+    end
+
+    test "show separates them, and says where the inherited ones come from", ctx do
+      assert %{"data" => data} =
+               ctx.conn |> get(~p"/api/roles/#{ctx.child}") |> json_response(200)
+
+      assert [%{"slug" => "posts:edit"}] = data["permissions"]
+
+      assert [
+               %{
+                 "slug" => "posts:view",
+                 "inherited_from" => [%{"id" => parent_id, "slug" => "parent", "name" => _}]
+               }
+             ] = data["inherited_permissions"]
+
+      assert parent_id == ctx.parent.id
+    end
+
+    test "the permissions route lists both, flagged", ctx do
+      assert %{"data" => [edit, view]} =
+               ctx.conn |> get(~p"/api/roles/#{ctx.child}/permissions") |> json_response(200)
+
+      assert %{"slug" => "posts:edit", "inherited" => false, "inherited_from" => []} = edit
+      assert %{"slug" => "posts:view", "inherited" => true, "inherited_from" => [_]} = view
+    end
+
+    test "revoking an inherited permission is a 409, not a 404", ctx do
+      {_u, token} =
+        create_user_with_token_and(permissions: ["permissions:assign"], roles: ["admin"])
+
+      conn =
+        build_conn()
+        |> authenticate_conn(token)
+        |> delete(~p"/api/roles/#{ctx.child.id}/permissions/#{ctx.inherited.id}")
+
+      assert error_detail(conn, 409) ==
+               "The role inherits this permission from a parent role; revoke it from that role"
+    end
+  end
+
+  describe "system roles and the last admin (RBAC-04)" do
+    setup %{user: user} do
+      {:ok, _} = Rephi.Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
+      {:ok, admin_role: Authorization.get_role_by_slug("admin"), me: user}
+    end
+
+    test "a system role cannot be deleted nor renamed by slug", %{conn: conn} do
+      manager = Authorization.get_role_by_slug("manager")
+
+      assert conn |> delete(~p"/api/roles/#{manager}") |> error_detail(409) ==
+               "System roles cannot be deleted"
+
+      assert conn |> put(~p"/api/roles/#{manager}", %{slug: "boss"}) |> json_response(422) == %{
+               "errors" => %{"slug" => ["cannot be changed on a system role"]}
+             }
+
+      assert %{"data" => %{"name" => "Boss", "is_system" => true}} =
+               conn |> put(~p"/api/roles/#{manager}", %{name: "Boss"}) |> json_response(200)
+
+      assert Authorization.get_role(manager.id)
+    end
+
+    test "the last admin cannot remove the role from itself", ctx do
+      path = ~p"/api/users/#{ctx.me.id}/roles/#{ctx.admin_role.id}"
+
+      assert ctx.conn |> delete(path) |> error_detail(409) ==
+               "At least one user must keep the admin role"
+
+      other = create_user()
+      {:ok, _} = Authorization.assign_role_to_user(other, ctx.admin_role)
+      assert ctx.conn |> delete(path) |> response(204)
+    end
+  end
+
+  describe "no escalation (RBAC-05)" do
+    setup %{conn: conn} do
+      {:ok, _} = Rephi.Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
+
+      {helpdesk, token} =
+        create_user_with_token_and(permissions: ["roles:assign"], roles: ["user"])
+
+      {:ok, helpdesk: helpdesk, as_helpdesk: authenticate_conn(conn, token)}
+    end
+
+    test "roles:assign alone cannot hand out a role the caller does not hold", ctx do
+      admin_role = Authorization.get_role_by_slug("admin")
+      user_role = Authorization.get_role_by_slug("user")
+      target = create_user()
+
+      conn = post(ctx.as_helpdesk, ~p"/api/users/#{ctx.helpdesk.id}/roles/#{admin_role.id}")
+
+      assert error_detail(conn, 403) ==
+               "You can only grant or revoke roles and permissions you hold"
+
+      refute Authorization.has_role?(ctx.helpdesk, "admin")
+
+      assert ctx.as_helpdesk
+             |> post(~p"/api/users/#{target.id}/roles/#{user_role.id}")
+             |> json_response(201)
+
+      {:ok, _} = Authorization.assign_role_to_user(target, admin_role)
+
+      assert ctx.as_helpdesk
+             |> delete(~p"/api/users/#{target.id}/roles/#{admin_role.id}")
+             |> error_detail(403) =~ "you hold"
     end
   end
 

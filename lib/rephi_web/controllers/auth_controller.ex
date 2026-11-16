@@ -8,6 +8,12 @@ defmodule RephiWeb.AuthController do
     * `POST /api/users/login` - Exchange credentials for a token
     * `POST /api/users/logout` - Revoke every token of the signed-in user
     * `GET /api/me` - The signed-in user with roles and permissions
+    * `PUT /api/me/password` - Change the password of the signed-in user
+
+  A new account gets the default role (`Rephi.Accounts.register_user/1`).
+  The user in every response carries the roles assigned to it and its
+  effective permissions, from `Rephi.Authorization.load_access/1`: one query,
+  shared with the claims of the token.
 
   Register and login accept their attributes flat (`{"email": ..., "password": ...}`)
   or wrapped under `"user"`. Both are throttled per client IP
@@ -25,7 +31,8 @@ defmodule RephiWeb.AuthController do
   action_fallback RephiWeb.FallbackController
 
   plug RephiWeb.Plugs.RateLimit, [bucket: :register] when action == :register
-  plug RephiWeb.Plugs.RateLimit, [bucket: :login] when action == :login
+  # Checking the current password is as good a password oracle as login.
+  plug RephiWeb.Plugs.RateLimit, [bucket: :login] when action in [:login, :change_password]
 
   swagger_path :register do
     post("/api/users/register")
@@ -45,7 +52,7 @@ defmodule RephiWeb.AuthController do
   end
 
   def register(conn, _params) do
-    with {:ok, user} <- Accounts.create_user(resource_params(conn, "user")) do
+    with {:ok, user} <- Accounts.register_user(resource_params(conn, "user")) do
       conn
       |> put_status(:created)
       |> render_session(user)
@@ -110,7 +117,42 @@ defmodule RephiWeb.AuthController do
   end
 
   def me(conn, _params) do
-    render(conn, :me, session_assigns(conn.assigns.current_user))
+    render(conn, :me, user: conn.assigns.current_user, access: current_access(conn))
+  end
+
+  swagger_path :change_password do
+    put("/api/me/password")
+    summary("Change my password")
+
+    description(
+      "Sets a new password for the signed-in user, who must send the current one. Every token issued before is revoked and the user's WebSocket connections are closed; the response carries a new token."
+    )
+
+    consumes("application/json")
+    produces("application/json")
+    security([%{Bearer: []}])
+
+    parameters do
+      body(:body, Schema.ref(:PasswordChange), "Current and new password", required: true)
+    end
+
+    response(200, "Password changed, new session", Schema.ref(:AuthResponse))
+    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
+    response(422, "Wrong current password or invalid new one", Schema.ref(:ValidationErrors))
+    response(429, "Too many attempts, see the retry-after header", Schema.ref(:ErrorResponse))
+  end
+
+  def change_password(conn, _params) do
+    params = resource_params(conn, "user")
+
+    with {:ok, user} <-
+           Accounts.change_password(
+             conn.assigns.current_user,
+             params["current_password"],
+             Map.take(params, ["password", "password_confirmation"])
+           ) do
+      render_session(conn, user)
+    end
   end
 
   defp credentials(%{"email" => email, "password" => password})
@@ -127,16 +169,9 @@ defmodule RephiWeb.AuthController do
   end
 
   defp render_session(conn, user) do
-    {:ok, token, _claims} = Guardian.encode_and_sign(user)
-    render(conn, :session, [token: token] ++ session_assigns(user))
-  end
-
-  defp session_assigns(user) do
-    [
-      user: user,
-      roles: Authorization.get_user_roles(user),
-      permissions: Authorization.get_user_permissions(user)
-    ]
+    access = Authorization.load_access(user)
+    {:ok, token, _claims} = Guardian.encode_and_sign(user, %{}, access: access)
+    render(conn, :session, token: token, user: user, access: access)
   end
 
   # Swagger schema definitions
@@ -160,6 +195,18 @@ defmodule RephiWeb.AuthController do
           password: "a-long-passphrase"
         }
       },
+      PasswordChange: %{
+        type: :object,
+        title: "Password Change",
+        description: "The current password and the new one",
+        properties: %{
+          current_password: %{type: :string},
+          password: %{type: :string, minLength: 8, description: "8 characters to 72 bytes"},
+          password_confirmation: %{type: :string, description: "Optional; must match"}
+        },
+        required: [:current_password, :password],
+        example: %{current_password: "a-long-passphrase", password: "another-passphrase"}
+      },
       LoginCredentials: %{
         type: :object,
         title: "Login Credentials",
@@ -177,7 +224,8 @@ defmodule RephiWeb.AuthController do
       SessionUser: %{
         type: :object,
         title: "Session User",
-        description: "The signed-in user with its roles and effective permissions",
+        description:
+          "The signed-in user with the roles assigned to it and its effective permissions (direct, through roles, inherited)",
         properties: %{
           id: %{type: :integer, description: "User ID"},
           email: %{type: :string, description: "User's email address"},

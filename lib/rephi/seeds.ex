@@ -20,6 +20,20 @@ defmodule Rephi.Seeds do
   module (`roles/0`, `permissions/0`): adding a permission is one line, and
   seeding again adds it to an existing database.
 
+  Every seeded role and permission is marked `is_system` (it cannot be
+  deleted nor have its slug changed), including rows that already existed
+  with the same slug: that is the one thing seeding changes on existing
+  rows.
+
+  ## Grants the seed no longer makes
+
+  Seeding never revokes anything. When the seed stops granting a permission
+  to a role (as `users:view` stopped being granted to `user`), an existing
+  database keeps the old grant. `run/1` reports them as `:stale_grants`
+  (`[{role_slug, permission_slug}]`, only between seeded roles and seeded
+  permissions) and `priv/repo/seeds.exs` prints how to revoke them. Review
+  them: a grant you made on purpose looks the same.
+
   ## The administrator
 
   `ADMIN_EMAIL` and `ADMIN_PASSWORD` name the administrator (a user with the
@@ -54,9 +68,11 @@ defmodule Rephi.Seeds do
   @role_hierarchy [{"admin", "manager"}, {"manager", "user"}]
 
   # {slug, name, description, roles granted it directly}. Admin gets every
-  # permission directly, on top of what it inherits.
+  # permission directly, on top of what it inherits. The `user` role, which
+  # every new account gets (`Rephi.Accounts.register_user/1`), holds no
+  # permission over other users.
   @permissions [
-    {"users:view", "View Users", "View user profiles and listings", ["user"]},
+    {"users:view", "View Users", "View user profiles and listings", ["manager"]},
     {"users:create", "Create Users", "Create new user accounts", ["manager"]},
     {"users:edit", "Edit Users", "Edit user information", ["manager"]},
     {"users:delete", "Delete Users", "Delete user accounts", []},
@@ -77,6 +93,8 @@ defmodule Rephi.Seeds do
     {"notifications:broadcast", "Broadcast Notifications",
      "Send a notification to every connected user", []}
   ]
+
+  @type stale_grant :: {role_slug :: String.t(), permission_slug :: String.t()}
 
   @type admin_result ::
           {:created, String.t()}
@@ -110,10 +128,11 @@ defmodule Rephi.Seeds do
     * `:admin` - `:required`, `:default` or `:optional`; defaults to the
       application configuration (see the module documentation)
 
-  Returns `{:ok, %{admin: admin_result}}`, or `{:error, message}` without
-  having changed anything.
+  Returns `{:ok, %{admin: admin_result, stale_grants: [stale_grant]}}`, or
+  `{:error, message}` without having changed anything.
   """
-  @spec run(keyword()) :: {:ok, %{admin: admin_result()}} | {:error, String.t()}
+  @spec run(keyword()) ::
+          {:ok, %{admin: admin_result(), stale_grants: [stale_grant()]}} | {:error, String.t()}
   def run(opts \\ []) do
     with {:ok, admin} <- admin_credentials(opts) do
       Repo.transact(fn ->
@@ -143,18 +162,51 @@ defmodule Rephi.Seeds do
         )
 
         with {:ok, result} <- seed_admin(admin, roles["admin"]) do
-          {:ok, %{admin: result}}
+          {:ok, %{admin: result, stale_grants: stale_grants()}}
         end
       end)
     end
   end
 
-  # Inserts the row identified by `slug` unless it exists, and returns it.
+  # Inserts the row identified by `slug` unless it exists, and returns it,
+  # marked as a system row either way.
   defp ensure!(schema, %{slug: slug} = attrs) do
-    Repo.get_by(schema, slug: slug) ||
-      schema.__struct__()
-      |> schema.changeset(attrs)
-      |> Repo.insert!()
+    case Repo.get_by(schema, slug: slug) do
+      nil ->
+        schema.__struct__()
+        |> schema.create_changeset(attrs)
+        |> Ecto.Changeset.put_change(:is_system, true)
+        |> Repo.insert!()
+
+      %{is_system: true} = existing ->
+        existing
+
+      existing ->
+        existing |> Ecto.Changeset.change(is_system: true) |> Repo.update!()
+    end
+  end
+
+  @doc """
+  Grants between seeded roles and seeded permissions that exist in the
+  database but that the seed does not make. See "Grants the seed no longer
+  makes".
+  """
+  @spec stale_grants() :: [stale_grant()]
+  def stale_grants do
+    seeded = MapSet.new(for p <- permissions(), role <- p.roles, do: {role, p.slug})
+
+    from(rp in "role_permissions",
+      join: r in Role,
+      on: r.id == rp.role_id,
+      join: p in Permission,
+      on: p.id == rp.permission_id,
+      where: r.slug in ^Enum.map(@roles, & &1.slug),
+      where: p.slug in ^Enum.map(@permissions, &elem(&1, 0)),
+      order_by: [r.slug, p.slug],
+      select: {r.slug, p.slug}
+    )
+    |> Repo.all()
+    |> Enum.reject(&MapSet.member?(seeded, &1))
   end
 
   defp link!(table, left, right, pairs) do

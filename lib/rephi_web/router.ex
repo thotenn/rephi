@@ -52,6 +52,7 @@ defmodule RephiWeb.Router do
     pipe_through :authenticated
 
     get "/me", AuthController, :me
+    put "/me/password", AuthController, :change_password
     post "/users/logout", AuthController, :logout
     post "/notifications/broadcast", NotificationController, :broadcast
 
@@ -66,7 +67,7 @@ defmodule RephiWeb.Router do
     post "/roles/:role_id/permissions/:permission_id", PermissionController, :assign_to_role
     delete "/roles/:role_id/permissions/:permission_id", PermissionController, :remove_from_role
 
-    # User management endpoints (admin only)
+    # User management endpoints (users:view / users:edit / users:delete)
     resources "/users", UserController, only: [:index, :show, :update, :delete]
     get "/users/:id/roles", UserController, :get_user_roles
   end
