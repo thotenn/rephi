@@ -80,7 +80,16 @@ class PhoenixSocket {
     if (!socket) return;
     this.socket = null;
     this.url = null;
-    socket.disconnect();
+    if (socket.connectionState() === "connecting") {
+      // Closing a WebSocket during its handshake makes browsers log a
+      // warning; close it as soon as the handshake ends instead. Nothing uses
+      // this socket any more (it is no longer `getSocket()`).
+      const close = () => socket.disconnect();
+      socket.onOpen(close);
+      socket.onError(close);
+    } else {
+      socket.disconnect();
+    }
     this.setStatus("idle");
   }
 
