@@ -2,6 +2,7 @@ import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, envField } from "astro/config";
 import { loadEnv } from "vite";
+import { appConfig } from "./app.config";
 
 // `astro.config.*` is evaluated before Astro loads `.env`, so the build-time
 // options below are read with Vite's loader (process env wins over `.env` files).
@@ -12,9 +13,9 @@ export default defineConfig({
   // static host (Cloudflare Pages, Workers static assets, a CDN...) serves as-is.
   output: "static",
 
-  // Sub-path the site is served from. "/" on Cloudflare Pages; set
-  // ASTRO_BASE=/some/path to host it under a prefix (see the README).
-  base: buildEnv.ASTRO_BASE || "/",
+  // Sub-path the site is served from (app.config.ts); ASTRO_BASE=/some/path
+  // overrides it to host the site under a prefix (see the README).
+  base: buildEnv.ASTRO_BASE || appConfig.basename,
 
   // Pages are emitted as `<route>/index.html`, whose canonical URL ends with a
   // slash on static hosts. Requiring it everywhere keeps dev and production
@@ -22,7 +23,7 @@ export default defineConfig({
   trailingSlash: "always",
   build: { format: "directory" },
 
-  server: { port: 4321 },
+  server: { port: appConfig.port },
 
   integrations: [react()],
 

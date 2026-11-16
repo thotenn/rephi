@@ -6,8 +6,8 @@ How routing works in `apps/example` and how to extend it.
 
 Routes are declared as data in `src/config/routes.ts` and turned into React Router routes by
 `src/router.tsx`, which wraps each page in `Suspense` (lazy loading) and in the guard its `meta`
-asks for. The router's basename is the app's Vite `base` (`/app/example`, from the folder name),
-so every path below is relative to it.
+asks for. The router's basename is the app's Vite `base`, i.e. `basename` in `app.config.ts`
+(`/app/example`, where Phoenix serves the build), so every path below is relative to it.
 
 ## File Structure
 

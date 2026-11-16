@@ -10,7 +10,8 @@ src/
 └── routes/                    # Componentes de las páginas
 ```
 
-Las rutas son relativas al `basename` del router (`/app/example`, el `base` de Vite). Ver
+Las rutas son relativas al `basename` del router (`/app/example`: `basename` de
+`app.config.ts`, que también es el `base` de Vite). Ver
 [ROUTER_GUIDE.md](ROUTER_GUIDE.md) para los guards (`requireAuth`, `permission`, `publicOnly`).
 
 ## Cómo Agregar Nuevas Rutas

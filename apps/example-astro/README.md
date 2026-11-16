@@ -144,7 +144,8 @@ yarn shared:build          # the app imports the compiled shared library
 yarn example-astro:dev     # http://localhost:4321
 ```
 
-The dev server listens on port **4321**. To use another port:
+The dev server listens on port **4321** (`port` in `app.config.ts`, next to `basename`, the
+path the site is served from). To use another port once:
 
 ```bash
 yarn example-astro:dev --port 5173
@@ -180,7 +181,7 @@ Copy `.env.example` to `.env` to override the defaults.
 |---|---|---|
 | `PUBLIC_API_URL` | `http://localhost:4000/api` | Base URL of the Phoenix REST API |
 | `PUBLIC_WS_URL` | `ws://localhost:4000/socket` | Phoenix socket endpoint |
-| `ASTRO_BASE` | `/` | Sub-path the site is served from (see [Base path](#base-path)) |
+| `ASTRO_BASE` | `basename` of `app.config.ts` (`/`) | Sub-path the site is served from (see [Base path](#base-path)) |
 
 The `PUBLIC_*` variables are public by design: they end up in the JavaScript sent to the
 browser. All three are read **when the site is built** (or when the dev server starts), so a

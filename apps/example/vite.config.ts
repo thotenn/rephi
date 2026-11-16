@@ -1,11 +1,6 @@
-import { basename } from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
-
-// Phoenix serves every `priv/static/apps/<name>` at `/app/<name>/`, and
-// `yarn build` copies `apps/<name>/dist` there: the folder name of this app is
-// its URL. A copy of this app under another folder needs no change here.
-const APP_NAME = basename(import.meta.dirname);
+import { appConfig } from "./app.config";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, import.meta.dirname, "VITE_");
@@ -16,9 +11,12 @@ export default defineConfig(({ mode }) => {
       // Resolves the `~/*` alias from tsconfig.json `paths`.
       tsconfigPaths: true,
     },
-    base: `/app/${APP_NAME}/`,
+    // Phoenix serves every `priv/static/apps/<name>` at `/app/<name>/`, and
+    // `yarn build` copies `apps/<name>/dist` there.
+    base: `${appConfig.basename}/`,
     server: {
-      port: Number(env.VITE_PORT) || 5001,
+      port: Number(env.VITE_PORT) || appConfig.port,
+      // Another port would not be on the backend's CORS list: fail instead.
       strictPort: true,
     },
     build: {
