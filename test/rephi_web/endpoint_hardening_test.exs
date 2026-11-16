@@ -99,7 +99,7 @@ defmodule RephiWeb.EndpointHardeningTest do
         |> put_req_header("content-type", "multipart/form-data")
         |> post("/api/users/login", "x")
 
-      assert unsupported.status in [400, 415]
+      assert unsupported.status == 400
 
       assert get_resp_header(unsupported, "access-control-allow-origin") == [
                "http://localhost:3000"
