@@ -11,6 +11,7 @@ defmodule Rephi.Accounts.User do
     * `token_version` - counter embedded in every JWT of the user. A token is
       only valid while its version matches, so incrementing it revokes every
       token issued before (see `Rephi.Accounts.revoke_tokens/1`)
+    * `must_change_password` - set by `Rephi.Accounts.reset_password/1`
 
   The three password fields are redacted, so they never show up when a user
   is inspected or logged.
@@ -29,6 +30,7 @@ defmodule Rephi.Accounts.User do
     field :password_confirmation, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
     field :token_version, :integer, default: 0
+    field :must_change_password, :boolean, default: false
 
     # Assigned roles and direct permissions only. What a user is allowed to
     # do (inherited roles, permissions through roles) is

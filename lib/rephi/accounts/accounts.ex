@@ -8,8 +8,9 @@ defmodule Rephi.Accounts do
   ## Token revocation
 
   Every JWT carries the `token_version` of its user (see
-  `RephiWeb.Auth.Guardian`). Three things end the sessions of a user: a
-  password change (`update_user/2`), an explicit logout (`revoke_tokens/1`)
+  `RephiWeb.Auth.Guardian`). Four things end the sessions of a user: a
+  password change (`change_password/3`), a password reset by an
+  administrator (`reset_password/1`), an explicit logout (`revoke_tokens/1`)
   and deleting the account (`delete_user/1`). Each of them also closes the
   WebSocket connections the user has open, by broadcasting `"disconnect"` on
   `socket_id/1`.
@@ -166,7 +167,11 @@ defmodule Rephi.Accounts do
   def change_password(%User{} = user, current_password, attrs) do
     if is_binary(current_password) and
          User.verify_password(current_password, user.hashed_password) do
-      with {:ok, updated} <- user |> User.password_changeset(attrs) |> Repo.update() do
+      with {:ok, updated} <-
+             user
+             |> User.password_changeset(attrs)
+             |> Ecto.Changeset.put_change(:must_change_password, false)
+             |> Repo.update() do
         disconnect_sockets(updated)
         {:ok, updated}
       end
@@ -176,6 +181,45 @@ defmodule Rephi.Accounts do
        |> Ecto.Changeset.change()
        |> Ecto.Changeset.add_error(:current_password, "is not valid")}
     end
+  end
+
+  @doc """
+  Sets a random temporary password (returned, never stored in clear), flags
+  `must_change_password` and ends every session of the user.
+  """
+  @spec reset_password(User.t()) :: {:ok, User.t(), String.t()} | {:error, :not_found}
+  def reset_password(%User{id: id} = user) do
+    password = temporary_password()
+
+    result =
+      Repo.transact(fn ->
+        changeset =
+          user
+          |> User.password_changeset(%{password: password})
+          # Incremented in SQL: a concurrent logout must not leave a token alive.
+          |> Ecto.Changeset.delete_change(:token_version)
+          |> Ecto.Changeset.put_change(:must_change_password, true)
+
+        with {:ok, _user} <- Repo.update(changeset, stale_error_field: :id),
+             {1, [updated]} <-
+               Repo.update_all(from(u in User, where: u.id == ^id, select: u),
+                 inc: [token_version: 1]
+               ) do
+          {:ok, updated}
+        else
+          _deleted -> {:error, :not_found}
+        end
+      end)
+
+    # After the commit, or a client re-checking its token on disconnect still finds it valid.
+    with {:ok, updated} <- result do
+      disconnect_sockets(updated)
+      {:ok, updated, password}
+    end
+  end
+
+  defp temporary_password do
+    18 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
   end
 
   @doc """

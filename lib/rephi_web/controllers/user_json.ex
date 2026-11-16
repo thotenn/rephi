@@ -22,6 +22,39 @@ defmodule RephiWeb.UserJSON do
   end
 
   @doc """
+  Renders the direct permissions of a user and the effective ones with their source.
+  """
+  def permissions(%{sources: %{direct: direct, effective: effective}}) do
+    %{
+      data: %{
+        direct:
+          for grant <- direct do
+            grant.permission
+            |> permission_data()
+            |> Map.merge(%{
+              assigned_by: grant.assigned_by,
+              notes: grant.notes,
+              granted_at: grant.inserted_at
+            })
+          end,
+        effective:
+          for entry <- effective do
+            entry.permission
+            |> permission_data()
+            |> Map.merge(%{direct: entry.direct, roles: Enum.map(entry.roles, &summary/1)})
+          end
+      }
+    }
+  end
+
+  @doc """
+  Renders a reset password: the user and its temporary password.
+  """
+  def password_reset(%{user: user, password: password}) do
+    %{data: %{user: data(user), temporary_password: password}}
+  end
+
+  @doc """
   Renders user roles.
   """
   def roles(%{roles: roles}) do
@@ -32,6 +65,7 @@ defmodule RephiWeb.UserJSON do
     %{
       id: user.id,
       email: user.email,
+      must_change_password: user.must_change_password,
       roles: grants(user.roles),
       permissions: grants(user.permissions),
       inserted_at: user.inserted_at,
@@ -47,6 +81,17 @@ defmodule RephiWeb.UserJSON do
       description: role.description
     }
   end
+
+  defp permission_data(permission) do
+    %{
+      id: permission.id,
+      name: permission.name,
+      slug: permission.slug,
+      description: permission.description
+    }
+  end
+
+  defp summary(%{id: id, name: name, slug: slug}), do: %{id: id, name: name, slug: slug}
 
   defp grants(grants) when is_list(grants) do
     for grant <- grants, do: %{id: grant.id, name: grant.name, slug: grant.slug}

@@ -7,18 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Role hierarchy over the API** - `GET /api/roles/:id/parents` and `GET /api/roles/:id/children`
+  (`roles:view`) list the direct links of a role (`RoleLink`: the role plus `system_link`,
+  `assigned_by`, `notes`, `linked_at`); `POST` / `DELETE /api/roles/:role_id/parents/:parent_id`
+  (`roles:edit`) link and unlink a parent. A non-admin must hold both roles (`403`); a cycle, a
+  duplicate link (`409`), removing a link of the default hierarchy (`409`) and unlinking the last
+  admins' path to the admin role (`409`) are refused
+- **Direct user permissions over the API** - `GET /api/users/:id/permissions` (`users:view`):
+  `direct` (with who granted them) and `effective` (each with `direct` and the `roles` it comes
+  from); `POST` / `DELETE /api/users/:user_id/permissions/:permission_id` (`permissions:assign`,
+  holding the permission unless admin). Revoking one the user only holds through a role is a `409`
+- **Admin password reset** - `POST /api/users/:id/password` (new permission
+  `users:reset_password`, seeded for `admin` only): a random temporary password returned once
+  (`cache-control: no-store`), every session of the user ended, and `must_change_password` set on
+  the account: until the user sets a new password with `PUT /api/me/password`, every other route
+  but `GET /api/me` and logout answers `403` (`RephiWeb.Auth.PasswordChangeGate`). Own account
+  `409`; a user holding roles the caller does not hold `403`
+- `must_change_password` in the session user (register, login, `/api/me`, password change) and in
+  the user listings
+- `role_roles` gets `assigned_by`, `notes` and `is_system` (links of the default hierarchy, marked
+  by the seeds); `Rephi.Authorization.assign_parent_role/3` and `remove_parent_role/3` take the
+  assignment options (`actor:` with `can_link_roles?/3`), plus `list_parent_roles/1`,
+  `list_child_roles/1` and `get_user_permission_sources/1`; `Rephi.Accounts.reset_password/1`
+- `@rephi/shared-components`: `fetchRoleParents`, `fetchRoleChildren`, `addRoleParent`,
+  `removeRoleParent`, `fetchUserPermissions`, `grantUserPermission`, `revokeUserPermission`,
+  `resetUserPassword` and their types (`RoleLink`, `UserPermissions`, `PasswordReset`,
+  `ManagedUser`...)
+- Both example apps: a Parent roles / Child roles section in the role detail, a Permissions modal
+  and a Reset password action (with the temporary password shown once and a copy button) in the
+  users screen, and a user who must change the password is kept on the profile page
+
 ### Changed
-- **Breaking** - **API documentation in OpenAPI 3.0** (`open_api_spex` 3.22) instead of Swagger
-  2.0 (`phoenix_swagger`). The document is now `GET /api/openapi`; the Swagger UI stays at
-  `GET /api/swagger`. `/api/swagger/swagger.json` and `/api/swagger/index.html` are gone (404):
-  a client or generator that read `swagger.json` must point at `/api/openapi` and read OpenAPI 3
-  (`nullable` instead of `x-nullable`, `components/schemas` instead of `definitions`,
-  `requestBody`, a `bearerAuth` HTTP bearer scheme instead of the `Bearer` API key). No alias
-  was kept on purpose: an old URL serving a different format would fail later and less clearly.
-  Operation ids (`RephiWeb.RoleController.update`, `...update.patch` for PATCH) and schema
-  names (`AuthResponse`, `RoleDetailResponse`, ...) are kept; nested objects that had no name
-  now have one (`Session`, `RoleDetail`, `RolePermissionEntry`, `UserRoleAssignment`,
-  `RolePermissionAssignment`, `Notification`)
+- **API documentation in OpenAPI 3.0** (`open_api_spex` 3.22) instead of Swagger 2.0
+  (`phoenix_swagger`). The document is now `GET /api/openapi`; the Swagger UI stays at
+  `GET /api/swagger`. Clients read OpenAPI 3: `nullable` instead of `x-nullable`,
+  `components/schemas` instead of `definitions`, `requestBody`, a `bearerAuth` HTTP bearer scheme
+  instead of the `Bearer` API key. Operation ids (`RephiWeb.RoleController.update`,
+  `...update.patch` for PATCH) and schema names (`AuthResponse`, `RoleDetailResponse`, ...) are
+  kept; nested objects that had no name now have one (`Session`, `RoleDetail`,
+  `RolePermissionEntry`, `UserRoleAssignment`, `RolePermissionAssignment`, `Notification`)
 - Endpoints are documented with an `operation` next to each controller action
   (`OpenApiSpex.ControllerSpecs`, helpers in `RephiWeb.ApiSpec.Operations`) and one schema module
   per body (`RephiWeb.Schemas.*`); `RephiWeb.ApiSpec` builds the document from the router at
@@ -31,8 +59,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   security schemes, examples that match their schemas) and, for every documented response, a
   real request whose status, headers and body (cast with `open_api_spex` against strict schemas,
   plus JSON types) match it both ways
+- `Rephi.Authorization.remove_permission_from_user/3` returns `{:error, :granted_through_role}`
+  (was `:not_found`) when the user holds the permission through a role only
+- A cycle refused by `assign_parent_role/3` is still a changeset error on `:parent_role_id`, now
+  tagged `validation: :cycle`
 
 ### Removed
+- **Breaking** - `/api/swagger/swagger.json` (Swagger 2.0) and `/api/swagger/index.html` answer
+  404: a client or generator that read `swagger.json` must point at `/api/openapi`. No alias was
+  kept on purpose: an old URL serving a different format would fail later and less clearly
 - `phoenix_swagger`, `RephiWeb.Swagger`, `RephiWeb.SwaggerController` and the Jason encoder shim
   for `PhoenixSwagger.Schema`
 - The generated `priv/static/swagger.json`: `mix phx.swagger.generate` is no longer run by
@@ -50,6 +85,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The stored target is now resolved the way the browser does before it is followed, so
   `/\evil.example`, a path with a tab or newline, or `..` segments that leave `ASTRO_BASE` are
   ignored too
+
+### Upgrading
+- Run the migrations (`20261116140000`, `20261116140100`), then seed again (`bin/seed` or
+  `mix run priv/repo/seeds.exs`) to get `users:reset_password` on `admin` and the default links
+  marked as system links (the migration already marks links between two system roles)
+- Clients reading the user object should handle `must_change_password` (send the user to the
+  password change form)
 
 ## [0.2.0] - 2026-11-16
 

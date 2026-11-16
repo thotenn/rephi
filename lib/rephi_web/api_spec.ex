@@ -33,8 +33,14 @@ defmodule RephiWeb.ApiSpec do
   invalid, expired or revoked token; 403 missing permission, or granting what \
   the caller does not hold; 404 unknown record or route (also for an id that \
   is not a positive integer); 409 the change conflicts with the data (system \
-  records, last admin, duplicates); 413 body over 1 MB; 422 invalid fields; \
-  429 rate limited (see `retry-after`).
+  records, last admin, duplicates, cycles in the role hierarchy); 413 body \
+  over 1 MB; 422 invalid fields; 429 rate limited (see `retry-after`).
+
+  **Reset passwords.** After an administrator resets a user's password \
+  (`POST /api/users/{id}/password`), that user's session reports \
+  `must_change_password: true` and every authenticated route except \
+  `GET /api/me`, `PUT /api/me/password` and `POST /api/users/logout` answers \
+  403 until the user sets a new password.
 
   **Write bodies** may be sent flat or wrapped under the singular resource \
   name (`{"role": {...}}`).

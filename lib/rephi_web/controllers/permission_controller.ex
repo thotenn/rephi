@@ -1,6 +1,7 @@
 defmodule RephiWeb.PermissionController do
   @moduledoc """
-  Controller for managing permissions and their assignment to roles.
+  Controller for managing permissions and their assignment to roles and
+  users.
 
   ## Endpoints
 
@@ -13,6 +14,8 @@ defmodule RephiWeb.PermissionController do
       to a role (requires "permissions:assign")
     * `DELETE /api/roles/:role_id/permissions/:permission_id` - Remove a permission
       from a role (requires "permissions:assign")
+    * `POST/DELETE /api/users/:user_id/permissions/:permission_id` - Grant or revoke
+      a permission of a user directly (requires "permissions:assign")
 
   `POST` and `PUT` accept the permission attributes flat or wrapped under
   `"permission"`. An id that is not the id of an existing record (unknown, not
@@ -29,15 +32,17 @@ defmodule RephiWeb.PermissionController do
     * Granting or revoking a permission requires holding it, or being an
       admin (`403` otherwise, `Rephi.Authorization.can_grant_permission?/2`).
     * Revoking from a role a permission it only inherits from a parent role
-      answers `409`: revoke it from that role.
+      answers `409`: revoke it from that role. Likewise for a user and a
+      permission it only holds through a role.
   """
   use RephiWeb, :controller
   use OpenApiSpex.ControllerSpecs
 
   import RephiWeb.ApiSpec.Operations
 
+  alias Rephi.Accounts
   alias Rephi.Authorization
-  alias Rephi.Authorization.Permission
+  alias Rephi.Authorization.{Permission, UserPermission}
   alias RephiWeb.Schemas
 
   action_fallback RephiWeb.FallbackController
@@ -51,7 +56,8 @@ defmodule RephiWeb.PermissionController do
   plug AuthorizationPlug, {:permission, "permissions:delete"} when action in [:delete]
 
   plug AuthorizationPlug,
-       {:permission, "permissions:assign"} when action in [:assign_to_role, :remove_from_role]
+       {:permission, "permissions:assign"}
+       when action in [:assign_to_role, :remove_from_role, :assign_to_user, :remove_from_user]
 
   operation :index,
     summary: "List permissions",
@@ -213,6 +219,32 @@ defmodule RephiWeb.PermissionController do
          {:ok, permission} <- Authorization.fetch_permission(permission_id),
          :ok <-
            Authorization.remove_permission_from_role(role, permission,
+             actor: current_access(conn)
+           ) do
+      send_resp(conn, :no_content, "")
+    end
+  end
+
+  def assign_to_user(conn, %{"user_id" => user_id, "permission_id" => permission_id} = params) do
+    opts = [actor: current_access(conn), notes: params["notes"]]
+
+    with {:ok, user} <- Accounts.fetch_user(user_id),
+         {:ok, permission} <- Authorization.fetch_permission(permission_id),
+         {:ok, %UserPermission{} = user_permission} <-
+           user
+           |> Authorization.assign_permission_to_user(permission, opts)
+           |> conflict_if_taken("Permission already granted to the user") do
+      conn
+      |> put_status(:created)
+      |> render(:user_assignment, user_permission: user_permission)
+    end
+  end
+
+  def remove_from_user(conn, %{"user_id" => user_id, "permission_id" => permission_id}) do
+    with {:ok, user} <- Accounts.fetch_user(user_id),
+         {:ok, permission} <- Authorization.fetch_permission(permission_id),
+         :ok <-
+           Authorization.remove_permission_from_user(user, permission,
              actor: current_access(conn)
            ) do
       send_resp(conn, :no_content, "")

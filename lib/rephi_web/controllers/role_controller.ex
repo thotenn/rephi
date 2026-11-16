@@ -15,6 +15,8 @@ defmodule RephiWeb.RoleController do
     * `DELETE /api/roles/:id` - Delete role (requires "roles:delete")
     * `POST /api/users/:user_id/roles/:role_id` - Assign role to user (requires "roles:assign")
     * `DELETE /api/users/:user_id/roles/:role_id` - Remove role from user (requires "roles:assign")
+    * `GET /api/roles/:id/parents`, `GET /api/roles/:id/children` (requires "roles:view")
+    * `POST/DELETE /api/roles/:role_id/parents/:parent_id` (requires "roles:edit")
 
   `POST` and `PUT` accept the role attributes flat or wrapped under `"role"`.
   An id that is not the id of an existing record (unknown, not a number, out
@@ -30,8 +32,11 @@ defmodule RephiWeb.RoleController do
       cannot change (`422`).
     * Assigning or removing a role requires holding it, or being an admin
       (`403` otherwise, `Rephi.Authorization.can_grant_role?/2`).
-    * Removing the admin role from its last holder, directly or by deleting
-      a role that inherits from it, answers `409`.
+    * Removing the admin role from its last holder, directly, by deleting
+      a role that inherits from it or by unlinking such a role from it,
+      answers `409`.
+    * Linking or unlinking a parent requires holding both roles, or being an
+      admin (`403`); cycles, duplicates and system links are `409`.
 
   ## Permission Requirements
 
@@ -41,6 +46,7 @@ defmodule RephiWeb.RoleController do
   - Update actions: `roles:edit`
   - Delete actions: `roles:delete`
   - Assignment actions: `roles:assign`
+  - Hierarchy changes: `roles:edit`
 
   """
   use RephiWeb, :controller
@@ -50,7 +56,7 @@ defmodule RephiWeb.RoleController do
 
   alias Rephi.Accounts
   alias Rephi.Authorization
-  alias Rephi.Authorization.Role
+  alias Rephi.Authorization.{Role, RoleRole}
   alias RephiWeb.Schemas
 
   action_fallback RephiWeb.FallbackController
@@ -59,10 +65,20 @@ defmodule RephiWeb.RoleController do
   security bearer_auth()
 
   plug AuthorizationPlug,
-       {:permission, "roles:view"} when action in [:index, :show, :get_role_permissions]
+       {:permission, "roles:view"}
+       when action in [
+              :index,
+              :show,
+              :get_role_permissions,
+              :get_role_parents,
+              :get_role_children
+            ]
 
   plug AuthorizationPlug, {:permission, "roles:create"} when action in [:create]
-  plug AuthorizationPlug, {:permission, "roles:edit"} when action in [:update]
+
+  plug AuthorizationPlug,
+       {:permission, "roles:edit"} when action in [:update, :add_parent, :remove_parent]
+
   plug AuthorizationPlug, {:permission, "roles:delete"} when action in [:delete]
 
   plug AuthorizationPlug,
@@ -243,4 +259,52 @@ defmodule RephiWeb.RoleController do
       render(conn, :permissions, sources: Authorization.get_role_permission_sources(role))
     end
   end
+
+  def get_role_parents(conn, %{"id" => id}) do
+    with {:ok, role} <- Authorization.fetch_role(id) do
+      render(conn, :links, links: Authorization.list_parent_roles(role))
+    end
+  end
+
+  def get_role_children(conn, %{"id" => id}) do
+    with {:ok, role} <- Authorization.fetch_role(id) do
+      render(conn, :links, links: Authorization.list_child_roles(role))
+    end
+  end
+
+  def add_parent(conn, %{"role_id" => role_id, "parent_id" => parent_id} = params) do
+    opts = [actor: current_access(conn), notes: params["notes"]]
+
+    with {:ok, role} <- Authorization.fetch_role(role_id),
+         {:ok, parent} <- Authorization.fetch_role(parent_id),
+         {:ok, %RoleRole{} = link} <-
+           role
+           |> Authorization.assign_parent_role(parent, opts)
+           |> conflict_if_taken("The role already inherits from this parent")
+           |> conflict_if_cycle() do
+      conn
+      |> put_status(:created)
+      |> render(:parent_assignment, link: link)
+    end
+  end
+
+  def remove_parent(conn, %{"role_id" => role_id, "parent_id" => parent_id}) do
+    with {:ok, role} <- Authorization.fetch_role(role_id),
+         {:ok, parent} <- Authorization.fetch_role(parent_id),
+         :ok <- Authorization.remove_parent_role(role, parent, actor: current_access(conn)) do
+      send_resp(conn, :no_content, "")
+    end
+  end
+
+  # The ids come from the path, so a cycle is a 409 like a duplicate, not a 422.
+  defp conflict_if_cycle({:error, %Ecto.Changeset{errors: errors}} = result) do
+    cycle? =
+      Enum.any?(errors, fn {_field, {_message, opts}} ->
+        opts[:validation] == :cycle or opts[:constraint] == :check
+      end)
+
+    if cycle?, do: {:error, :hierarchy_cycle}, else: result
+  end
+
+  defp conflict_if_cycle(result), do: result
 end

@@ -152,7 +152,7 @@ Settings that are code rather than environment live in `config/config.exs`:
   the default role and returns a session: `{"data": {"user": {...}, "token": "..."}}`.
 - `POST /api/users/login` exchanges credentials for a session.
 - Send the token as `Authorization: Bearer <token>`. `GET /api/me` returns the signed-in user:
-  `{id, email, roles, permissions}`, where `roles` are the ones assigned to the user and
+  `{id, email, must_change_password, roles, permissions}`, where `roles` are the ones assigned to the user and
   `permissions` its effective permissions (direct, through roles and inherited). Register, login
   and the password change describe the user the same way.
 - **Tokens** are access tokens that last 24 hours (`TOKEN_TTL_SECONDS`); there is no refresh token.
@@ -168,7 +168,14 @@ Settings that are code rather than environment live in `config/config.exs`:
   (they share a counter), 5 registrations per minute. Past the limit: `429` with a `retry-after`
   header. The counters live in memory, per node. Behind a reverse proxy see
   `RATE_LIMIT_TRUSTED_PROXIES` in [Deployment](#reverse-proxies).
-- Nobody can set another user's password through the API.
+- **Password reset by an administrator.** `POST /api/users/:id/password` (permission
+  `users:reset_password`, seeded for `admin` only) replaces another user's password with a random
+  temporary one, returned once in that response (`cache-control: no-store`; only its hash is
+  stored). Every session of the user ends (tokens revoked, sockets closed) and the account is
+  flagged `must_change_password`: the user signs in with the temporary password, and until it sets
+  a new one with `PUT /api/me/password` every other route but `GET /api/me` and logout answers
+  `403`. Nobody chooses another user's password, and your own is changed with
+  `PUT /api/me/password` (`409` here).
 
 ## Authorization (RBAC)
 
@@ -176,13 +183,13 @@ Settings that are code rather than environment live in `config/config.exs`:
 
 `mix run priv/repo/seeds.exs` (part of `mix setup` and `mix ecto.setup`), or `bin/seed` in a
 release, runs `Rephi.Seeds.run/1`. It is idempotent and transactional, never changes what already
-exists (an administrator's password included) and marks the seeded roles and permissions as
-**system records**.
+exists (an administrator's password included) and marks the seeded roles, permissions and
+hierarchy links as **system records**.
 
 - **3 roles**: `admin` inherits from `manager`, which inherits from `user`.
-- **18 permissions**: `users:view|create|edit|delete`, `roles:view|create|edit|delete|assign`,
-  `permissions:view|create|edit|delete|assign`, `system:settings|logs|manage` and
-  `notifications:broadcast`.
+- **19 permissions**: `users:view|create|edit|delete|reset_password`,
+  `roles:view|create|edit|delete|assign`, `permissions:view|create|edit|delete|assign`,
+  `system:settings|logs|manage` and `notifications:broadcast`.
 - **Grants**: `admin` holds every permission. `manager` holds `users:view`, `users:create`,
   `users:edit` and `roles:view`. `user` holds none (it is the role every new account gets).
 - **The first administrator** from `ADMIN_EMAIL` / `ADMIN_PASSWORD`: required outside
@@ -197,12 +204,20 @@ how to revoke it; it never revokes anything itself.
   holds their permissions. A permission's `parent_id` only groups permissions for display: holding
   the parent grants none of its children.
 - **System records** (`is_system`) cannot be deleted (`409`) nor change slug (`422`); their name
-  and description can change.
-- **No escalation**: granting or revoking a role requires holding it, and a permission requires
-  holding that permission, unless the caller is an administrator (`403`). Editing or deleting a
-  user who holds roles the caller does not hold is a `403` too.
-- **The last administrator** cannot lose the admin role, directly or through a deleted role
-  (`409`), and nobody can delete their own account (`409`).
+  and description can change. The links of the default hierarchy (`admin → manager → user`) are
+  system links: they cannot be removed (`409`).
+- **The hierarchy** is managed over the API (`roles:edit`): a link that would make a role inherit
+  from itself is refused (`409`), and linking or unlinking a parent requires holding both roles,
+  unless the caller is an administrator (`403`).
+- **No escalation**: granting or revoking a role requires holding it, and a permission (to a role
+  or directly to a user) requires holding that permission, unless the caller is an administrator
+  (`403`). Editing, deleting or resetting the password of a user who holds roles the caller does
+  not hold is a `403` too.
+- **Direct permissions** are revoked from the user; one the user only holds through a role is
+  refused (`409`), like a permission a role only inherits.
+- **The last administrator** cannot lose the admin role, directly, through a deleted role or
+  through an unlinked parent (`409`), and nobody can delete their own account or reset their own
+  password (`409`).
 - Slugs: roles `editor`, `content_editor`, `team-lead`; permissions `category:action`
   (`reports:export`).
 
@@ -280,15 +295,18 @@ it, but would answer with its own error format).
 | Documentation | `GET /api/openapi`, `GET /api/swagger` (where `SWAGGER_ENABLED`) | none |
 | Auth | `POST /api/users/register`, `POST /api/users/login` | none |
 | | `GET /api/me`, `PUT /api/me/password`, `POST /api/users/logout` | signed in |
-| Users | `GET /api/users`, `GET /api/users/:id`, `GET /api/users/:id/roles` | `users:view` |
+| Users | `GET /api/users`, `GET /api/users/:id`, `GET /api/users/:id/roles`, `GET /api/users/:id/permissions` | `users:view` |
 | | `PUT/PATCH /api/users/:id` (email only) | `users:edit` |
 | | `DELETE /api/users/:id` | `users:delete` |
-| Roles | `GET /api/roles`, `GET /api/roles/:id`, `GET /api/roles/:id/permissions` | `roles:view` |
+| | `POST /api/users/:id/password` (temporary password) | `users:reset_password` |
+| Roles | `GET /api/roles`, `GET /api/roles/:id`, `GET /api/roles/:id/permissions`, `GET /api/roles/:id/parents`, `GET /api/roles/:id/children` | `roles:view` |
 | | `POST /api/roles`, `PUT/PATCH /api/roles/:id`, `DELETE /api/roles/:id` | `roles:create` / `roles:edit` / `roles:delete` |
+| | `POST/DELETE /api/roles/:role_id/parents/:parent_id` | `roles:edit` |
 | | `POST/DELETE /api/users/:user_id/roles/:role_id` | `roles:assign` |
 | Permissions | `GET /api/permissions`, `GET /api/permissions/:id` | `permissions:view` |
 | | `POST /api/permissions`, `PUT/PATCH /api/permissions/:id`, `DELETE /api/permissions/:id` | `permissions:create` / `permissions:edit` / `permissions:delete` |
 | | `POST/DELETE /api/roles/:role_id/permissions/:permission_id` | `permissions:assign` |
+| | `POST/DELETE /api/users/:user_id/permissions/:permission_id` | `permissions:assign` |
 | Notifications | `POST /api/notifications/broadcast` | `notifications:broadcast` |
 
 **Envelopes.** A successful response with a body is `{"data": ...}`. Lists of users, roles and
@@ -307,9 +325,9 @@ their attributes flat (`{"name": "Editor", "slug": "editor"}`) or wrapped under 
 |---|---|
 | `400` | Malformed JSON; login without email or password |
 | `401` | Missing, invalid, expired or revoked token; wrong credentials |
-| `403` | Missing permission, or granting/changing what the caller does not hold |
+| `403` | Missing permission, granting/changing what the caller does not hold, or a password reset not yet replaced |
 | `404` | Unknown record (also an id that is not a positive integer) or route |
-| `409` | The change conflicts with the data: duplicate assignment, system record, last administrator, own account, inherited permission |
+| `409` | The change conflicts with the data: duplicate assignment, system record or link, last administrator, own account, inherited permission, cycle in the role hierarchy |
 | `413` | Body over 1 MB |
 | `422` | Invalid fields |
 | `429` | Rate limited; wait `retry-after` seconds |

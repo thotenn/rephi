@@ -663,4 +663,162 @@ defmodule Rephi.AuthorizationTest do
       assert %DateTime{time_zone: "Etc/UTC"} = record.inserted_at
     end
   end
+
+  describe "hierarchy links (assign_parent_role/3, remove_parent_role/3)" do
+    test "keep who linked them and the notes; seeded-style system links cannot be removed" do
+      [child, parent] = for _ <- 1..2, do: create_role()
+      linker = create_user()
+
+      assert {:ok, %RoleRole{} = link} =
+               Authorization.assign_parent_role(child, parent,
+                 assigned_by: linker.id,
+                 notes: "Editors do what authors do"
+               )
+
+      assert link.assigned_by == linker.id
+      assert link.notes == "Editors do what authors do"
+      refute link.is_system
+
+      assert {:error, changeset} =
+               Authorization.assign_parent_role(create_role(), parent,
+                 notes: String.duplicate("x", 2001)
+               )
+
+      assert %{notes: [_]} = errors_on(changeset)
+
+      Repo.update_all(RoleRole, set: [is_system: true])
+      assert Authorization.remove_parent_role(child, parent) == {:error, :system_link}
+      assert [{_, %RoleRole{is_system: true}}] = Authorization.list_parent_roles(child)
+
+      Repo.update_all(RoleRole, set: [is_system: false])
+      assert Authorization.remove_parent_role(child, parent) == :ok
+      assert Authorization.remove_parent_role(child, parent) == {:error, :not_found}
+    end
+
+    test "a cycle is flagged as such in the changeset" do
+      [a, b] = for _ <- 1..2, do: create_role()
+      {:ok, _} = Authorization.assign_parent_role(b, a)
+
+      for {child, parent} <- [{a, a}, {a, b}] do
+        assert {:error, %Ecto.Changeset{errors: [parent_role_id: {_message, opts}]}} =
+                 Authorization.assign_parent_role(child, parent)
+
+        assert opts[:validation] == :cycle
+      end
+    end
+
+    test "with :actor, a non-admin must hold both roles; an admin may link anything" do
+      admin_role = seed_admin_role()
+      [child, parent, other] = for _ <- 1..3, do: create_role()
+
+      holder = create_user()
+      for role <- [child, parent], do: {:ok, _} = Authorization.assign_role_to_user(holder, role)
+      access = Authorization.load_access(holder)
+
+      assert Authorization.can_link_roles?(access, child, parent)
+      refute Authorization.can_link_roles?(access, child, other)
+      refute Authorization.can_link_roles?(access, other, parent)
+      refute Authorization.can_link_roles?(nil, child, parent)
+      refute Authorization.can_link_roles?(access, child, nil)
+
+      assert {:error, :escalation} = Authorization.assign_parent_role(child, other, actor: access)
+
+      assert {:error, :escalation} =
+               Authorization.assign_parent_role(other, parent, actor: access)
+
+      assert {:ok, link} = Authorization.assign_parent_role(child, parent, actor: access)
+      assert link.assigned_by == holder.id
+
+      outsider = Authorization.load_access(create_user())
+
+      assert Authorization.remove_parent_role(child, parent, actor: outsider) ==
+               {:error, :escalation}
+
+      assert Authorization.remove_parent_role(child, parent, actor: access) == :ok
+
+      admin = Authorization.load_access(user_with_role(admin_role))
+      assert {:ok, _} = Authorization.assign_parent_role(other, parent, actor: admin)
+      assert Authorization.remove_parent_role(other, parent, actor: admin) == :ok
+    end
+
+    test "list_parent_roles/1 and list_child_roles/1: direct links only, by slug, one query" do
+      root = create_role(%{slug: "zz_root"})
+      [a, b] = [create_role(%{slug: "aa_mid"}), create_role(%{slug: "bb_mid"})]
+      leaf = create_role()
+
+      for mid <- [b, a], do: {:ok, _} = Authorization.assign_parent_role(mid, root)
+      for mid <- [a, b], do: {:ok, _} = Authorization.assign_parent_role(leaf, mid)
+
+      assert {parents, 1} = count_queries(fn -> Authorization.list_parent_roles(leaf) end)
+      assert Enum.map(parents, fn {role, _link} -> role.slug end) == ["aa_mid", "bb_mid"]
+
+      assert {children, 1} = count_queries(fn -> Authorization.list_child_roles(root) end)
+      assert Enum.map(children, fn {role, _link} -> role.slug end) == ["aa_mid", "bb_mid"]
+      assert Authorization.list_child_roles(leaf) == []
+      assert Authorization.list_parent_roles(root) == []
+
+      assert Authorization.list_parent_roles(%Role{}) == []
+      assert Authorization.list_child_roles(nil) == []
+    end
+  end
+
+  describe "user permissions (get_user_permission_sources/1, remove_permission_from_user/3)" do
+    test "direct grants with their data, and every effective permission with its sources" do
+      {[root, mid], [root_slug, mid_slug]} = chain(2)
+      shared = create_permission(%{slug: "aa:shared"})
+      {:ok, _} = Authorization.assign_permission_to_role(root, shared)
+      {:ok, _} = Authorization.assign_permission_to_role(mid, shared)
+      direct_only = create_permission(%{slug: "zz:direct"})
+
+      granter = create_user()
+      user = user_with_role(mid)
+
+      {:ok, _} =
+        Authorization.assign_permission_to_user(user, direct_only,
+          assigned_by: granter.id,
+          notes: "Audit"
+        )
+
+      {:ok, _} = Authorization.assign_permission_to_user(user, shared)
+
+      assert {%{direct: direct, effective: effective}, 2} =
+               count_queries(fn -> Authorization.get_user_permission_sources(user) end)
+
+      assert [%{permission: %Permission{slug: "aa:shared"}}, granted] = direct
+      assert granted.permission.slug == "zz:direct"
+      assert granted.assigned_by == granter.id
+      assert granted.notes == "Audit"
+
+      by_slug = Map.new(effective, &{&1.permission.slug, &1})
+      assert Enum.map(effective, & &1.permission.slug) == Enum.sort(Map.keys(by_slug))
+      assert MapSet.new(Map.keys(by_slug)) == Authorization.load_access(user).permission_slugs
+
+      assert %{direct: true, roles: roles} = by_slug["aa:shared"]
+      assert Enum.map(roles, & &1.slug) == Enum.sort([root.slug, mid.slug])
+      assert %{direct: false, roles: [%{id: root_id}]} = by_slug[root_slug]
+      assert root_id == root.id
+      assert %{direct: false, roles: [%{slug: mid_role_slug}]} = by_slug[mid_slug]
+      assert mid_role_slug == mid.slug
+      assert %{direct: true, roles: []} = by_slug["zz:direct"]
+
+      assert Authorization.get_user_permission_sources(%User{}) == %{direct: [], effective: []}
+      assert Authorization.get_user_permission_sources(nil) == %{direct: [], effective: []}
+    end
+
+    test "revoking what the user only holds through a role is refused as such" do
+      {[role], [slug]} = chain(1)
+      user = user_with_role(role)
+      permission = Authorization.get_permission_by_slug(slug)
+
+      assert Authorization.remove_permission_from_user(user, permission) ==
+               {:error, :granted_through_role}
+
+      assert Authorization.remove_permission_from_user(user, create_permission()) ==
+               {:error, :not_found}
+
+      {:ok, _} = Authorization.assign_permission_to_user(user, permission)
+      assert Authorization.remove_permission_from_user(user, permission) == :ok
+      assert Authorization.can?(user, permission)
+    end
+  end
 end

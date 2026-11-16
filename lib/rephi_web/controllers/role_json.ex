@@ -7,7 +7,7 @@ defmodule RephiWeb.RoleJSON do
   the role itself, and the ones it only inherits from its parent roles.
   """
 
-  alias Rephi.Authorization.{Role, UserRole}
+  alias Rephi.Authorization.{Role, RoleRole, UserRole}
   alias RephiWeb.PaginationJSON
 
   @doc """
@@ -51,6 +51,44 @@ defmodule RephiWeb.RoleJSON do
         assigned_by: user_role.assigned_by,
         notes: user_role.notes,
         inserted_at: user_role.inserted_at
+      }
+    }
+  end
+
+  @doc """
+  Renders the parents or the children of a role, each with its link.
+  """
+  def links(%{links: links}) do
+    %{
+      data:
+        for {%Role{} = role, %RoleRole{} = link} <- links do
+          %{
+            id: role.id,
+            name: role.name,
+            slug: role.slug,
+            description: role.description,
+            is_system: role.is_system,
+            system_link: link.is_system,
+            assigned_by: link.assigned_by,
+            notes: link.notes,
+            linked_at: link.inserted_at
+          }
+        end
+    }
+  end
+
+  @doc """
+  Renders a new link of the hierarchy: `role_id` inherits from `parent_id`.
+  """
+  def parent_assignment(%{link: %RoleRole{} = link}) do
+    %{
+      data: %{
+        role_id: link.child_role_id,
+        parent_id: link.parent_role_id,
+        is_system: link.is_system,
+        assigned_by: link.assigned_by,
+        notes: link.notes,
+        inserted_at: link.inserted_at
       }
     }
   end

@@ -7,19 +7,24 @@ defmodule RephiWeb.UserController do
     * `GET /api/users` - List users, paginated (`users:view`)
     * `GET /api/users/:id` - Get a user (`users:view`)
     * `GET /api/users/:id/roles` - The roles assigned to a user (`users:view`)
+    * `GET /api/users/:id/permissions` - Direct and effective permissions (`users:view`)
     * `PUT /api/users/:id` - Change the email of a user (`users:edit`)
     * `DELETE /api/users/:id` - Delete a user (`users:delete`)
+    * `POST /api/users/:id/password` - Reset another user's password
+      (`users:reset_password`)
 
   ## Rules
 
     * `PUT` only changes the email; the body may be flat or wrapped under
       `"user"`. A `password` in it is refused (`422`): users change their own
-      password with `PUT /api/me/password`, nobody sets another user's.
-    * `PUT` and `DELETE` on a user who holds a role the caller does not hold
-      (assigned or inherited) answer `403`, unless the caller is an admin
-      (`Rephi.Authorization.can_manage_user?/2`).
-    * Nobody can delete their own account here (`409`), and the last user
-      holding the admin role cannot be deleted (`409`).
+      password with `PUT /api/me/password`; an administrator resets someone
+      else's with `POST /api/users/:id/password`.
+    * `PUT`, `DELETE` and the password reset on a user who holds a role the
+      caller does not hold (assigned or inherited) answer `403`, unless the
+      caller is an admin (`Rephi.Authorization.can_manage_user?/2`).
+    * Nobody can delete their own account (`409`) nor reset their own
+      password (`409`) here, and the last user holding the admin role cannot
+      be deleted (`409`).
 
   An `:id` that is not the id of an existing user (unknown, not a number, out
   of range) answers `404`. Lists accept `page` and `page_size` (see
@@ -41,10 +46,12 @@ defmodule RephiWeb.UserController do
   security bearer_auth()
 
   plug AuthorizationPlug,
-       {:permission, "users:view"} when action in [:index, :show, :get_user_roles]
+       {:permission, "users:view"}
+       when action in [:index, :show, :get_user_roles, :get_user_permissions]
 
   plug AuthorizationPlug, {:permission, "users:edit"} when action in [:update]
   plug AuthorizationPlug, {:permission, "users:delete"} when action in [:delete]
+  plug AuthorizationPlug, {:permission, "users:reset_password"} when action in [:reset_password]
 
   operation :index,
     summary: "List users",
@@ -127,7 +134,7 @@ defmodule RephiWeb.UserController do
 
   def delete(conn, %{"id" => id}) do
     with {:ok, user} <- Accounts.fetch_user(id),
-         :ok <- refuse_self(conn, user),
+         :ok <- refuse_self(conn, user, :self_delete),
          :ok <- ensure_can_manage(conn, user),
          {:ok, _user} <- Accounts.delete_user(user) do
       send_resp(conn, :no_content, "")
@@ -153,6 +160,23 @@ defmodule RephiWeb.UserController do
     end
   end
 
+  def get_user_permissions(conn, %{"id" => id}) do
+    with {:ok, user} <- Accounts.fetch_user(id) do
+      render(conn, :permissions, sources: Authorization.get_user_permission_sources(user))
+    end
+  end
+
+  def reset_password(conn, %{"id" => id}) do
+    with {:ok, user} <- Accounts.fetch_user(id),
+         :ok <- refuse_self(conn, user, :self_password_reset),
+         :ok <- ensure_can_manage(conn, user),
+         {:ok, user, password} <- Accounts.reset_password(user) do
+      conn
+      |> put_resp_header("cache-control", "no-store")
+      |> render(:password_reset, user: Accounts.preload_grants(user), password: password)
+    end
+  end
+
   defp refuse_password(params) do
     if Map.has_key?(params, "password") or Map.has_key?(params, "password_confirmation") do
       {:error,
@@ -167,8 +191,8 @@ defmodule RephiWeb.UserController do
     end
   end
 
-  defp refuse_self(conn, user) do
-    if conn.assigns.current_user.id == user.id, do: {:error, :self_delete}, else: :ok
+  defp refuse_self(conn, user, reason) do
+    if conn.assigns.current_user.id == user.id, do: {:error, reason}, else: :ok
   end
 
   defp ensure_can_manage(conn, user) do

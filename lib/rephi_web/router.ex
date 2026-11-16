@@ -16,6 +16,10 @@ defmodule RephiWeb.Router do
     plug RephiWeb.Auth.Pipeline
   end
 
+  pipeline :password_settled do
+    plug RephiWeb.Auth.PasswordChangeGate
+  end
+
   # The API documentation is only served where it is enabled
   # (`config :rephi, :swagger_enabled`, SWAGGER_ENABLED at runtime).
   pipeline :api_docs do
@@ -54,6 +58,10 @@ defmodule RephiWeb.Router do
     get "/me", AuthController, :me
     put "/me/password", AuthController, :change_password
     post "/users/logout", AuthController, :logout
+
+    # A route a user with a reset password must still reach goes above this line.
+    pipe_through :password_settled
+
     post "/notifications/broadcast", NotificationController, :broadcast
 
     # Role management endpoints
@@ -61,15 +69,23 @@ defmodule RephiWeb.Router do
     get "/roles/:id/permissions", RoleController, :get_role_permissions
     post "/users/:user_id/roles/:role_id", RoleController, :assign_to_user
     delete "/users/:user_id/roles/:role_id", RoleController, :remove_from_user
+    get "/roles/:id/parents", RoleController, :get_role_parents
+    get "/roles/:id/children", RoleController, :get_role_children
+    post "/roles/:role_id/parents/:parent_id", RoleController, :add_parent
+    delete "/roles/:role_id/parents/:parent_id", RoleController, :remove_parent
 
     # Permission management endpoints
     resources "/permissions", PermissionController, except: [:new, :edit]
     post "/roles/:role_id/permissions/:permission_id", PermissionController, :assign_to_role
     delete "/roles/:role_id/permissions/:permission_id", PermissionController, :remove_from_role
+    post "/users/:user_id/permissions/:permission_id", PermissionController, :assign_to_user
+    delete "/users/:user_id/permissions/:permission_id", PermissionController, :remove_from_user
 
     # User management endpoints (users:view / users:edit / users:delete)
     resources "/users", UserController, only: [:index, :show, :update, :delete]
     get "/users/:id/roles", UserController, :get_user_roles
+    get "/users/:id/permissions", UserController, :get_user_permissions
+    post "/users/:id/password", UserController, :reset_password
   end
 
   scope "/api" do

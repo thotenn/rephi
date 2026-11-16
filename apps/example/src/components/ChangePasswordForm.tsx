@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "react-hot-toast";
-import type { ChangePasswordParams } from "@rephi/shared-components";
+import { useAuthStore, type ChangePasswordParams } from "@rephi/shared-components";
 import { useChangePassword } from "~/hooks/useAuth";
 import { applyServerErrors } from "~/utils/forms";
 import { changePasswordSchema } from "~/utils/passwords";
@@ -31,6 +31,7 @@ const autoComplete: Record<(typeof FIELDS)[number], string> = {
  */
 export default function ChangePasswordForm() {
   const changePassword = useChangePassword();
+  const mustChangePassword = useAuthStore((state) => !!state.user?.must_change_password);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
@@ -58,6 +59,14 @@ export default function ChangePasswordForm() {
     <div className="mt-8 bg-white overflow-hidden shadow rounded-lg">
       <div className="px-4 py-5 sm:p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Change Password</h2>
+        {mustChangePassword && (
+          <div className="rounded-md bg-yellow-50 border border-yellow-300 p-4 mb-4 max-w-md" role="alert" data-testid="must-change-password">
+            <p className="text-sm text-yellow-900">
+              An administrator reset your password. Enter the temporary password you were given as
+              the current password and choose a new one to continue.
+            </p>
+          </div>
+        )}
         <form className="space-y-4 max-w-md" onSubmit={handleSubmit(onSubmit)} noValidate>
           {serverError && (
             <div className="rounded-md bg-red-50 p-4" role="alert">

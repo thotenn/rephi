@@ -1,7 +1,15 @@
 import {
+  addRoleParent,
   api,
   fetchAllPages,
   fetchPage,
+  fetchRoleChildren,
+  fetchRoleParents,
+  fetchUserPermissions,
+  grantUserPermission,
+  removeRoleParent,
+  resetUserPassword,
+  revokeUserPermission,
   type ApiResponse,
   type PageParams,
   type PaginatedResponse,
@@ -35,6 +43,10 @@ export const rolesApi = {
     api.post(`/roles/${roleId}/permissions/${permissionId}`).then(() => undefined),
   removePermission: (roleId: number, permissionId: number): Promise<void> =>
     api.delete(`/roles/${roleId}/permissions/${permissionId}`).then(() => undefined),
+  parents: fetchRoleParents,
+  children: fetchRoleChildren,
+  addParent: (roleId: number, parentId: number) => addRoleParent(roleId, parentId),
+  removeParent: removeRoleParent,
 };
 
 export const permissionsApi = {
@@ -62,6 +74,10 @@ export const usersApi = {
     api.post(`/users/${userId}/roles/${roleId}`).then(() => undefined),
   removeRole: (userId: number, roleId: number): Promise<void> =>
     api.delete(`/users/${userId}/roles/${roleId}`).then(() => undefined),
+  permissions: fetchUserPermissions,
+  grantPermission: (userId: number, permissionId: number) => grantUserPermission(userId, permissionId),
+  revokePermission: revokeUserPermission,
+  resetPassword: resetUserPassword,
 };
 
 /** react-query keys of the admin data. */
@@ -69,10 +85,15 @@ export const adminKeys = {
   users: ["admin", "users"] as const,
   usersPage: (page: number) => ["admin", "users", page] as const,
   userRoles: (userId: number) => ["admin", "users", userId, "roles"] as const,
+  userPermissions: (userId: number) => ["admin", "users", userId, "permissions"] as const,
   roles: ["admin", "roles"] as const,
   rolesPage: (page: number) => ["admin", "roles", "page", page] as const,
   allRoles: ["admin", "roles", "all"] as const,
   role: (id: number) => ["admin", "roles", "detail", id] as const,
+  /** A link changes both ends: invalidate the whole prefix. */
+  hierarchy: ["admin", "roles", "hierarchy"] as const,
+  roleParents: (id: number) => ["admin", "roles", "hierarchy", id, "parents"] as const,
+  roleChildren: (id: number) => ["admin", "roles", "hierarchy", id, "children"] as const,
   permissions: ["admin", "permissions"] as const,
   permissionsPage: (page: number) => ["admin", "permissions", "page", page] as const,
   allPermissions: ["admin", "permissions", "all"] as const,

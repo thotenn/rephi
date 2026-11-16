@@ -4,6 +4,7 @@ import { fetchMe, getErrorMessage, usePermissions } from "~/lib/rephi";
 import { ErrorAlert, Modal } from "~/components/react";
 import { adminKeys, permissionsApi, rolesApi } from "~/lib/api/admin";
 import type { Role } from "~/types/admin.types";
+import RoleParentsSection from "./RoleParentsSection";
 
 interface RolePermissionsModalProps {
   role: Role;
@@ -63,6 +64,8 @@ export default function RolePermissionsModal({ role, onClose }: RolePermissionsM
       title={`Permissions for ${role.name}`}
       className="max-w-4xl max-h-[80vh] overflow-y-auto"
     >
+      <RoleParentsSection role={role} />
+
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {detail.isPending ? (

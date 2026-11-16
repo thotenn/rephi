@@ -69,6 +69,36 @@ defmodule RephiWeb.QueryBudgetTest do
     assert cost(fn -> get(conn, ~p"/api/users") end) == @authenticated + 4
   end
 
+  test "the hierarchy and the permissions of a user", %{as_admin: conn, admin: admin} do
+    manager = Authorization.get_role_by_slug("manager")
+
+    # + role + its links
+    assert cost(fn -> get(conn, ~p"/api/roles/#{manager}/parents") end) == @authenticated + 2
+    assert cost(fn -> get(conn, ~p"/api/roles/#{manager}/children") end) == @authenticated + 2
+
+    # + user + direct grants + permissions through roles (whole hierarchy)
+    assert cost(fn -> get(conn, ~p"/api/users/#{admin}/permissions") end) == @authenticated + 3
+
+    roles = for _ <- 1..5, do: create_role()
+
+    for [parent, child] <- Enum.chunk_every(roles, 2, 1, :discard) do
+      {:ok, _} = Authorization.assign_parent_role(child, parent)
+      {:ok, _} = Authorization.assign_parent_role(manager, parent)
+    end
+
+    for role <- roles,
+        do: {:ok, _} = Authorization.assign_permission_to_role(role, create_permission())
+
+    {:ok, _} = Authorization.assign_role_to_user(admin, List.last(roles))
+
+    for _ <- 1..5,
+        do: {:ok, _} = Authorization.assign_permission_to_user(admin, create_permission())
+
+    assert cost(fn -> get(conn, ~p"/api/roles/#{manager}/parents") end) == @authenticated + 2
+    assert cost(fn -> get(conn, ~p"/api/roles/#{hd(roles)}/children") end) == @authenticated + 2
+    assert cost(fn -> get(conn, ~p"/api/users/#{admin}/permissions") end) == @authenticated + 3
+  end
+
   test "the depth of the hierarchy does not matter", %{conn: conn} do
     roles = for _ <- 1..6, do: create_role()
 

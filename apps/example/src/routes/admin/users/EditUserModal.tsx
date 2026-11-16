@@ -12,8 +12,8 @@ interface EditUserModalProps {
 }
 
 /**
- * Changes a user's email (`users:edit`). Passwords cannot be set for other
- * users: everyone changes their own from the profile page.
+ * Changes a user's email (`users:edit`). Passwords are not set here: see
+ * `ResetPasswordModal` and the profile page.
  */
 export default function EditUserModal({ user, onClose }: EditUserModalProps) {
   const queryClient = useQueryClient();

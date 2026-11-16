@@ -22,7 +22,8 @@ defmodule Rephi.Seeds do
 
   Every seeded role and permission is marked `is_system` (it cannot be
   deleted nor have its slug changed), including rows that already existed
-  with the same slug: that is the one thing seeding changes on existing
+  with the same slug, and so is every link of the seeded hierarchy (it
+  cannot be removed): that is the one thing seeding changes on existing
   rows.
 
   ## Grants the seed no longer makes
@@ -76,6 +77,8 @@ defmodule Rephi.Seeds do
     {"users:create", "Create Users", "Create new user accounts", ["manager"]},
     {"users:edit", "Edit Users", "Edit user information", ["manager"]},
     {"users:delete", "Delete Users", "Delete user accounts", []},
+    {"users:reset_password", "Reset User Passwords",
+     "Give another user a temporary password, ending their sessions", []},
     {"roles:view", "View Roles", "View roles and their permissions", ["manager"]},
     {"roles:create", "Create Roles", "Create new roles", []},
     {"roles:edit", "Edit Roles", "Edit role information", []},
@@ -107,6 +110,11 @@ defmodule Rephi.Seeds do
   The default roles, in the order they are created.
   """
   def roles, do: @roles
+
+  @doc """
+  The default role hierarchy as `{child_slug, parent_slug}` pairs.
+  """
+  def role_hierarchy, do: @role_hierarchy
 
   @doc """
   The default permissions as `%{slug, name, description, roles}` maps, where
@@ -147,7 +155,8 @@ defmodule Rephi.Seeds do
           "role_roles",
           :child_role_id,
           :parent_role_id,
-          for({child, parent} <- @role_hierarchy, do: {roles[child].id, roles[parent].id})
+          for({child, parent} <- @role_hierarchy, do: {roles[child].id, roles[parent].id}),
+          system: true
         )
 
         link!(
@@ -209,15 +218,23 @@ defmodule Rephi.Seeds do
     |> Enum.reject(&MapSet.member?(seeded, &1))
   end
 
-  defp link!(table, left, right, pairs) do
+  defp link!(table, left, right, pairs, opts \\ []) do
     now = NaiveDateTime.utc_now(:second)
 
     rows =
       for {left_id, right_id} <- pairs do
-        %{left => left_id, right => right_id, inserted_at: now, updated_at: now}
+        row = %{left => left_id, right => right_id, inserted_at: now, updated_at: now}
+        if opts[:system], do: Map.put(row, :is_system, true), else: row
       end
 
-    Repo.insert_all(table, rows, on_conflict: :nothing)
+    if opts[:system] do
+      Repo.insert_all(table, rows,
+        on_conflict: [set: [is_system: true]],
+        conflict_target: [right, left]
+      )
+    else
+      Repo.insert_all(table, rows, on_conflict: :nothing)
+    end
   end
 
   defp seed_admin(:skip, _role), do: {:ok, :skipped}

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
-import { isEmbedded } from "~/lib/navigation";
+import { go, isEmbedded } from "~/lib/navigation";
 import { setRealtimeConnected } from "~/lib/realtime";
+import { isRoute, ROUTES } from "~/lib/routes";
 import {
   fetchMe,
   LOBBY_TOPIC,
@@ -55,6 +56,23 @@ function Notifications({ userId }: { userId: number }) {
   return null;
 }
 
+// This island persists across navigations, hence the astro:page-load listener.
+function usePasswordChangeRedirect(mustChangePassword: boolean) {
+  useEffect(() => {
+    if (!mustChangePassword || isEmbedded) return;
+
+    const enforce = () => {
+      if (isRoute(window.location.pathname, ROUTES.pages.profile)) return;
+      toast("Choose a new password to continue.", { id: "must-change-password", icon: "🔑" });
+      go(ROUTES.pages.profile, { replace: true });
+    };
+
+    enforce();
+    document.addEventListener("astro:page-load", enforce);
+    return () => document.removeEventListener("astro:page-load", enforce);
+  }, [mustChangePassword]);
+}
+
 /**
  * App-wide runtime: owns the Phoenix socket, the notification channels, the
  * reaction to a lost session and the toast container.
@@ -66,12 +84,17 @@ function Notifications({ userId }: { userId: number }) {
 export default function AppRuntime() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const userId = useAuthStore((state) => state.user?.id);
+  const mustChangePassword = useAuthStore(
+    (state) => state.isAuthenticated && !!state.user?.must_change_password
+  );
   // A session restored from storage may be stale or dead: it is checked once
   // per page load before the socket opens, so a revoked token ends the session
   // over HTTP (401) instead of failing a WebSocket handshake.
   const [bootChecked, setBootChecked] = useState(() => !useAuthStore.getState().isAuthenticated);
   // A framed copy of the page must not open a second socket (see `isEmbedded`).
   const online = isAuthenticated && bootChecked && !isEmbedded;
+
+  usePasswordChangeRedirect(mustChangePassword);
 
   useEffect(() => {
     if (bootChecked || isEmbedded) return;
