@@ -1,35 +1,29 @@
 import React, { ReactNode } from 'react';
+import { useAuthStore } from '../stores/auth.store';
+import { userCanAll, userCanAny } from '../permissions';
 
 interface PermissionGuardProps {
   children: ReactNode;
+  /** Permission slugs, e.g. `['users:view']`. */
   permissions: string[];
-  userPermissions: string[];
+  /** Require every permission instead of any of them. */
   requireAll?: boolean;
   fallback?: ReactNode;
-  onUnauthorized?: () => void;
 }
 
+/**
+ * Renders `children` when the signed-in user (from the auth store) has the
+ * permissions, `fallback` otherwise. UI only: the server authorizes every
+ * request on its own.
+ */
 export const PermissionGuard: React.FC<PermissionGuardProps> = ({
   children,
   permissions,
-  userPermissions,
   requireAll = false,
-  fallback = null,
-  onUnauthorized
+  fallback = null
 }) => {
-  const hasPermission = requireAll
-    ? permissions.every(perm => userPermissions.includes(perm))
-    : permissions.some(perm => userPermissions.includes(perm));
+  const user = useAuthStore((state) => state.user);
+  const allowed = requireAll ? userCanAll(user, permissions) : userCanAny(user, permissions);
 
-  React.useEffect(() => {
-    if (!hasPermission) {
-      onUnauthorized?.();
-    }
-  }, [hasPermission, onUnauthorized]);
-
-  if (!hasPermission) {
-    return <>{fallback}</>;
-  }
-
-  return <>{children}</>;
+  return <>{allowed ? children : fallback}</>;
 };

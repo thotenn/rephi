@@ -1,27 +1,35 @@
-import { env } from './env';
-
 /**
  * Runtime configuration of the library.
  *
- * `env.SERVER_API_URL` / `env.WS_URL` are inlined when this package is built, so
- * they cannot differ between deployments of the same build. Consumers that need
- * their own endpoints (a static site on a CDN, a second environment, tests...)
- * call `configureRephi()` once, before the first request or socket connection.
+ * Nothing is inlined when the library is built: every app passes its own
+ * values once, before the first request or socket connection, usually from
+ * its own build-time environment (`import.meta.env.VITE_*`, `astro:env`...).
+ *
+ * ```ts
+ * configureRephi({
+ *   apiUrl: "https://api.example.com/api",
+ *   wsUrl: "wss://api.example.com/socket",
+ *   debug: import.meta.env.DEV,
+ * });
+ * ```
  */
 export interface RephiConfig {
   /** Base URL of the REST API, e.g. `https://api.example.com/api` or `/api`. */
   apiUrl: string;
   /** Phoenix socket endpoint, e.g. `wss://api.example.com/socket` or `/socket`. */
   wsUrl: string;
+  /** Logs socket traffic and library diagnostics to the console. */
+  debug: boolean;
 }
 
 type Listener = (config: Readonly<RephiConfig>) => void;
 
-// Defaults are the values baked in at library build time, which keeps existing
-// consumers working without calling `configureRephi()`.
+// Same-origin defaults: right for an app that Phoenix serves itself
+// (`/app/<name>/`), where the API lives at `/api` and the socket at `/socket`.
 const config: RephiConfig = {
-  apiUrl: env.SERVER_API_URL,
-  wsUrl: env.WS_URL,
+  apiUrl: "/api",
+  wsUrl: "/socket",
+  debug: false,
 };
 
 const listeners = new Set<Listener>();
@@ -32,15 +40,16 @@ export function getRephiConfig(): Readonly<RephiConfig> {
 }
 
 /**
- * Overrides the API and/or socket URL at runtime. Keys that are missing or
- * `undefined` keep their current value. Safe to call more than once.
+ * Overrides part of the configuration. Keys that are missing or `undefined`
+ * keep their current value. Safe to call more than once.
  *
- * The `api` axios instance picks the new base URL up immediately; the socket
- * uses the new URL the next time `PhoenixSocket.connect()` runs.
+ * The `api` axios instance picks a new base URL up immediately; the socket
+ * uses a new URL the next time `PhoenixSocket.connect()` runs.
  */
 export function configureRephi(overrides: Partial<RephiConfig>): Readonly<RephiConfig> {
   if (overrides.apiUrl !== undefined) config.apiUrl = overrides.apiUrl;
   if (overrides.wsUrl !== undefined) config.wsUrl = overrides.wsUrl;
+  if (overrides.debug !== undefined) config.debug = overrides.debug;
   listeners.forEach((listener) => listener(config));
   return config;
 }
@@ -51,4 +60,9 @@ export function onRephiConfigChange(listener: Listener): () => void {
   return () => {
     listeners.delete(listener);
   };
+}
+
+/** Internal: `console.debug` that only speaks when `debug` is on. */
+export function debugLog(...args: unknown[]): void {
+  if (config.debug) console.debug("[rephi]", ...args);
 }

@@ -1,12 +1,19 @@
-import axios from "axios";
-import { useAuthStore } from "../../stores/auth.store";
-import type { ApiError } from "../../types";
+import axios, { AxiosHeaders, isAxiosError } from "axios";
 import { getRephiConfig, onRephiConfigChange } from "../../config";
-import { setCsrfHeader } from "./csrf";
+import { toApiError } from "../../errors";
+import { endSession, isSigningOut } from "../../session";
+import { useAuthStore } from "../../stores/auth.store";
 
+/**
+ * The axios instance every request to the API goes through.
+ *
+ * - Sends the session token as `Authorization: Bearer <token>`.
+ * - Rejects with an `ApiError` (see `errors.ts`) built from the error envelope.
+ * - A 401 on a request that carried the current token ends the session
+ *   (`endSession("unauthorized")`): the token expired or was revoked.
+ */
 const api = axios.create({
   baseURL: getRephiConfig().apiUrl,
-  withCredentials: true,
 });
 
 // Follow `configureRephi({ apiUrl })` calls made after this module was loaded.
@@ -16,47 +23,35 @@ onRephiConfigChange(({ apiUrl }) => {
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (token && !config.headers.has("Authorization")) {
+    config.headers.set("Authorization", `Bearer ${token}`);
   }
-  setCsrfHeader(config.headers);
   return config;
 });
 
-// Response interceptor for error handling
+function bearerOf(headers: unknown): string | null {
+  const value = AxiosHeaders.from(headers as AxiosHeaders).get("Authorization");
+  return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7) : null;
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response) {
-      // Normalize error format
-      const apiError: ApiError = error.response.data || {};
-      
-      // Extract meaningful error message
-      let errorMessage = "An error occurred";
-      
-      if (apiError.error) {
-        errorMessage = apiError.error;
-      } else if (apiError.message) {
-        errorMessage = apiError.message;
-      } else if (apiError.errors) {
-        // Convert validation errors to a single message
-        const firstError = Object.values(apiError.errors)[0];
-        if (Array.isArray(firstError) && firstError.length > 0) {
-          errorMessage = firstError[0];
-        }
+  (error: unknown) => {
+    if (!isAxiosError(error)) return Promise.reject(error);
+    if (axios.isCancel(error)) return Promise.reject(error);
+
+    const response = error.response;
+
+    // Only a token that is still the current one ends the session: a late
+    // answer to a request sent before a re-login must not sign the user out.
+    if (response?.status === 401) {
+      const sentToken = bearerOf(error.config?.headers);
+      if (sentToken && sentToken === useAuthStore.getState().token && !isSigningOut()) {
+        endSession("unauthorized");
       }
-      
-      // Create normalized error
-      const normalizedError = new Error(errorMessage);
-      Object.assign(normalizedError, {
-        response: error.response,
-        apiError: apiError
-      });
-      
-      return Promise.reject(normalizedError);
     }
-    
-    return Promise.reject(error);
+
+    return Promise.reject(toApiError(response, error));
   }
 );
 

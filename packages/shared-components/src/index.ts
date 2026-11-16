@@ -1,49 +1,81 @@
+// Configuration (call `configureRephi` once, before the first request)
+export { configureRephi, getRephiConfig } from './config';
+export type { RephiConfig } from './config';
+
+// HTTP client, auth calls and pagination
+export {
+  api,
+  AUTH_ENDPOINTS,
+  changePassword,
+  describePage,
+  fetchAllPages,
+  fetchMe,
+  fetchPage,
+  hasNextPage,
+  hasPreviousPage,
+  login,
+  logout,
+  MAX_PAGE_SIZE,
+  PhoenixSocket,
+  register
+} from './controllers';
+export type { SocketStatus } from './controllers';
+
+// Errors
+export {
+  ApiError,
+  describeError,
+  fieldErrorsToMessage,
+  getErrorMessage,
+  getFieldErrors,
+  humanizeField,
+  isApiError
+} from './errors';
+export type { ErrorInfo } from './errors';
+
+// Session
+export { endSession, onSessionEnd, startSession } from './session';
+export { AUTH_STORAGE_KEY, useAuthStore } from './stores';
+
+// Authorization helpers (UI only)
+export { userCan, userCanAll, userCanAny, userHasRole } from './permissions';
+
+// Realtime
+export { LOBBY_TOPIC, NOTIFICATION_EVENT, userTopic } from './realtime';
+
 // Components
-export { PhoenixProvider, usePhoenix } from './components/PhoenixProvider';
 export { AuthGuard } from './components/AuthGuard';
 export { PermissionGuard } from './components/PermissionGuard';
 
 // Hooks
-export { useChannel } from './hooks';
-export { usePermissions } from './hooks/usePermissions';
+export { useChannel, useChannelEvent, usePermissions, usePhoenixSocket } from './hooks';
+export type { UseChannelOptions, UseChannelResult } from './hooks';
 
 // Utils
-export { 
-  setRedirectPath,
-  getRedirectPath,
-  clearRedirectPath,
-  filterRoutesByPermissions,
-  createProtectedRoute
-} from './utils/routes';
-export type {
-  RouteConfig
-} from './utils/routes';
-
-// Environment (build-time defaults) and runtime configuration
-export { env } from './env';
-export type { Env } from './env';
-export { configureRephi, getRephiConfig } from './config';
-export type { RephiConfig } from './config';
-
 export {
-  getCsrfToken,
-  setCsrfHeader,
-  api,
-  PhoenixSocket
-} from './controllers';
+  clearRedirectPath,
+  createProtectedRoute,
+  filterRoutesByPermissions,
+  getRedirectPath,
+  setRedirectPath
+} from './utils/routes';
+export type { RouteAccess, RouteConfig } from './utils/routes';
 
 // Types
 export type {
-  ApiError,
-  PaginatedResponse,
+  ApiErrorBody,
   ApiResponse,
-  Role,
-  Permission,
-  User,
-  AuthResponse,
+  AuthSession,
+  ChangePasswordParams,
+  FieldErrors,
   LoginCredentials,
-  RegisterCredentials
+  PageMeta,
+  PageParams,
+  PaginatedResponse,
+  Permission,
+  RegisterCredentials,
+  RephiNotification,
+  Role,
+  SessionEndReason,
+  User
 } from './types';
-
-// Stores
-export { useAuthStore } from './stores';

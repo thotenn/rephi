@@ -1,14 +1,21 @@
 export type {
-  ApiError,
+  ApiResponse,
+  ApiErrorBody,
+  FieldErrors,
+  PageMeta,
+  PageParams,
   PaginatedResponse,
-  ApiResponse
 } from "./api.types";
 
 export type {
-  Role,
-  Permission,
-  User,
-  AuthResponse,
+  AuthSession,
+  ChangePasswordParams,
   LoginCredentials,
-  RegisterCredentials
+  Permission,
+  RegisterCredentials,
+  Role,
+  SessionEndReason,
+  User,
 } from "./auth.types";
+
+export type { RephiNotification } from "./realtime.types";

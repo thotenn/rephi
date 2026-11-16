@@ -1,57 +1,22 @@
-import { useMemo } from 'react';
+import { useAuthStore } from "../stores/auth.store";
+import { userCan, userCanAll, userCanAny, userHasRole } from "../permissions";
 
-interface UsePermissionsOptions {
-  roles?: string[];
-  permissions?: string[];
-  rolePermissions?: Record<string, string[]>;
-}
-
-export const usePermissions = (options: UsePermissionsOptions = {}) => {
-  const { roles = [], permissions = [], rolePermissions = {} } = options;
-
-  const allPermissions = useMemo(() => {
-    const permSet = new Set(permissions);
-    
-    roles.forEach(role => {
-      const rolePerms = rolePermissions[role] || [];
-      rolePerms.forEach(perm => permSet.add(perm));
-    });
-
-    return Array.from(permSet);
-  }, [roles, permissions, rolePermissions]);
-
-  const hasPermission = (permission: string): boolean => {
-    return allPermissions.includes(permission);
-  };
-
-  const hasAnyPermission = (perms: string[]): boolean => {
-    return perms.some(perm => hasPermission(perm));
-  };
-
-  const hasAllPermissions = (perms: string[]): boolean => {
-    return perms.every(perm => hasPermission(perm));
-  };
-
-  const hasRole = (role: string): boolean => {
-    return roles.includes(role);
-  };
-
-  const hasAnyRole = (checkRoles: string[]): boolean => {
-    return checkRoles.some(role => hasRole(role));
-  };
-
-  const hasAllRoles = (checkRoles: string[]): boolean => {
-    return checkRoles.every(role => hasRole(role));
-  };
+/**
+ * Permission checks against the signed-in user of the auth store. Re-renders
+ * when the user changes (login, logout, `fetchMe()`).
+ */
+export function usePermissions() {
+  const user = useAuthStore((state) => state.user);
 
   return {
-    permissions: allPermissions,
-    roles,
-    hasPermission,
-    hasAnyPermission,
-    hasAllPermissions,
-    hasRole,
-    hasAnyRole,
-    hasAllRoles
+    user,
+    /** Effective permission slugs of the user. */
+    permissions: user?.permissions.map((permission) => permission.slug) ?? [],
+    /** Slugs of the roles assigned to the user (inherited roles are not listed). */
+    roles: user?.roles.map((role) => role.slug) ?? [],
+    can: (slug: string) => userCan(user, slug),
+    canAny: (slugs: readonly string[]) => userCanAny(user, slugs),
+    canAll: (slugs: readonly string[]) => userCanAll(user, slugs),
+    hasRole: (slug: string) => userHasRole(user, slug),
   };
-};
+}

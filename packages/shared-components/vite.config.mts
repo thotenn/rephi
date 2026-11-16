@@ -50,8 +50,5 @@ export default defineConfig({
         'zustand/middleware'
       ]
     }
-  },
-  // `import.meta.env.VITE_*` is inlined at build time from the root `.env`.
-  envDir: resolve(import.meta.dirname, '../..'),
-  envPrefix: 'VITE_'
+  }
 });
