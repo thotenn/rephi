@@ -89,9 +89,8 @@ config :rephi, Rephi.Authorization, admin_role: "admin"
 # `Rephi.Accounts.register_user/1`.
 config :rephi, Rephi.Accounts, default_role: "user"
 
-# The API documentation (the OpenAPI document at /api/openapi and the Swagger
-# UI at /api/swagger) is served only where this is true (dev and test).
-# SWAGGER_ENABLED overrides it at runtime.
+# /api/openapi and /api/swagger are served only where this is true (dev and
+# test). SWAGGER_ENABLED overrides it at runtime.
 config :rephi, :swagger_enabled, false
 
 # Import environment specific config. This must remain at the bottom

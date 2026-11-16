@@ -1,27 +1,7 @@
 defmodule RephiWeb.ApiContractTest do
   @moduledoc """
-  The OpenAPI document (`RephiWeb.ApiSpec`) describes the API that actually
-  runs.
-
-    * every controller route of the router has an operation, and the
-      document is well formed: unique operation ids, every `$ref` resolves,
-      declared tags and security schemes, integer path ids, a 401 on every
-      authenticated operation, examples that match their schemas;
-    * every response the document declares is produced by a real request -
-      the status, the documented headers and the whole body against the
-      declared schema, both ways: a field the endpoint sends and the schema
-      does not declare fails, and so does a field the schema declares and
-      the endpoint does not send.
-
-  The body is checked twice: with `OpenApiSpex.cast_value/3` against the
-  schema made strict (every object `additionalProperties: false`; response
-  objects must list every property in `required`, see "is well formed"),
-  which covers fields, `nullable`, enums, formats and patterns; and against
-  the JSON types (`OpenApiSpex` casting would accept `"1"` for an integer).
-
-  Adding an endpoint or a response means adding the request that produces it
-  to `cases/1` (or relying on the generic ones: 400, 401, 403, 404, 413,
-  429).
+  The OpenAPI document matches the running API: every route documented, a valid document,
+  and every documented response produced by a real request and checked both ways.
   """
   use RephiWeb.ConnCase, async: false
 
@@ -88,8 +68,7 @@ defmodule RephiWeb.ApiContractTest do
         if op["security"], do: assert(Map.has_key?(op["responses"], "401"), where)
       end
 
-      # A response object declares exactly what the views send: every
-      # property is required (a field that can be empty is nullable).
+      # So that casting catches a declared field the endpoint does not send.
       for {name, schema} <- response_schemas(document),
           {where, object} <- objects(schema, name) do
         properties = Map.keys(object["properties"])
@@ -462,7 +441,6 @@ defmodule RephiWeb.ApiContractTest do
 
   # -- the document -----------------------------------------------------------
 
-  # What GET /api/openapi serves, as decoded JSON.
   defp document, do: RephiWeb.ApiSpec.spec() |> Jason.encode!() |> Jason.decode!()
 
   defp controller_routes do
@@ -486,8 +464,6 @@ defmodule RephiWeb.ApiContractTest do
 
   defp ref_path("#/" <> pointer), do: String.split(pointer, "/")
 
-  # The schemas of the response bodies: the inline ones and every component
-  # they reach, with where they are.
   defp response_schemas(document) do
     roots =
       for {verb, path, op} <- operations(document),
@@ -514,7 +490,6 @@ defmodule RephiWeb.ApiContractTest do
     end
   end
 
-  # Every object with properties inside a schema, with where it is.
   defp objects(%{"properties" => properties} = schema, where) do
     nested = for {key, property} <- properties, do: objects(property, "#{where}.#{key}")
     [{where, schema} | List.flatten(nested)]
@@ -523,9 +498,7 @@ defmodule RephiWeb.ApiContractTest do
   defp objects(%{"items" => items}, where), do: objects(items, "#{where}[]")
   defp objects(_schema, _where), do: []
 
-  # The spec with every object that lists its properties closed to any other
-  # (`additionalProperties: false`), so casting a body with an undeclared
-  # field fails.
+  # additionalProperties: false, so casting fails on an undeclared field.
   defp strict(%OpenApiSpex.OpenApi{} = spec) do
     schemas = Map.new(spec.components.schemas, fn {name, schema} -> {name, strict(schema)} end)
     put_in(spec.components.schemas, schemas)
@@ -572,8 +545,7 @@ defmodule RephiWeb.ApiContractTest do
     assert_types(body, response["content"]["application/json"]["schema"], document, where)
   end
 
-  # The JSON types, which casting does not check (it accepts "1" for an
-  # integer or "true" for a boolean), and UTC date-times.
+  # Casting accepts "1" for an integer and "true" for a boolean: check JSON types.
   defp assert_types(value, %{"$ref" => ref}, document, where) do
     assert_types(value, get_in(document, ref_path(ref)), document, "#{where} (#{ref})")
   end

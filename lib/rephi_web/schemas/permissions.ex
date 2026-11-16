@@ -1,6 +1,3 @@
-# Permissions and their assignment to roles (`RephiWeb.PermissionController`).
-# See `RephiWeb.Schemas`.
-
 defmodule RephiWeb.Schemas.Permission do
   require OpenApiSpex
   alias OpenApiSpex.Schema

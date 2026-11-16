@@ -1,7 +1,3 @@
-# The schemas every part of the API shares: the error envelopes, the meta of
-# a page, the summaries of roles and permissions and the notes of an
-# assignment. See `RephiWeb.Schemas`.
-
 defmodule RephiWeb.Schemas.ErrorResponse do
   require OpenApiSpex
   alias OpenApiSpex.Schema

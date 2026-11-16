@@ -28,8 +28,7 @@ erl_crash.dump
 
 # --- Generated at build time ---------------------------------------------------
 
-# `mix openapi.spec.json --spec RephiWeb.ApiSpec ...` (an export of the API
-# document for a client generator; the server builds it from the code).
+# `mix openapi.spec.json` export (the server builds the document itself).
 /openapi.json
 
 # Frontend builds copied by scripts/copy-builds.js (`yarn build`).

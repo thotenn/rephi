@@ -1,6 +1,3 @@
-# The service descriptor, the health checks, this document and the
-# notifications. See `RephiWeb.Schemas`.
-
 defmodule RephiWeb.Schemas.ServiceResponse do
   require OpenApiSpex
   alias OpenApiSpex.Schema

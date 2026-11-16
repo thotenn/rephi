@@ -17,8 +17,7 @@ defmodule RephiWeb.Router do
   end
 
   # The API documentation is only served where it is enabled
-  # (`config :rephi, :swagger_enabled`, SWAGGER_ENABLED at runtime), and puts
-  # the OpenAPI document (`RephiWeb.ApiSpec`) in the connection.
+  # (`config :rephi, :swagger_enabled`, SWAGGER_ENABLED at runtime).
   pipeline :api_docs do
     plug :ensure_api_docs_enabled
     plug OpenApiSpex.Plug.PutApiSpec, module: RephiWeb.ApiSpec
@@ -73,15 +72,14 @@ defmodule RephiWeb.Router do
     get "/users/:id/roles", UserController, :get_user_roles
   end
 
-  # API documentation: the OpenAPI 3.0 document and the Swagger UI on top of
-  # it (an HTML page that loads its assets from a CDN, hence not the strict
-  # CSP of :api). See `RephiWeb.ApiSpec`.
   scope "/api" do
     pipe_through [:api, :api_docs]
 
     get "/openapi", RephiWeb.OpenApiController, :show
   end
 
+  # Not :api: the Swagger UI page loads its scripts from a CDN, which the
+  # strict CSP of :api would block.
   scope "/api" do
     pipe_through [:frontend, :api_docs]
 

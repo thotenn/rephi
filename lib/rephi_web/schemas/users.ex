@@ -1,5 +1,3 @@
-# User management (`RephiWeb.UserController`). See `RephiWeb.Schemas`.
-
 defmodule RephiWeb.Schemas.User do
   require OpenApiSpex
   alias OpenApiSpex.Schema

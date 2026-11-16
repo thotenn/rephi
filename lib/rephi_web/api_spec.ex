@@ -1,22 +1,7 @@
 defmodule RephiWeb.ApiSpec do
   @moduledoc """
-  The OpenAPI 3.0 document of the API.
-
-  The paths come from the router: every route whose controller declares an
-  `operation` for its action (`OpenApiSpex.ControllerSpecs`, helpers in
-  `RephiWeb.ApiSpec.Operations`). The schemas are the `RephiWeb.Schemas.*`
-  modules the operations reach. Nothing is generated to disk:
-
-    * `GET /api/openapi` serves it (`RephiWeb.OpenApiController`) and
-      `GET /api/swagger` is the Swagger UI on top of it, both only where
-      `config :rephi, :swagger_enabled` is true (`SWAGGER_ENABLED`);
-    * `mix openapi.spec.json --spec RephiWeb.ApiSpec --start-app=false`
-      writes it to a file for a client generator or CI;
-    * `test/rephi_web/api_contract_test.exs` checks it against the API.
-
-  The document is built once and cached (`OpenApiSpex.Plug.PutApiSpec`);
-  development turns the cache off (`config/dev.exs`) so a changed operation
-  shows up after a reload.
+  The OpenAPI 3.0 document: paths from the router's `operation`s, schemas from
+  `RephiWeb.Schemas.*`. Served at `/api/openapi`, checked by `api_contract_test.exs`.
   """
 
   @behaviour OpenApiSpex.OpenApi
@@ -96,10 +81,8 @@ defmodule RephiWeb.ApiSpec do
     |> OpenApiSpex.resolve_schema_modules()
   end
 
-  # `resources` routes PUT and PATCH to the same action, so both operations
-  # come out with the same id and `OpenApiSpex.Paths` tells them apart with a
-  # " (2)" suffix on one of them. Give them stable ids instead: PUT keeps the
-  # action's (`RephiWeb.RoleController.update`), PATCH gets `.patch` appended.
+  # PUT and PATCH of `resources` share an action; `OpenApiSpex.Paths` would
+  # suffix one id with " (2)" depending on map order. PATCH gets ".patch".
   defp operation_per_verb(paths) do
     Map.new(paths, fn
       {path, %PathItem{put: %Operation{} = put, patch: %Operation{} = patch} = item} ->

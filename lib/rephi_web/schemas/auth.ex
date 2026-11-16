@@ -1,6 +1,3 @@
-# Registration, login, the session and the signed-in user
-# (`RephiWeb.AuthController`). See `RephiWeb.Schemas`.
-
 defmodule RephiWeb.Schemas.UserRegistration do
   require OpenApiSpex
   alias OpenApiSpex.Schema
