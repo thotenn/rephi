@@ -23,6 +23,8 @@ defmodule RephiWeb.AuthController do
   use RephiWeb, :controller
   use PhoenixSwagger
 
+  import RephiWeb.Swagger
+
   alias PhoenixSwagger.Schema
   alias Rephi.Accounts
   alias Rephi.Authorization
@@ -37,18 +39,23 @@ defmodule RephiWeb.AuthController do
   swagger_path :register do
     post("/api/users/register")
     summary("Register a new user")
-    description("Creates a new user account and returns authentication token")
+
+    description(
+      "Creates an account with the default role (user) and returns a session. The attributes may also be wrapped under \"user\". Rate limited per client IP."
+    )
+
+    tag("Auth")
     consumes("application/json")
     produces("application/json")
 
     parameters do
-      user(:body, Schema.ref(:UserRegistration), "User registration details", required: true)
+      body(:body, Schema.ref(:UserRegistration), "Email and password", required: true)
     end
 
-    response(201, "User created successfully", Schema.ref(:AuthResponse))
-
-    response(422, "Validation errors", Schema.ref(:ValidationErrors))
-    response(429, "Too many attempts, see the retry-after header", Schema.ref(:ErrorResponse))
+    response(201, "Account created, new session", Schema.ref(:AuthResponse))
+    body_errors()
+    validation_response("Invalid or taken email, or invalid password")
+    rate_limited()
   end
 
   def register(conn, _params) do
@@ -61,20 +68,25 @@ defmodule RephiWeb.AuthController do
 
   swagger_path :login do
     post("/api/users/login")
-    summary("User login")
-    description("Authenticates user credentials and returns authentication token")
+    summary("Log in")
+
+    description(
+      "Exchanges credentials for a session. The attributes may also be wrapped under \"user\". Rate limited per client IP."
+    )
+
+    tag("Auth")
     consumes("application/json")
     produces("application/json")
 
     parameters do
-      credentials(:body, Schema.ref(:LoginCredentials), "Login credentials", required: true)
+      body(:body, Schema.ref(:LoginCredentials), "Email and password", required: true)
     end
 
-    response(200, "Login successful", Schema.ref(:AuthResponse))
-
-    response(400, "Email or password missing", Schema.ref(:ErrorResponse))
-    response(401, "Invalid credentials", Schema.ref(:ErrorResponse))
-    response(429, "Too many attempts, see the retry-after header", Schema.ref(:ErrorResponse))
+    response(200, "Logged in, new session", Schema.ref(:AuthResponse))
+    body_errors()
+    error_response(400, "Malformed JSON body, or email or password missing or not a string")
+    error_response(401, "Invalid email or password")
+    rate_limited()
   end
 
   def login(conn, _params) do
@@ -89,13 +101,12 @@ defmodule RephiWeb.AuthController do
     summary("Log out")
 
     description(
-      "Revokes every token issued to the signed-in user (on all devices) and closes its WebSocket connections"
+      "Revokes every token issued to the signed-in user (on all devices) and closes its WebSocket connections. No body."
     )
 
-    security([%{Bearer: []}])
-
+    tag("Auth")
+    bearer_auth()
     response(204, "Logged out")
-    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
   end
 
   def logout(conn, _params) do
@@ -106,14 +117,12 @@ defmodule RephiWeb.AuthController do
 
   swagger_path :me do
     get("/api/me")
-    summary("Get current user")
-    description("Returns the current authenticated user's information")
+    summary("Get the signed-in user")
+    description("The signed-in user with the roles assigned to it and its effective permissions")
+    tag("Auth")
     produces("application/json")
-    security([%{Bearer: []}])
-
-    response(200, "User information", Schema.ref(:MeResponse))
-
-    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
+    bearer_auth()
+    response(200, "The signed-in user", Schema.ref(:MeResponse))
   end
 
   def me(conn, _params) do
@@ -125,21 +134,22 @@ defmodule RephiWeb.AuthController do
     summary("Change my password")
 
     description(
-      "Sets a new password for the signed-in user, who must send the current one. Every token issued before is revoked and the user's WebSocket connections are closed; the response carries a new token."
+      "Sets a new password for the signed-in user, who must send the current one. Every token issued before (the one of this request included) is revoked and the user's WebSocket connections are closed; the response carries a new session. The attributes may also be wrapped under \"user\". Shares the rate limit of login."
     )
 
+    tag("Auth")
     consumes("application/json")
     produces("application/json")
-    security([%{Bearer: []}])
+    bearer_auth()
 
     parameters do
       body(:body, Schema.ref(:PasswordChange), "Current and new password", required: true)
     end
 
     response(200, "Password changed, new session", Schema.ref(:AuthResponse))
-    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
-    response(422, "Wrong current password or invalid new one", Schema.ref(:ValidationErrors))
-    response(429, "Too many attempts, see the retry-after header", Schema.ref(:ErrorResponse))
+    body_errors()
+    validation_response("Wrong current password, or invalid new one")
+    rate_limited()
   end
 
   def change_password(conn, _params) do
@@ -176,24 +186,38 @@ defmodule RephiWeb.AuthController do
 
   # Swagger schema definitions
   def swagger_definitions do
-    %{
+    RephiWeb.Swagger.definitions(%{
       UserRegistration: %{
         type: :object,
         title: "User Registration",
-        description: "New user registration data",
+        description: "A new account",
         properties: %{
-          email: %{type: :string, description: "User's email address", format: :email},
+          email: %{
+            type: :string,
+            format: :email,
+            maxLength: 160,
+            description: "Stored trimmed and lowercased; unique regardless of case"
+          },
           password: %{
             type: :string,
-            description: "User's password (8 characters minimum, 72 bytes maximum)",
-            minLength: 8
-          }
+            minLength: 8,
+            description: "8 characters minimum, 72 bytes maximum"
+          },
+          password_confirmation: %{type: :string, description: "Optional; must match password"}
         },
         required: [:email, :password],
-        example: %{
-          email: "user@example.com",
-          password: "a-long-passphrase"
-        }
+        example: %{email: "user@example.com", password: "a-long-passphrase"}
+      },
+      LoginCredentials: %{
+        type: :object,
+        title: "Login Credentials",
+        description: "Email (any case) and password",
+        properties: %{
+          email: %{type: :string, format: :email},
+          password: %{type: :string}
+        },
+        required: [:email, :password],
+        example: %{email: "user@example.com", password: "a-long-passphrase"}
       },
       PasswordChange: %{
         type: :object,
@@ -201,66 +225,45 @@ defmodule RephiWeb.AuthController do
         description: "The current password and the new one",
         properties: %{
           current_password: %{type: :string},
-          password: %{type: :string, minLength: 8, description: "8 characters to 72 bytes"},
-          password_confirmation: %{type: :string, description: "Optional; must match"}
+          password: %{
+            type: :string,
+            minLength: 8,
+            description: "8 characters minimum, 72 bytes maximum"
+          },
+          password_confirmation: %{type: :string, description: "Optional; must match password"}
         },
         required: [:current_password, :password],
         example: %{current_password: "a-long-passphrase", password: "another-passphrase"}
-      },
-      LoginCredentials: %{
-        type: :object,
-        title: "Login Credentials",
-        description: "User login credentials",
-        properties: %{
-          email: %{type: :string, description: "User's email address", format: :email},
-          password: %{type: :string, description: "User's password"}
-        },
-        required: [:email, :password],
-        example: %{
-          email: "user@example.com",
-          password: "a-long-passphrase"
-        }
       },
       SessionUser: %{
         type: :object,
         title: "Session User",
         description:
-          "The signed-in user with the roles assigned to it and its effective permissions (direct, through roles, inherited)",
+          "The signed-in user: the roles assigned to it (not the inherited ones) and its effective permissions (direct, through roles and inherited), by slug",
         properties: %{
-          id: %{type: :integer, description: "User ID"},
-          email: %{type: :string, description: "User's email address"},
-          roles: %{type: :array, items: Schema.ref(:SessionGrant)},
-          permissions: %{type: :array, items: Schema.ref(:SessionGrant)}
+          id: %{type: :integer},
+          email: %{type: :string},
+          roles: %{type: :array, items: Schema.ref(:Grant)},
+          permissions: %{type: :array, items: Schema.ref(:Grant)}
         },
         required: [:id, :email, :roles, :permissions],
         example: %{
-          id: 1,
+          id: 2,
           email: "user@example.com",
-          roles: [%{id: 1, name: "Administrator", slug: "admin"}],
-          permissions: [%{id: 1, name: "View Users", slug: "users:view"}]
+          roles: [%{id: 3, name: "User", slug: "user"}],
+          permissions: []
         }
-      },
-      SessionGrant: %{
-        type: :object,
-        title: "Session Grant",
-        description: "A role or permission held by the signed-in user",
-        properties: %{
-          id: %{type: :integer},
-          name: %{type: :string},
-          slug: %{type: :string}
-        },
-        required: [:id, :name, :slug]
       },
       AuthResponse: %{
         type: :object,
-        title: "Authentication Response",
-        description: "Successful authentication response",
+        title: "Session Response",
+        description: "A new session: the user and the access token to send as a Bearer token",
         properties: %{
           data: %{
             type: :object,
             properties: %{
               user: Schema.ref(:SessionUser),
-              token: %{type: :string, description: "JWT authentication token"}
+              token: %{type: :string, description: "JWT access token (24 hours by default)"}
             },
             required: [:user, :token]
           }
@@ -268,8 +271,13 @@ defmodule RephiWeb.AuthController do
         required: [:data],
         example: %{
           data: %{
-            user: %{id: 1, email: "user@example.com", roles: [], permissions: []},
-            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            user: %{
+              id: 2,
+              email: "user@example.com",
+              roles: [%{id: 3, name: "User", slug: "user"}],
+              permissions: []
+            },
+            token: "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9..."
           }
         }
       },
@@ -285,44 +293,7 @@ defmodule RephiWeb.AuthController do
           }
         },
         required: [:data]
-      },
-      ErrorResponse: %{
-        type: :object,
-        title: "Error Response",
-        description: "Error envelope used by every non-validation error of the API",
-        properties: %{
-          errors: %{
-            type: :object,
-            properties: %{
-              detail: %{type: :string, description: "Human readable error message"}
-            },
-            required: [:detail]
-          }
-        },
-        required: [:errors],
-        example: %{
-          errors: %{detail: "Invalid email or password"}
-        }
-      },
-      ValidationErrors: %{
-        type: :object,
-        title: "Validation Errors",
-        description: "Validation error envelope: one list of messages per invalid field",
-        properties: %{
-          errors: %{
-            type: :object,
-            description: "Validation error messages keyed by field",
-            additionalProperties: %{type: :array, items: %{type: :string}}
-          }
-        },
-        required: [:errors],
-        example: %{
-          errors: %{
-            email: ["can't be blank"],
-            password: ["should be at least 8 character(s)"]
-          }
-        }
       }
-    }
+    })
   end
 end

@@ -110,13 +110,35 @@ defmodule RephiWeb.Router do
     end
   end
 
+  @api_version Mix.Project.config()[:version]
+
+  @api_description """
+  Phoenix JSON API with JWT authentication, role-based access control and \
+  real-time notifications over WebSockets (`/socket`, channel `user:lobby`).
+
+  **Envelopes.** A successful response with a body is `{"data": ...}`; a \
+  paginated list adds `"meta": {"page", "page_size", "total", "total_pages"}` \
+  (`page` from 1, `page_size` 50 by default, at most 100). An error is \
+  `{"errors": {"detail": "message"}}`, or `{"errors": {"field": ["message"]}}` \
+  for a validation error (422).
+
+  **Status codes.** 400 malformed JSON or missing credentials; 401 missing, \
+  invalid, expired or revoked token; 403 missing permission, or granting what \
+  the caller does not hold; 404 unknown record or route (also for an id that \
+  is not a positive integer); 409 the change conflicts with the data (system \
+  records, last admin, duplicates); 413 body over 1 MB; 422 invalid fields; \
+  429 rate limited (see `retry-after`).
+
+  **Write bodies** may be sent flat or wrapped under the singular resource \
+  name (`{"role": {...}}`).
+  """
+
   def swagger_info do
     %{
       info: %{
-        version: "1.0",
+        version: @api_version,
         title: "Rephi API",
-        description:
-          "Phoenix/Elixir backend with JWT authentication and real-time WebSocket communication"
+        description: @api_description
       },
       securityDefinitions: %{
         Bearer: %{
@@ -124,11 +146,23 @@ defmodule RephiWeb.Router do
           name: "Authorization",
           in: "header",
           description:
-            "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
+            "The access token returned by login, register or a password change: \"Authorization: Bearer <token>\""
         }
       },
       consumes: ["application/json"],
-      produces: ["application/json"]
+      produces: ["application/json"],
+      tags: [
+        %{name: "Auth", description: "Sessions and the signed-in user"},
+        %{name: "Users", description: "User management (users:*)"},
+        %{name: "Roles", description: "Roles and their assignment to users (roles:*)"},
+        %{
+          name: "Permissions",
+          description: "Permissions and their assignment to roles (permissions:*)"
+        },
+        %{name: "Notifications", description: "Real-time notifications"},
+        %{name: "Health", description: "Liveness and readiness checks"},
+        %{name: "Service", description: "The service and this document"}
+      ]
     }
   end
 

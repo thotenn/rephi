@@ -28,25 +28,4 @@ defmodule RephiWeb.PaginationJSON do
       total_pages: page.total_pages
     }
   end
-
-  @doc """
-  Swagger definitions shared by the paginated endpoints.
-  """
-  def swagger_definitions do
-    %{
-      PageMeta: %{
-        type: :object,
-        title: "Page Meta",
-        description: "Where a page sits in the whole list",
-        properties: %{
-          page: %{type: :integer, description: "Current page, from 1"},
-          page_size: %{type: :integer, description: "Entries per page (at most 100)"},
-          total: %{type: :integer, description: "Entries in the whole list"},
-          total_pages: %{type: :integer, description: "Number of pages"}
-        },
-        required: [:page, :page_size, :total, :total_pages],
-        example: %{page: 1, page_size: 50, total: 3, total_pages: 1}
-      }
-    }
-  end
 end

@@ -9,8 +9,25 @@ defmodule RephiWeb.SwaggerController do
   The path can be overridden with `config :rephi, :swagger_file, "/some/path"`.
   """
   use RephiWeb, :controller
+  use PhoenixSwagger
+
+  import RephiWeb.Swagger
 
   action_fallback RephiWeb.FallbackController
+
+  swagger_path :show do
+    get("/api/swagger/swagger.json")
+    summary("This document")
+
+    description(
+      "The Swagger 2.0 document of the API. Served only where Swagger is enabled (dev and test; SWAGGER_ENABLED=true in production), 404 otherwise. The UI is at /api/swagger."
+    )
+
+    tag("Service")
+    produces("application/json")
+    response(200, "The Swagger document", %{type: :object})
+    error_response(404, "Swagger disabled, or the document has not been generated yet")
+  end
 
   @hint "API specification not generated yet. Run `mix phx.swagger.generate`."
 

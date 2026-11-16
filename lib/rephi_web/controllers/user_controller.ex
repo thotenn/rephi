@@ -29,9 +29,11 @@ defmodule RephiWeb.UserController do
   use RephiWeb, :controller
   use PhoenixSwagger
 
+  import RephiWeb.Swagger
+
+  alias PhoenixSwagger.Schema
   alias Rephi.Accounts
   alias Rephi.Authorization
-  alias RephiWeb.PaginationJSON
 
   action_fallback RephiWeb.FallbackController
 
@@ -49,18 +51,12 @@ defmodule RephiWeb.UserController do
       "One page of users, ordered by id, with the roles assigned to them and the permissions granted to them directly. Requires users:view."
     )
 
+    tag("Users")
     produces("application/json")
-    security([%{Bearer: []}])
-
-    parameters do
-      page(:query, :integer, "Page, from 1 (default 1)", required: false)
-      page_size(:query, :integer, "Entries per page (default 50, at most 100)", required: false)
-    end
-
-    response(200, "Success", Schema.ref(:UsersResponse))
-    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
-    response(403, "Forbidden - requires users:view", Schema.ref(:ErrorResponse))
-    response(422, "Invalid page or page_size", Schema.ref(:ValidationErrors))
+    bearer_auth()
+    page_params()
+    response(200, "One page of users", Schema.ref(:UsersResponse))
+    error_response(403, "Forbidden - requires users:view")
   end
 
   def index(conn, params) do
@@ -73,17 +69,13 @@ defmodule RephiWeb.UserController do
     get("/api/users/{id}")
     summary("Get a user")
     description("A user with its assigned roles and direct permissions. Requires users:view.")
+    tag("Users")
     produces("application/json")
-    security([%{Bearer: []}])
-
-    parameters do
-      id(:path, :integer, "User ID", required: true)
-    end
-
-    response(200, "Success", Schema.ref(:UserResponse))
-    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
-    response(403, "Forbidden - requires users:view", Schema.ref(:ErrorResponse))
-    response(404, "User not found", Schema.ref(:ErrorResponse))
+    bearer_auth()
+    id_param(:id, "User ID")
+    response(200, "The user", Schema.ref(:UserResponse))
+    error_response(403, "Forbidden - requires users:view")
+    error_response(404, "User not found")
   end
 
   def show(conn, %{"id" => id}) do
@@ -93,34 +85,36 @@ defmodule RephiWeb.UserController do
   end
 
   swagger_path :update do
-    put("/api/users/{id}")
     summary("Change the email of a user")
 
     description(
-      "Only the email can change. A password in the body is refused: users change their own with PUT /api/me/password. Requires users:edit, and holding every role of the user (or being an admin)."
+      "Only the email can change; other attributes are ignored and a password is refused (422): users change their own with PUT /api/me/password. The attributes may also be wrapped under \"user\". PUT and PATCH behave the same. Requires users:edit, and holding every role of the user or being an admin."
     )
 
-    produces("application/json")
+    tag("Users")
     consumes("application/json")
-    security([%{Bearer: []}])
+    produces("application/json")
+    bearer_auth()
+    id_param(:id, "User ID")
 
     parameters do
-      id(:path, :integer, "User ID", required: true)
-      user(:body, Schema.ref(:UpdateUserRequest), "User attributes to update", required: true)
+      body(:body, Schema.ref(:UpdateUserRequest), "The new email", required: true)
     end
 
-    response(200, "Success", Schema.ref(:UserResponse))
-    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
+    response(200, "User updated", Schema.ref(:UserResponse))
+    body_errors()
 
-    response(
+    error_response(
       403,
-      "Forbidden - requires users:edit, or the user holds roles the caller does not",
-      Schema.ref(:ErrorResponse)
+      "Forbidden - requires users:edit, or the user holds roles the caller does not"
     )
 
-    response(404, "User not found", Schema.ref(:ErrorResponse))
-    response(422, "Validation errors", Schema.ref(:ValidationErrors))
+    error_response(404, "User not found")
+    validation_response("Invalid or taken email, or a password in the body")
   end
+
+  defoverridable swagger_path_update: 1
+  def swagger_path_update(route), do: route |> super() |> operation_per_verb()
 
   def update(conn, %{"id" => id}) do
     params = resource_params(conn, "user")
@@ -138,27 +132,22 @@ defmodule RephiWeb.UserController do
     summary("Delete a user")
 
     description(
-      "Requires users:delete, and holding every role of the user (or being an admin). Nobody can delete their own account, nor the last user holding the admin role."
+      "Revokes the user's tokens and closes its WebSocket connections. Requires users:delete, and holding every role of the user or being an admin."
     )
 
+    tag("Users")
     produces("application/json")
-    security([%{Bearer: []}])
+    bearer_auth()
+    id_param(:id, "User ID")
+    response(204, "User deleted")
 
-    parameters do
-      id(:path, :integer, "User ID", required: true)
-    end
-
-    response(204, "No Content - User deleted successfully")
-    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
-
-    response(
+    error_response(
       403,
-      "Forbidden - requires users:delete, or the user holds roles the caller does not",
-      Schema.ref(:ErrorResponse)
+      "Forbidden - requires users:delete, or the user holds roles the caller does not"
     )
 
-    response(404, "User not found", Schema.ref(:ErrorResponse))
-    response(409, "Own account, or the last admin", Schema.ref(:ErrorResponse))
+    error_response(404, "User not found")
+    error_response(409, "The caller's own account, or the last user holding the admin role")
   end
 
   def delete(conn, %{"id" => id}) do
@@ -172,19 +161,19 @@ defmodule RephiWeb.UserController do
 
   swagger_path :get_user_roles do
     get("/api/users/{id}/roles")
-    summary("Get user roles")
-    description("The roles assigned to the user (not the inherited ones). Requires users:view.")
+    summary("List the roles of a user")
+
+    description(
+      "The roles assigned to the user (not the inherited ones), by slug. Not paginated. Requires users:view."
+    )
+
+    tag("Users")
     produces("application/json")
-    security([%{Bearer: []}])
-
-    parameters do
-      id(:path, :integer, "User ID", required: true)
-    end
-
-    response(200, "Success", Schema.ref(:UserRolesResponse))
-    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
-    response(403, "Forbidden - requires users:view", Schema.ref(:ErrorResponse))
-    response(404, "User not found", Schema.ref(:ErrorResponse))
+    bearer_auth()
+    id_param(:id, "User ID")
+    response(200, "The roles of the user", Schema.ref(:UserRolesResponse))
+    error_response(403, "Forbidden - requires users:view")
+    error_response(404, "User not found")
   end
 
   def get_user_roles(conn, %{"id" => id}) do
@@ -219,28 +208,27 @@ defmodule RephiWeb.UserController do
 
   # Swagger definitions
   def swagger_definitions do
-    Map.merge(PaginationJSON.swagger_definitions(), %{
+    RephiWeb.Swagger.definitions(%{
       User: %{
         type: :object,
         title: "User",
-        description: "A user in the system",
         properties: %{
-          id: %{type: :integer, description: "User ID"},
-          email: %{type: :string, description: "User email address"},
+          id: %{type: :integer},
+          email: %{type: :string},
           roles: %{
             type: :array,
-            description: "Roles assigned to the user, by slug",
-            items: Schema.ref(:SessionGrant)
+            description: "Roles assigned to the user (not the inherited ones), by slug",
+            items: Schema.ref(:Grant)
           },
           permissions: %{
             type: :array,
             description: "Permissions granted to the user directly (not through roles), by slug",
-            items: Schema.ref(:SessionGrant)
+            items: Schema.ref(:Grant)
           },
-          inserted_at: %{type: :string, format: :"date-time", description: "Creation timestamp"},
-          updated_at: %{type: :string, format: :"date-time", description: "Last update timestamp"}
+          inserted_at: %{type: :string, format: :"date-time"},
+          updated_at: %{type: :string, format: :"date-time"}
         },
-        required: [:id, :email]
+        required: [:id, :email, :roles, :permissions, :inserted_at, :updated_at]
       },
       UsersResponse: %{
         type: :object,
@@ -255,11 +243,11 @@ defmodule RephiWeb.UserController do
           data: [
             %{
               id: 1,
-              email: "user@example.com",
+              email: "admin@example.com",
               roles: [%{id: 1, name: "Administrator", slug: "admin"}],
               permissions: [],
-              inserted_at: "2025-01-03T10:00:00Z",
-              updated_at: "2025-01-03T10:00:00Z"
+              inserted_at: "2026-01-03T10:00:00Z",
+              updated_at: "2026-01-03T10:00:00Z"
             }
           ],
           meta: %{page: 1, page_size: 50, total: 1, total_pages: 1}
@@ -268,41 +256,29 @@ defmodule RephiWeb.UserController do
       UserResponse: %{
         type: :object,
         title: "User Response",
-        description: "Response containing a single user",
+        description: "A single user",
         properties: %{
           data: Schema.ref(:User)
-        }
+        },
+        required: [:data]
       },
       UpdateUserRequest: %{
         type: :object,
         title: "Update User Request",
-        description: "Only the email can change",
+        description: "Only the email can change; without it nothing changes",
         properties: %{
-          email: %{type: :string, description: "User email address"}
+          email: %{type: :string, format: :email, maxLength: 160}
         },
-        required: [:email],
-        example: %{
-          email: "user@example.com"
-        }
+        example: %{email: "someone@example.com"}
       },
       UserRolesResponse: %{
         type: :object,
         title: "User Roles Response",
-        description: "Response containing user roles",
+        description: "The roles assigned to a user",
         properties: %{
-          data: %{
-            type: :array,
-            items: %{
-              type: :object,
-              properties: %{
-                id: %{type: :integer},
-                name: %{type: :string},
-                slug: %{type: :string},
-                description: %{type: :string}
-              }
-            }
-          }
-        }
+          data: %{type: :array, items: Schema.ref(:GrantWithDescription)}
+        },
+        required: [:data]
       }
     })
   end
