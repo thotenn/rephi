@@ -3,12 +3,9 @@ import { usePermissions } from "~/lib/rephi";
 import { ADMIN_PERMISSIONS, href, isRoute, isUnderRoute, ROUTES } from "~/lib/routes";
 
 interface AdminMenuProps {
-  /** Pathname of the page being rendered, provided by Astro at build time. */
   pathname: string;
 }
 
-// Each entry shows for users with the permission of its screen, so a manager
-// with `users:view` gets "User Management" without the rest.
 const links = [
   { route: ROUTES.admin.users, label: "User Management", permission: ADMIN_PERMISSIONS.users },
   { route: ROUTES.admin.roles, label: "Roles Management", permission: ADMIN_PERMISSIONS.roles },
@@ -19,14 +16,12 @@ const links = [
   },
 ];
 
-/** Admin dropdown of the header. Renders nothing for users without any admin screen. */
 export default function AdminMenu({ pathname }: AdminMenuProps) {
   const { can } = usePermissions();
   const visibleLinks = links.filter((link) => can(link.permission));
   const [showAdminDropdown, setShowAdminDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {

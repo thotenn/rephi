@@ -1,8 +1,4 @@
-/**
- * Returns the requested Web Storage area, or `null` when it is not available:
- * during server-side rendering / prerendering, or in browsers that block storage
- * access (reading the property can throw a `SecurityError` there).
- */
+/** `null` during SSR or when the browser blocks storage (accessing it can throw). */
 export function getStorage(kind: 'local' | 'session'): Storage | null {
   try {
     if (typeof window === 'undefined') return null;

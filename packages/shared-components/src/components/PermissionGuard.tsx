@@ -4,18 +4,11 @@ import { userCanAll, userCanAny } from '../permissions';
 
 interface PermissionGuardProps {
   children: ReactNode;
-  /** Permission slugs, e.g. `['users:view']`. */
   permissions: string[];
-  /** Require every permission instead of any of them. */
   requireAll?: boolean;
   fallback?: ReactNode;
 }
 
-/**
- * Renders `children` when the signed-in user (from the auth store) has the
- * permissions, `fallback` otherwise. UI only: the server authorizes every
- * request on its own.
- */
 export const PermissionGuard: React.FC<PermissionGuardProps> = ({
   children,
   permissions,

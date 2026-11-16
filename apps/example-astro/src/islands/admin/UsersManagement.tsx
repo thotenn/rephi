@@ -99,7 +99,6 @@ function UsersManagementScreen() {
   );
 }
 
-/** Users list (paginated) with roles, permissions, email edit, password reset and deletion. */
 export default function UsersManagement() {
   return (
     <IslandProviders>

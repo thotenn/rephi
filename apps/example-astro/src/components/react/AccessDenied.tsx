@@ -1,8 +1,7 @@
 import { go } from "~/lib/navigation";
 import { ROUTES } from "~/lib/routes";
 
-// A page opened directly has nothing of this app to go back to. Astro's client
-// router numbers the history entries it creates in `history.state.index`.
+// Astro's client router numbers its history entries: index 0 has nothing of this app to go back to.
 function goBack() {
   const index = (window.history.state as { index?: number } | null)?.index ?? 0;
   if (index > 0) {

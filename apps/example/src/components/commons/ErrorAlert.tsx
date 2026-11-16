@@ -3,7 +3,6 @@ interface ErrorAlertProps {
   onDismiss?: () => void;
 }
 
-/** Red banner with a server message. Renders nothing without a message. */
 export default function ErrorAlert({ message, onDismiss }: ErrorAlertProps) {
   if (!message) return null;
 

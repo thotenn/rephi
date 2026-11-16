@@ -2,12 +2,10 @@ import { useAuthStore } from "~/lib/rephi";
 import { roleBadgeClass } from "~/lib/roles";
 
 interface UserInfoCardProps {
-  /** Also list the effective permissions. */
   showPermissions?: boolean;
   className?: string;
 }
 
-/** Card with the signed-in user's details, read from the auth store. */
 export default function UserInfoCard({ showPermissions = false, className = "" }: UserInfoCardProps) {
   const user = useAuthStore((state) => state.user);
 

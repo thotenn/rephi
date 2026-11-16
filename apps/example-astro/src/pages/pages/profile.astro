@@ -5,9 +5,7 @@ import AppLayout from "~/layouts/AppLayout.astro";
 ---
 
 <AppLayout title="Profile" heading="User Profile">
-  {/* client:only - shows the signed-in user, who is only known in the browser. */}
   <UserInfoCard client:only="react" showPermissions />
 
-  {/* client:only - only makes sense with a session, which exists in the browser only. */}
   <ChangePasswordForm client:only="react" />
 </AppLayout>

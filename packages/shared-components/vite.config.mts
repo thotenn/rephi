@@ -3,13 +3,7 @@ import { resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-/**
- * Emits the `.d.ts` files with `tsc` once the bundle is written.
- *
- * Doing it from the build (instead of a separate `&& tsc` step) keeps the
- * declarations in `dist` after `emptyOutDir` and refreshes them on every
- * rebuild in watch mode (`yarn workspace @rephi/shared-components dev`).
- */
+// Emitting the .d.ts from the build keeps them after `emptyOutDir` and refreshes them in watch mode.
 function emitDeclarations(): Plugin {
   return {
     name: 'rephi:emit-declarations',
@@ -39,8 +33,6 @@ export default defineConfig({
       fileName: (format) => `index.${format === 'es' ? 'mjs' : 'js'}`
     },
     rolldownOptions: {
-      // Everything listed in `dependencies` / `peerDependencies` stays external
-      // so consumers resolve a single copy of each.
       external: [
         'react',
         'react/jsx-runtime',

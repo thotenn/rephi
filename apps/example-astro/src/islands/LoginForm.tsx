@@ -9,8 +9,7 @@ import { useHydrated } from "~/lib/hydration";
 import { getRedirectPath, useAuthStore } from "~/lib/rephi";
 import type { LoginCredentials } from "~/lib/rephi";
 
-// No minimum length here: accounts created under older, shorter password
-// rules can still sign in. The rules apply when a password is set.
+// No minimum length: accounts with older, shorter passwords must still sign in.
 const loginSchema = z.object({
   email: z.email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
@@ -21,9 +20,7 @@ const sessionNotices = {
   unauthorized: "Your session has ended. Please sign in again.",
 } as const;
 
-// The "redirect back" target lives in sessionStorage, which only exists in the
-// browser. Reading it through an external store with a server snapshot keeps
-// the prerendered HTML and the first client render identical.
+// sessionStorage exists only in the browser: the server snapshot keeps prerender and hydration identical.
 const subscribeToNothing = () => () => {};
 const hasRedirectTarget = () => getRedirectPath() !== null;
 const noRedirectTarget = () => false;
@@ -38,7 +35,6 @@ function LoginFormFields() {
     hasRedirectTarget,
     noRedirectTarget
   );
-  // Set when the session ended on a page of this tab (kept by the client router).
   const sessionEndReason = useAuthStore((state) => state.sessionEndReason);
   const notice = sessionEndReason
     ? sessionNotices[sessionEndReason]

@@ -3,7 +3,6 @@ import { roleBadgeClass } from "~/utils/roles";
 
 interface UserInfoProps {
   user: User | null;
-  /** Also list the effective permissions. */
   showPermissions?: boolean;
   className?: string;
 }

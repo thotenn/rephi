@@ -3,31 +3,18 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { SessionEndReason, User } from "../types";
 import { getStorage } from "../utils/storage";
 
-/** localStorage key of the persisted session. */
 export const AUTH_STORAGE_KEY = "auth-storage";
 
 interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
-  /**
-   * Why the last session ended, until a new one starts. Not persisted: it lets
-   * the login page tell "you signed out" from "your session expired".
-   */
   sessionEndReason: SessionEndReason | null;
-  /** Starts a session (login, register, password change). */
   setSession: (user: User, token: string) => void;
-  /** Replaces the user of the current session (e.g. after `GET /api/me`). */
   setUser: (user: User) => void;
-  /**
-   * Forgets the session locally. Prefer `logout()` (tells the server) or
-   * `endSession()` (also closes the socket and notifies listeners).
-   */
   clear: (reason?: SessionEndReason) => void;
 }
 
-// Without a browser (SSR, prerendering, tests in Node) the session is kept in
-// memory only.
 const memoryStorage: Storage = (() => {
   const data = new Map<string, string>();
   return {
@@ -67,8 +54,6 @@ export const useAuthStore = create<AuthState>()(
   )
 );
 
-// Keeps every tab on the same session: signing out (or in) in one tab is
-// picked up by the others through the `storage` event.
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
     if (event.key !== AUTH_STORAGE_KEY && event.key !== null) return;

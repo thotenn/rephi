@@ -1,24 +1,9 @@
 import type { FieldErrors } from "./types";
 
-/**
- * The error every call through the `api` instance rejects with.
- *
- * The API answers with one of two error bodies:
- *
- *   - `{"errors": {"detail": "..."}}` for a general error, which becomes `detail`;
- *   - `{"errors": {"<field>": ["...", ...]}}` for validation errors (422), which
- *     become `fieldErrors`.
- *
- * `message` is always something that can be shown to a person.
- */
 export class ApiError extends Error {
-  /** HTTP status, or `null` when no response arrived (network error, CORS, timeout). */
   readonly status: number | null;
-  /** The `detail` of a general error. */
   readonly detail: string | null;
-  /** Validation errors by field (empty unless the response was a 422 with fields). */
   readonly fieldErrors: FieldErrors;
-  /** Seconds to wait before retrying, from the `retry-after` header of a 429. */
   readonly retryAfter: number | null;
 
   constructor(
@@ -45,7 +30,6 @@ export class ApiError extends Error {
     this.retryAfter = retryAfter;
   }
 
-  /** True for a validation error that names fields. */
   get hasFieldErrors(): boolean {
     return Object.keys(this.fieldErrors).length > 0;
   }
@@ -55,13 +39,11 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
 }
 
-/** "password_confirmation" -> "Password confirmation". */
 export function humanizeField(field: string): string {
   const words = field.replace(/_/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** One line per field: "Slug has already been taken". */
 export function fieldErrorsToMessage(fieldErrors: FieldErrors): string {
   return Object.entries(fieldErrors)
     .map(([field, messages]) => `${humanizeField(field)} ${messages.join(", ")}`)
@@ -107,10 +89,6 @@ function statusFallback(status: number, retryAfter: number | null): string {
   }
 }
 
-/**
- * Builds an `ApiError` from what axios received: the status, the body (one of
- * the two error envelopes, or anything else) and the `retry-after` header.
- */
 export function toApiError(
   response: { status: number; data?: unknown; headers?: unknown } | undefined,
   cause?: unknown
@@ -142,19 +120,12 @@ export function toApiError(
   return new ApiError(statusFallback(status, retryAfter), { status, retryAfter, cause });
 }
 
-/** What a form needs to display an error. */
 export interface ErrorInfo {
-  /** A sentence for a banner or a toast. */
   message: string;
-  /** Messages by field, for the inputs that the server rejected. */
   fieldErrors: FieldErrors;
   status: number | null;
 }
 
-/**
- * Turns anything a request can throw into a message plus field errors.
- * `fallback` is used for errors that carry no message of their own.
- */
 export function describeError(error: unknown, fallback = "Something went wrong. Please try again."): ErrorInfo {
   if (isApiError(error)) {
     return { message: error.message || fallback, fieldErrors: error.fieldErrors, status: error.status };
@@ -165,12 +136,10 @@ export function describeError(error: unknown, fallback = "Something went wrong. 
   return { message: fallback, fieldErrors: {}, status: null };
 }
 
-/** The message of `describeError`, for places that only show a line of text. */
 export function getErrorMessage(error: unknown, fallback?: string): string {
   return describeError(error, fallback).message;
 }
 
-/** The field errors of an `ApiError` (an empty object for anything else). */
 export function getFieldErrors(error: unknown): FieldErrors {
   return isApiError(error) ? error.fieldErrors : {};
 }

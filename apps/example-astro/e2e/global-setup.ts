@@ -1,7 +1,6 @@
 import { ADMIN, API_URL, api, cleanup } from "./support/api";
 
-// Read-only tests share these two sessions, handed to the workers through
-// process.env. No test may end them: signing out revokes every token of a user.
+// Shared by read-only tests: none may sign out, which revokes every token of the user.
 export default async function globalSetup() {
   try {
     await fetch(`${API_URL}/health`);

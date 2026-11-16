@@ -16,7 +16,6 @@ export interface RoleLink {
   slug: string;
   description: string | null;
   is_system: boolean;
-  /** The link belongs to the default hierarchy: it cannot be removed (409). */
   system_link: boolean;
   assigned_by: number | null;
   notes: string | null;
@@ -48,7 +47,6 @@ export interface EffectiveUserPermission {
   slug: string;
   description: string | null;
   direct: boolean;
-  /** The roles the permission is assigned to, held by the user directly or through the hierarchy. */
   roles: Role[];
 }
 

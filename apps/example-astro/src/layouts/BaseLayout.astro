@@ -6,12 +6,9 @@ import { asset, href, ROUTES } from "~/lib/routes";
 import "~/styles/global.css";
 
 interface Props {
-  /** Page title; the site name is appended. */
   title: string;
   description?: string;
-  /** Keep the page out of search results (everything behind the login). */
   noindex?: boolean;
-  /** Public-only page: visitors who already have a session are sent home. */
   guestOnly?: boolean;
 }
 
@@ -35,20 +32,8 @@ const homeUrl = href(ROUTES.home);
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex" />}
     <meta name="generator" content={Astro.generator} />
-    {/*
-      Client-side navigation between the prerendered pages. Besides the page
-      transition, it is what lets the runtime island below survive a navigation.
-    */}
     <ClientRouter />
-    {/*
-      Public-only pages are prerendered and painted before any island loads, so
-      a signed-in visitor would briefly see them. This render-blocking check
-      redirects before the first paint. It is only a shortcut for the initial
-      load of the top-level page (not for client-side navigations, nor for the
-      hidden frame Astro uses in development): it peeks at the store persisted
-      by the shared library ("auth-storage"), and the GuestRedirect island
-      below remains the authoritative check.
-    */}
+    {/* Redirects a signed-in visitor before the first paint; GuestRedirect stays the authoritative check. */}
     {
       guestOnly && (
         <script is:inline define:vars={{ homeUrl }}>
@@ -65,17 +50,9 @@ const homeUrl = href(ROUTES.home);
     }
   </head>
   <body>
-    {/* client:only - no markup, it only redirects visitors who are already signed in. */}
     {guestOnly && <GuestRedirect client:only="react" />}
     <slot />
-    {/*
-      Socket + notifications + toast container.
-      client:only   - it only makes sense in the browser (it reads the persisted
-                      session and opens a WebSocket); there is nothing to prerender.
-      transition:persist - the client router moves this island into the next
-                      page instead of recreating it, so the socket stays open
-                      and visible toasts are not lost while navigating.
-    */}
+    {/* transition:persist keeps the socket open and the toasts visible across navigations. */}
     <AppRuntime client:only="react" transition:persist="app-runtime" />
     <script>
       import { skipDevIframePreload } from "~/lib/dev-navigation";

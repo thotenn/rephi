@@ -6,11 +6,6 @@ import {
   type FieldErrors,
 } from "~/lib/rephi";
 
-/**
- * Shows a failed request on a react-hook-form form: the server's field errors
- * go under the matching inputs, and whatever has no input (a general error, a
- * 429, a field the form does not show) is returned for a banner.
- */
 export function applyServerErrors<T extends FieldValues>(
   error: unknown,
   setError: UseFormSetError<T>,

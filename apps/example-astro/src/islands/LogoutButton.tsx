@@ -8,7 +8,6 @@ export default function LogoutButton() {
 
   const handleClick = () => {
     setPending(true);
-    // The session always ends locally, whatever the server answered.
     void signOut().finally(() => setPending(false));
   };
 

@@ -53,8 +53,7 @@ export default function Modal({
       ref={dialogRef}
     >
       <div
-        // A caller's own max-w-* replaces the default width instead of
-        // competing with it.
+        // A caller's own max-w-* replaces the default width.
         className={`bg-white rounded-lg shadow-lg w-full p-6 relative ${
           className?.includes("max-w-") ? "" : "max-w-lg"
         } ${className || ""}`}

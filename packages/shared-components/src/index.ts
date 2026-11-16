@@ -1,8 +1,6 @@
-// Configuration (call `configureRephi` once, before the first request)
 export { configureRephi, getRephiConfig } from './config';
 export type { RephiConfig } from './config';
 
-// HTTP client, auth calls and pagination
 export {
   addRoleParent,
   api,
@@ -32,7 +30,6 @@ export {
 } from './controllers';
 export type { SocketStatus } from './controllers';
 
-// Errors
 export {
   ApiError,
   describeError,
@@ -44,14 +41,11 @@ export {
 } from './errors';
 export type { ErrorInfo } from './errors';
 
-// Session
 export { endSession, onSessionEnd, startSession } from './session';
 export { AUTH_STORAGE_KEY, useAuthStore } from './stores';
 
-// Authorization helpers (UI only)
 export { userCan, userCanAll, userCanAny, userHasRole } from './permissions';
 
-// Realtime
 export { LOBBY_TOPIC, NOTIFICATION_EVENT, userTopic } from './realtime';
 export { presenceCounts } from './utils/presence';
 

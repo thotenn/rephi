@@ -43,7 +43,6 @@ export default function RoleParentsSection({ role }: RoleParentsSectionProps) {
   const afterChange = () => {
     setError(null);
     setSelected("");
-    // Both ends of the link and every inherited permission may have changed.
     queryClient.invalidateQueries({ queryKey: adminKeys.hierarchy });
     queryClient.invalidateQueries({ queryKey: adminKeys.role(role.id) });
     // The signed-in user may hold this role: refresh their permissions.

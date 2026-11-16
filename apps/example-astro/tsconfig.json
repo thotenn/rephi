@@ -6,12 +6,10 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
 
-    /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    /* Path mapping */
     "paths": {
       "~/*": ["./src/*"]
     }

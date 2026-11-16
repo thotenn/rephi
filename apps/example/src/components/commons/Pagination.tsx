@@ -3,12 +3,10 @@ import { describePage, hasNextPage, hasPreviousPage, type PageMeta } from "@reph
 interface PaginationProps {
   meta: PageMeta | undefined;
   onPageChange: (page: number) => void;
-  /** Disables the buttons while the next page loads. */
   busy?: boolean;
   label?: string;
 }
 
-/** Previous / next controls and "21–40 of 57" for a paginated list. */
 export default function Pagination({ meta, onPageChange, busy = false, label = "Pagination" }: PaginationProps) {
   if (!meta || meta.total_pages <= 1) {
     return meta ? <p className="mt-4 text-sm text-gray-500">{describePage(meta)}</p> : null;

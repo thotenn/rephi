@@ -12,7 +12,6 @@ import tseslint from "typescript-eslint";
 export default defineConfig([
   globalIgnores(["dist", ".astro", ".wrangler", "e2e/.results", "e2e/.report"]),
   {
-    // React islands and plain TypeScript modules: same rule set as apps/example.
     files: ["**/*.{ts,tsx}"],
     extends: [
       js.configs.recommended,
@@ -28,14 +27,12 @@ export default defineConfig([
       globals: globals.browser,
     },
     settings: {
-      // Resolves the `~/*` alias and workspace packages through tsconfig.json.
       "import-x/resolver-next": [
         createTypeScriptImportResolver({ project: `${import.meta.dirname}/tsconfig.json` }),
       ],
     },
     rules: {
-      // eslint-plugin-react-hooks (maintained by the React team) owns the hooks
-      // rules, so the @eslint-react copies of the same checks are switched off.
+      // Duplicates of the eslint-plugin-react-hooks rules.
       "@eslint-react/error-boundaries": "off",
       "@eslint-react/exhaustive-deps": "off",
       "@eslint-react/purity": "off",
@@ -49,8 +46,7 @@ export default defineConfig([
       // `astro:*` modules are virtual: they only exist inside Astro's bundler.
       "import-x/no-unresolved": ["error", { ignore: ["^astro:"] }],
 
-      // The shared library must be imported through `~/lib/rephi`, which applies
-      // the runtime configuration first. Types are erased, so they are allowed.
+      // Import the library through `~/lib/rephi`, which configures it first.
       "@typescript-eslint/no-restricted-imports": [
         "error",
         {
@@ -65,14 +61,11 @@ export default defineConfig([
       ],
     },
   },
-  // `.astro` files: the frontmatter is linted as TypeScript, the template with
-  // Astro's recommended rules plus accessibility checks for the static markup.
-  // Astro's configs come last so that its parser handles the files.
+  // Astro's configs come last so that its parser handles `.astro` files.
   {
     files: ["**/*.astro"],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     rules: {
-      // Covered by TypeScript itself and by the @typescript-eslint variants.
       "no-undef": "off",
       "no-unused-vars": "off",
     },

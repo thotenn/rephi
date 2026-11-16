@@ -9,30 +9,19 @@ export interface SlugRecordValues {
 }
 
 interface SlugRecordModalProps {
-  /** "Role" or "Permission". */
   noun: string;
-  /** The record being edited, or `null` to create one. */
   editing: (SlugRecordValues & { is_system: boolean }) | null;
   onClose: () => void;
   onSubmit: (values: SlugRecordValues) => void;
   submitting: boolean;
-  /** Field errors returned by the server (422). */
   serverFieldErrors: FieldErrors;
-  /** Any other server error (403, 409...). */
   serverError: string | null;
-  /** Client-side slug check; returns a message when the slug is invalid. */
   validateSlug: (slug: string) => string | null;
-  /** Suggests a slug from the name while creating. */
   slugFromName: (name: string) => string;
   slugPlaceholder: string;
   slugHint: string;
 }
 
-/**
- * Create / edit form shared by roles and permissions (name, slug,
- * description). Shows the server's field errors under each input. The slug of
- * a system record cannot change, so its input is locked.
- */
 export default function SlugRecordModal({
   noun,
   editing,

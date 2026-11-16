@@ -9,8 +9,6 @@ interface Props {
 
 const { heading = "Welcome to Rephi" } = Astro.props;
 
-// Known at build time: each page is prerendered with its own pathname, so the
-// active link needs no JavaScript.
 const pathname = Astro.url.pathname;
 
 const links = [
@@ -46,15 +44,10 @@ const links = [
             })
           }
 
-          {/* client:only - rendered for admins only, which is browser-side knowledge. */}
           <AdminMenu client:only="react" pathname={pathname} />
         </nav>
       </div>
 
-      {/*
-        client:load - the markup never depends on the session, so it is
-        prerendered (no layout shift) and hydrated right away to be clickable.
-      */}
       <LogoutButton client:load />
     </div>
   </div>

@@ -32,12 +32,10 @@ export default defineConfig([
       parserOptions: { tsconfigRootDir },
     },
     settings: {
-      // Resolves the `~/*` alias and workspace packages through tsconfig.json.
       "import-x/resolver-next": [createTypeScriptImportResolver({ project: `${tsconfigRootDir}/tsconfig.json` })],
     },
     rules: {
-      // eslint-plugin-react-hooks (maintained by the React team) owns the hooks
-      // rules, so the @eslint-react copies of the same checks are switched off.
+      // eslint-plugin-react-hooks owns these checks; the @eslint-react copies are off.
       "@eslint-react/error-boundaries": "off",
       "@eslint-react/exhaustive-deps": "off",
       "@eslint-react/purity": "off",

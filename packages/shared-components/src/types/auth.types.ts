@@ -1,34 +1,24 @@
-/** A role as the session and the user listings describe it. */
 export interface Role {
   id: number;
   name: string;
   slug: string;
 }
 
-/** A permission as the session and the user listings describe it. */
 export interface Permission {
   id: number;
   name: string;
   slug: string;
 }
 
-/**
- * The signed-in user, as returned by register, login, `GET /api/me` and
- * `PUT /api/me/password`.
- */
 export interface User {
   id: number;
-  /** Normalized by the server: trimmed and lower-cased. */
   email: string;
-  /** After an admin reset, every route but `/me`, the password change and logout answers 403. */
+  /** Until changed, the API answers 403 to everything but `/me`, the password change and logout. */
   must_change_password: boolean;
-  /** Roles assigned to the user (not the ones it only inherits). */
   roles: Role[];
-  /** Effective permissions: direct, through roles and inherited. Authorize the UI with these. */
   permissions: Permission[];
 }
 
-/** A new session: what register, login and a password change return. */
 export interface AuthSession {
   user: User;
   token: string;
@@ -51,9 +41,6 @@ export interface ChangePasswordParams {
   password_confirmation: string;
 }
 
-/** Why the session ended (see `onSessionEnd`). */
 export type SessionEndReason =
-  /** The user signed out, here or in another tab. */
   | "logout"
-  /** The server rejected the token (expired, revoked elsewhere, user deleted...). */
   | "unauthorized";

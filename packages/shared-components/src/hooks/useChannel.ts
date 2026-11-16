@@ -4,23 +4,14 @@ import { debugLog } from "../config";
 import PhoenixSocket from "../controllers/api/socket";
 
 export interface UseChannelOptions {
-  /** Join params. A change (by value) leaves the channel and joins again. */
   params?: Record<string, unknown>;
-  /** `false` keeps the channel left (e.g. until the user is known). Default `true`. */
   enabled?: boolean;
 }
 
 export interface UseChannelResult {
-  /** The joined channel, or `null` until the join succeeds. */
   channel: Channel | null;
-  /** True while the channel is joined; false while the socket is down or rejoining. */
   connected: boolean;
-  /** The `reason` of a refused join (e.g. `"unauthorized"`), which is not retried. */
   error: string | null;
-  /**
-   * Who is present, for a topic the server tracks with Phoenix Presence (the lobby):
-   * one entry per key with its metas. `null` until the first `presence_state`.
-   */
   presences: PresenceEntry[] | null;
 }
 
@@ -47,18 +38,7 @@ const initialState: ChannelState = {
   presences: null,
 };
 
-/**
- * Joins `topic` on the shared socket (`PhoenixSocket`) while the component is
- * mounted, and leaves it on unmount or when `topic` / `params` change.
- *
- * It does not open the socket: whoever owns the session calls
- * `PhoenixSocket.connect()`. The channel is joined as soon as a socket exists
- * (Phoenix queues the join until the socket opens) and is rejoined by Phoenix
- * after a reconnect, which flips `connected` back to true.
- *
- * Join each topic in one place only: Phoenix allows a single subscription per
- * topic and socket, and a second join evicts the first one.
- */
+/** Does not open the socket. Join each topic in one place: a second join on the same socket evicts the first. */
 export function useChannel(topic: string | null | undefined, options: UseChannelOptions = {}): UseChannelResult {
   const { params, enabled = true } = options;
   const paramsKey = JSON.stringify(params ?? {});
@@ -104,7 +84,6 @@ export function useChannel(topic: string | null | undefined, options: UseChannel
         if (reason === "unauthorized") channel.leave();
       })
       .receive("timeout", () => {
-        // Phoenix retries the join on its own.
         update({ connected: false });
       });
 
@@ -115,7 +94,6 @@ export function useChannel(topic: string | null | undefined, options: UseChannel
     };
   }, [socket, topic, enabled, paramsKey]);
 
-  // State left over from another socket / topic / params is not this one's.
   const current =
     enabled && state.socket === socket && state.topic === topic && state.paramsKey === paramsKey;
 
@@ -124,10 +102,6 @@ export function useChannel(topic: string | null | undefined, options: UseChannel
     : { channel: null, connected: false, error: null, presences: null };
 }
 
-/**
- * Calls `handler` for every `event` pushed on `channel` (as returned by
- * `useChannel`). The latest `handler` is always used, without re-binding.
- */
 export function useChannelEvent<Payload = unknown>(
   channel: Channel | null,
   event: string,

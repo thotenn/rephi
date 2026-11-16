@@ -1,6 +1,5 @@
 import { useRealtimeConnected } from "~/lib/realtime";
 
-/** One line with the state of the live notifications, for every signed-in user. */
 export default function RealtimeHint() {
   const connected = useRealtimeConnected();
 

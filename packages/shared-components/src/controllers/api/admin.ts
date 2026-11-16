@@ -52,7 +52,6 @@ export async function revokeUserPermission(userId: number, permissionId: number)
   await api.delete(`/users/${userId}/permissions/${permissionId}`);
 }
 
-/** The temporary password is only ever returned by this call. */
 export function resetUserPassword(userId: number): Promise<PasswordReset> {
   return api.post<ApiResponse<PasswordReset>>(`/users/${userId}/password`).then(unwrap);
 }

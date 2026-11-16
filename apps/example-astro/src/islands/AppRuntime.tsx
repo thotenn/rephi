@@ -29,12 +29,7 @@ function NotificationToast({ notification }: { notification: RephiNotification }
   );
 }
 
-/**
- * Joins `user:lobby` (broadcasts) and `user:<id>` (the user's own
- * notifications) and turns their events into toasts. This is the only
- * subscriber in the app, so each notification is shown exactly once. The
- * lobby's presence (who is online) goes to `~/lib/realtime` for other islands.
- */
+// The only subscriber of these channels, so each notification shows once; presence goes to ~/lib/realtime.
 function Notifications({ userId }: { userId: number }) {
   const lobby = useChannel(LOBBY_TOPIC);
   const personal = useChannel(userTopic(userId));
@@ -82,23 +77,13 @@ function usePasswordChangeRedirect(mustChangePassword: boolean) {
   }, [mustChangePassword]);
 }
 
-/**
- * App-wide runtime: owns the Phoenix socket, the notification channels, the
- * reaction to a lost session and the toast container.
- *
- * It is rendered once in the base layout with `transition:persist`, so Astro's
- * client router carries this island (and its open socket) from page to page
- * instead of tearing it down on every navigation.
- */
 export default function AppRuntime() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const userId = useAuthStore((state) => state.user?.id);
   const mustChangePassword = useAuthStore(
     (state) => state.isAuthenticated && !!state.user?.must_change_password
   );
-  // A session restored from storage may be stale or dead: it is checked once
-  // per page load before the socket opens, so a revoked token ends the session
-  // over HTTP (401) instead of failing a WebSocket handshake.
+  // Check a restored session over HTTP first: a revoked token gets a 401, not a failed socket handshake.
   const [bootChecked, setBootChecked] = useState(() => !useAuthStore.getState().isAuthenticated);
   // A framed copy of the page must not open a second socket (see `isEmbedded`).
   const online = isAuthenticated && bootChecked && !isEmbedded;
@@ -120,10 +105,7 @@ export default function AppRuntime() {
     };
   }, [online]);
 
-  // `RouteGuard` follows the store and takes the user to the login page; this
-  // only tells the user why. Cached data is dropped when the next session
-  // starts (`useLogin` / `useRegister`): clearing it here would make the
-  // queries of the page being left refetch without a token.
+  // Cached data is dropped on the next login: clearing it here would refetch without a token.
   useEffect(() => {
     if (isEmbedded) return;
     return onSessionEnd((reason) => {

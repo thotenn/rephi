@@ -2,11 +2,6 @@ import { getStorage } from "./storage";
 
 const REDIRECT_KEY = "auth_redirect_path";
 
-/**
- * Remembers where a signed-out visitor wanted to go, for the login to send
- * them back (session storage: per tab, gone when the tab closes). Apps with a
- * client router can carry it in the navigation state instead.
- */
 export function setRedirectPath(path: string): void {
   getStorage("session")?.setItem(REDIRECT_KEY, path);
 }
@@ -21,9 +16,7 @@ export function clearRedirectPath(): void {
 
 export interface RouteConfig {
   path: string;
-  /** Any of these permissions grants access. */
   permissions?: string[];
-  /** Any of these roles (assigned, not inherited) grants access. Prefer `permissions`. */
   roles?: string[];
   requireAuth?: boolean;
   children?: RouteConfig[];
@@ -31,9 +24,7 @@ export interface RouteConfig {
 
 export interface RouteAccess {
   isAuthenticated: boolean;
-  /** Effective permission slugs of the user. */
   permissions: readonly string[];
-  /** Assigned role slugs of the user. */
   roles?: readonly string[];
 }
 
@@ -49,10 +40,6 @@ function allows(route: RouteConfig, access: RouteAccess): boolean {
   return true;
 }
 
-/**
- * Keeps the routes the user may see (e.g. to build a menu). A route with
- * children is kept while at least one child is.
- */
 export function filterRoutesByPermissions(routes: RouteConfig[], access: RouteAccess): RouteConfig[] {
   return routes.flatMap((route) => {
     if (!allows(route, access)) return [];

@@ -1,6 +1,5 @@
 import { defineConfig, type PlaywrightTestConfig } from "@playwright/test";
 
-// Settings: e2e/README.md.
 const baseURL = withTrailingSlash(process.env.E2E_BASE_URL ?? "http://localhost:5101/app/example/");
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:4100/api";
 const channel = process.env.E2E_BROWSER_CHANNEL ?? "chrome";

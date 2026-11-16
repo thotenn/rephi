@@ -10,18 +10,12 @@ import {
   type RegisterCredentials,
 } from "@rephi/shared-components";
 
-/*
- * Navigation is not done here: the route guards follow the auth store.
- * `PublicRoute` leaves the login / register page once a session exists (to the
- * page the visitor wanted, or home) and `ProtectedRoute` sends a visitor whose
- * session ended to the login page. One place each, so no double navigation.
- */
+// No navigation here: the route guards follow the auth store, so there is a single place for each redirect.
 
 export function useLogin() {
   const queryClient = useQueryClient();
 
   return useMutation<AuthSession, Error, LoginCredentials>({
-    // Drop anything cached for a previous session before the new one starts.
     onMutate: () => queryClient.clear(),
     mutationFn: login,
   });
@@ -36,12 +30,10 @@ export function useRegister() {
   });
 }
 
-/** Signs out on the server (revokes the token everywhere), then locally. */
 export function useLogout() {
   return useMutation<void, Error, void>({ mutationFn: logout });
 }
 
-/** Changes the password; the new session replaces the stored one. */
 export function useChangePassword() {
   return useMutation<AuthSession, Error, ChangePasswordParams>({ mutationFn: changePassword });
 }

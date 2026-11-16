@@ -5,7 +5,6 @@ import AppLayout from "~/layouts/AppLayout.astro";
 ---
 
 <AppLayout title="Dashboard" heading="Dashboard">
-  {/* client:only - the counters depend on the signed-in user and on the live socket. */}
   <DashboardStats client:only="react" />
 
   <div class="mt-8 bg-white shadow overflow-hidden sm:rounded-lg">

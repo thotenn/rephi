@@ -9,8 +9,7 @@ import { useLogin } from "~/hooks/useAuth";
 import { applyServerErrors } from "~/utils/forms";
 import type { LoginLocationState } from "~/utils/redirect";
 
-// No minimum length here: accounts created under older, shorter password
-// rules can still sign in. The rules apply when a password is set.
+// No minimum length: accounts created under older, shorter rules must still sign in.
 const loginSchema = z.object({
   email: z.email("Invalid email address"),
   password: z.string().min(1, "Password is required"),

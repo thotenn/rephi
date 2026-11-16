@@ -43,7 +43,6 @@ function PermissionsManagementScreen() {
     mutationFn: (permission: Permission) => permissionsApi.delete(permission.id),
     onSuccess: (_, permission) => {
       toast.success(`Permission "${permission.name}" deleted`);
-      // Deleting the last row of a page: go back one page.
       if (permissionsQuery.data?.data.length === 1 && page > 1) setPage(page - 1);
       invalidate();
     },
@@ -126,7 +125,6 @@ function PermissionsManagementScreen() {
   );
 }
 
-/** Permissions list (paginated, grouped by category) with create / edit / delete. */
 export default function PermissionsManagement() {
   return (
     <IslandProviders>

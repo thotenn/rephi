@@ -6,10 +6,7 @@ import RealtimeProvider from "~/realtime/RealtimeProvider";
 
 export default function App() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  // A session restored from storage may be stale (roles changed) or dead
-  // (token expired or revoked): it is checked once on boot before the socket
-  // opens, so a dead token ends the session over HTTP (401) instead of
-  // failing a WebSocket handshake.
+  // Check a restored session over HTTP before the socket opens: a dead token ends with a 401, not a failed handshake.
   const [bootChecked, setBootChecked] = useState(() => !useAuthStore.getState().isAuthenticated);
 
   useEffect(() => {
@@ -19,7 +16,6 @@ export default function App() {
       .finally(() => setBootChecked(true));
   }, [bootChecked]);
 
-  // One socket per session: opened on login, closed on logout.
   useEffect(() => {
     if (!isAuthenticated || !bootChecked) return;
     PhoenixSocket.connect();
@@ -28,10 +24,7 @@ export default function App() {
     };
   }, [isAuthenticated, bootChecked]);
 
-  // The route guards follow the store and take the user to the login page;
-  // this only tells the user why. Cached data is dropped when the next session
-  // starts (`useLogin` / `useRegister`): clearing it here would make the
-  // queries of the page being left refetch without a token.
+  // Cache is dropped when the next session starts: clearing it here would refetch the page being left without a token.
   useEffect(
     () =>
       onSessionEnd((reason) => {

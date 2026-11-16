@@ -153,7 +153,6 @@ function RolesManagementScreen() {
   );
 }
 
-/** Roles list (paginated) with create / edit / delete and the permissions of each role. */
 export default function RolesManagement() {
   return (
     <IslandProviders>

@@ -24,14 +24,12 @@ import type {
   UserWithGrants,
 } from "~/types/admin.types";
 
-/** Rows per page of the admin tables (the server default is 50, its maximum 100). */
 export const ADMIN_PAGE_SIZE = 20;
 
 const unwrap = <T>(res: { data: ApiResponse<T> }) => res.data.data;
 
 export const rolesApi = {
   list: (params: PageParams): Promise<PaginatedResponse<Role>> => fetchPage<Role>("/roles", params),
-  /** Every role (all pages), for pickers. */
   all: (): Promise<Role[]> => fetchAllPages<Role>("/roles"),
   get: (id: number): Promise<RoleDetail> => api.get(`/roles/${id}`).then(unwrap<RoleDetail>),
   create: (data: RoleFormData): Promise<RoleDetail> =>
@@ -52,7 +50,6 @@ export const rolesApi = {
 export const permissionsApi = {
   list: (params: PageParams): Promise<PaginatedResponse<Permission>> =>
     fetchPage<Permission>("/permissions", params),
-  /** Every permission (all pages), for pickers. */
   all: (): Promise<Permission[]> => fetchAllPages<Permission>("/permissions"),
   create: (data: PermissionFormData): Promise<Permission> =>
     api.post("/permissions", { permission: data }).then(unwrap<Permission>),
@@ -66,7 +63,6 @@ export const usersApi = {
     fetchPage<UserWithGrants>("/users", params),
   roles: (userId: number): Promise<UserRole[]> =>
     api.get(`/users/${userId}/roles`).then(unwrap<UserRole[]>),
-  /** Only the email can change here; users change their own password on their profile. */
   updateEmail: (id: number, email: string): Promise<UserWithGrants> =>
     api.put(`/users/${id}`, { user: { email } }).then(unwrap<UserWithGrants>),
   delete: (id: number): Promise<void> => api.delete(`/users/${id}`).then(() => undefined),
@@ -80,7 +76,6 @@ export const usersApi = {
   resetPassword: resetUserPassword,
 };
 
-/** react-query keys of the admin data. */
 export const adminKeys = {
   users: ["admin", "users"] as const,
   usersPage: (page: number) => ["admin", "users", page] as const,

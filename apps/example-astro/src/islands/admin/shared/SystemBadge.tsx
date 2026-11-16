@@ -1,4 +1,3 @@
-/** Marks a seeded role or permission (not deletable, slug locked). */
 export default function SystemBadge() {
   return (
     <span

@@ -8,10 +8,6 @@ interface ErrorBoundaryState {
   failed: boolean;
 }
 
-/**
- * Catches render errors of an island so a failure in one of them shows a
- * message instead of leaving a hole in the page.
- */
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { failed: false };
 

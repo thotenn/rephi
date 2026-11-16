@@ -11,12 +11,6 @@ interface RolePermissionsModalProps {
   onClose: () => void;
 }
 
-/**
- * The permissions of a role: the ones assigned to it (removable) and the ones
- * it inherits from its parent roles (read-only: they are revoked on the parent).
- * Assigning needs `permissions:assign`, and listing what can be assigned needs
- * `permissions:view`; without them the modal is read-only.
- */
 export default function RolePermissionsModal({ role, onClose }: RolePermissionsModalProps) {
   const queryClient = useQueryClient();
   const { can } = usePermissions();

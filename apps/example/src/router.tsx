@@ -71,7 +71,6 @@ export const router = createBrowserRouter([
     children: processRoutes(allRoutes),
   },
 ], {
-  // `base` of vite.config.ts (`basename` of app.config.ts, "/app/example/"),
-  // without the trailing slash.
+  // Vite's `base` ("/app/example/") without the trailing slash.
   basename: import.meta.env.BASE_URL.replace(/\/+$/, ""),
 });

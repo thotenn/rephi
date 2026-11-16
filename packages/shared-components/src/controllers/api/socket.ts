@@ -2,24 +2,11 @@ import { Socket } from "phoenix";
 import { debugLog, getRephiConfig } from "../../config";
 import { useAuthStore } from "../../stores/auth.store";
 
-/** Connection state of the shared socket. */
 export type SocketStatus = "idle" | "connecting" | "open" | "closed";
 
 type Listener = () => void;
 type DropListener = () => void;
 
-/**
- * The one Phoenix socket of the app.
- *
- * - The token travels as Phoenix's `authToken` (in the `Sec-WebSocket-Protocol`
- *   header, never in the URL) and is read from the auth store on every
- *   (re)connect, so a reconnect after a token change sends the current one.
- * - `connect()` reuses the socket while it is open, connecting or waiting to
- *   reconnect: there is never more than one transport alive.
- * - When the server closes the socket on its own (it does on logout, password
- *   change or user deletion), `onDrop` listeners run; the session module uses
- *   that to check whether the session is still valid.
- */
 class PhoenixSocket {
   private socket: Socket | null = null;
   private url: string | null = null;
@@ -27,10 +14,6 @@ class PhoenixSocket {
   private readonly listeners = new Set<Listener>();
   private readonly dropListeners = new Set<DropListener>();
 
-  /**
-   * Opens the socket, or returns the existing one. Returns `null` without a
-   * session: the server would refuse the connection anyway.
-   */
   connect(): Socket | null {
     const { wsUrl } = getRephiConfig();
 
@@ -41,16 +24,14 @@ class PhoenixSocket {
 
     if (this.socket) {
       if (this.url === wsUrl) {
-        // `Socket#connect` is a no-op while the socket is open or connecting.
         this.socket.connect();
         return this.socket;
       }
-      // The endpoint was reconfigured: drop the socket bound to the old URL.
       this.disconnect();
     }
 
     const socket = new Socket(wsUrl, {
-      // A function is evaluated on every (re)connect.
+      // Read on every (re)connect; sent in Sec-WebSocket-Protocol, never in the URL.
       authToken: () => useAuthStore.getState().token ?? "",
       reconnectAfterMs: (tries) => [1000, 2000, 5000, 10000][tries - 1] ?? 10000,
       rejoinAfterMs: (tries) => [1000, 2000, 5000][tries - 1] ?? 5000,
@@ -74,16 +55,13 @@ class PhoenixSocket {
     return socket;
   }
 
-  /** Closes the socket for good (until the next `connect()`). */
   disconnect(): void {
     const socket = this.socket;
     if (!socket) return;
     this.socket = null;
     this.url = null;
     if (socket.connectionState() === "connecting") {
-      // Closing a WebSocket during its handshake makes browsers log a
-      // warning; close it as soon as the handshake ends instead. Nothing uses
-      // this socket any more (it is no longer `getSocket()`).
+      // Closing during the handshake makes browsers log a warning; close once it ends.
       const close = () => socket.disconnect();
       socket.onOpen(close);
       socket.onError(close);
@@ -93,13 +71,11 @@ class PhoenixSocket {
     this.setStatus("idle");
   }
 
-  /** Replaces the socket with a new one (e.g. after the token changed). */
   reconnect(): Socket | null {
     this.disconnect();
     return this.connect();
   }
 
-  /** The current socket, without creating one. */
   getSocket = (): Socket | null => this.socket;
 
   getStatus = (): SocketStatus => this.status;
@@ -108,10 +84,6 @@ class PhoenixSocket {
     return this.status === "open";
   }
 
-  /**
-   * Called whenever the socket instance or its status changes. Fits
-   * `useSyncExternalStore(PhoenixSocket.subscribe, PhoenixSocket.getSocket)`.
-   */
   subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener);
     return () => {
@@ -119,7 +91,6 @@ class PhoenixSocket {
     };
   };
 
-  /** Called when the socket closes without `disconnect()` being called. */
   onDrop(listener: DropListener): () => void {
     this.dropListeners.add(listener);
     return () => {

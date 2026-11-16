@@ -4,19 +4,10 @@ import { toApiError } from "../../errors";
 import { endSession, isSigningOut } from "../../session";
 import { useAuthStore } from "../../stores/auth.store";
 
-/**
- * The axios instance every request to the API goes through.
- *
- * - Sends the session token as `Authorization: Bearer <token>`.
- * - Rejects with an `ApiError` (see `errors.ts`) built from the error envelope.
- * - A 401 on a request that carried the current token ends the session
- *   (`endSession("unauthorized")`): the token expired or was revoked.
- */
 const api = axios.create({
   baseURL: getRephiConfig().apiUrl,
 });
 
-// Follow `configureRephi({ apiUrl })` calls made after this module was loaded.
 onRephiConfigChange(({ apiUrl }) => {
   api.defaults.baseURL = apiUrl;
 });
@@ -42,8 +33,7 @@ api.interceptors.response.use(
 
     const response = error.response;
 
-    // Only a token that is still the current one ends the session: a late
-    // answer to a request sent before a re-login must not sign the user out.
+    // A late 401 for a token replaced since (re-login) must not end the new session.
     if (response?.status === 401) {
       const sentToken = bearerOf(error.config?.headers);
       if (sentToken && sentToken === useAuthStore.getState().token && !isSigningOut()) {

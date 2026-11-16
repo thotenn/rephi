@@ -6,7 +6,6 @@ interface FieldErrorProps {
   field: string;
 }
 
-/** The server's messages for one input, e.g. "Slug has already been taken". */
 export default function FieldError({ errors, field }: FieldErrorProps) {
   const messages = errors[field];
   if (!messages?.length) return null;

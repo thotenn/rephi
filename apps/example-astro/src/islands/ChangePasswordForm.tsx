@@ -25,11 +25,6 @@ const autoComplete: Record<(typeof FIELDS)[number], string> = {
   password_confirmation: "new-password",
 };
 
-/**
- * `PUT /api/me/password`. The server signs out every other device of the user
- * and returns a new session, which the library stores (the socket reconnects
- * with the new token), so the user stays signed in here.
- */
 function ChangePasswordFields() {
   const changePassword = useChangePassword();
   const mustChangePassword = useAuthStore((state) => !!state.user?.must_change_password);

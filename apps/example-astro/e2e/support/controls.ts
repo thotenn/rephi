@@ -133,7 +133,6 @@ async function clickAndObserve(page: Page, target: Locator, control: Control): P
   }
 }
 
-// A dead control: its click caused no navigation, request, browser dialog or DOM change.
 export async function probeControls(page: Page, options: ProbeOptions): Promise<ProbeResult> {
   const result: ProbeResult = { exercised: [], dead: [], skipped: [] };
   await explore(page, options.open, options.scope ?? "body", options.skip, options.depth ?? 2, [], "", result);

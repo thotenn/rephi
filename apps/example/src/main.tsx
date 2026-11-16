@@ -1,4 +1,4 @@
-// Configures the shared library before anything else can use it.
+// Must stay the first import: configures the shared library before anything uses it.
 import "./lib/rephi";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

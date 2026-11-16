@@ -16,10 +16,6 @@ const BROADCAST_PERMISSION = "notifications:broadcast";
 const MAX_MESSAGE_LENGTH = 500;
 const DEFAULT_TEST_MESSAGE = "This is a test notification";
 
-/**
- * Sends notifications: to every connected user (with `notifications:broadcast`) or, for
- * anyone, a test to the user's own tabs. Incoming ones are shown by the `AppRuntime` island.
- */
 function NotificationSenderForm() {
   const { can } = usePermissions();
   const connected = useRealtimeConnected();

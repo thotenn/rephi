@@ -11,15 +11,11 @@ export interface RouteConfig {
     description?: string;
     requireAuth?: boolean;
     publicOnly?: boolean; // For login/register pages
-    /** Permission the user needs (e.g. "users:view"); implies requireAuth. */
     permission?: string;
   };
 }
 
-// Route paths - centralized for easy management. Relative to the router's
-// basename (`/app/example`). A path must not end in something that looks like a
-// file extension (`/users/john.doe`): Phoenix answers those with a 404 instead
-// of the app's index.html.
+// A path must not end in something like a file extension (`/users/john.doe`): Phoenix answers those with a 404.
 export const ROUTE_PATHS = {
   home: "/home",
   auth: {
@@ -46,7 +42,6 @@ export const QUICK_LINKS = {
   sendNotification: `${ROUTE_PATHS.home}${NOTIFY_HASH}`,
 } as const;
 
-/** Permission that opens each admin screen (and its entry in the Admin menu). */
 export const ADMIN_PERMISSIONS = {
   users: "users:view",
   roles: "roles:view",

@@ -3,13 +3,7 @@ import { go, isEmbedded } from "~/lib/navigation";
 import { useAuthStore } from "~/lib/rephi";
 import { ROUTES } from "~/lib/routes";
 
-/**
- * Sends visitors who already have a session to the home page. Used on the
- * public-only pages (welcome, login, register); renders nothing.
- *
- * The check runs once, on arrival. Signing in on the page itself is handled by
- * the form, which knows where to go next (the "redirect back" target).
- */
+// Checked once, on arrival: after signing in on the page, the form decides where to go.
 export default function GuestRedirect() {
   useEffect(() => {
     if (!isEmbedded && useAuthStore.getState().isAuthenticated) {

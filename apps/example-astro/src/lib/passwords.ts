@@ -13,7 +13,6 @@ export const passwordField = z
     error: `Password must be at most ${MAX_PASSWORD_BYTES} bytes`,
   });
 
-/** Email + new password + confirmation, for the registration form. */
 export const registrationSchema = z
   .object({
     email: z.email("Invalid email address"),
@@ -25,7 +24,6 @@ export const registrationSchema = z
     path: ["password_confirmation"],
   });
 
-/** Current password + new password + confirmation, for the change-password form. */
 export const changePasswordSchema = z
   .object({
     current_password: z.string().min(1, "Enter your current password"),

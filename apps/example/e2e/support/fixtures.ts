@@ -1,7 +1,7 @@
 import { test as base, expect, type Browser, type Page } from "@playwright/test";
 import type { Session } from "./api";
 
-// AUTH_STORAGE_KEY of @rephi/shared-components.
+// Must match AUTH_STORAGE_KEY of @rephi/shared-components.
 const AUTH_STORAGE_KEY = "auth-storage";
 
 function sharedSession(variable: "E2E_ADMIN_SESSION" | "E2E_PLAIN_SESSION"): Session {

@@ -1,7 +1,6 @@
 import { ADMIN, API_URL, api, cleanup } from "./support/api";
 
-// The API rate-limits logins and registrations: two shared sessions, handed to
-// the workers through process.env. No test may end them.
+// Logins are rate-limited: two shared sessions for every worker, which no test may end.
 export default async function globalSetup() {
   try {
     await fetch(`${API_URL}/health`);

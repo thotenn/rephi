@@ -11,11 +11,6 @@ interface UserRolesModalProps {
   onClose: () => void;
 }
 
-/**
- * Assigns and removes roles of a user (`roles:assign`). The server refuses
- * (and this shows why) granting a role the signed-in user does not hold (403)
- * or removing the admin role from the last admin (409).
- */
 export default function UserRolesModal({ user, onClose }: UserRolesModalProps) {
   const queryClient = useQueryClient();
   const { can } = usePermissions();

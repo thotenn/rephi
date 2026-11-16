@@ -8,11 +8,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     resolve: {
-      // Resolves the `~/*` alias from tsconfig.json `paths`.
       tsconfigPaths: true,
     },
-    // Phoenix serves every `priv/static/apps/<name>` at `/app/<name>/`, and
-    // `yarn build` copies `apps/<name>/dist` there.
     base: `${appConfig.basename}/`,
     server: {
       port: Number(env.VITE_PORT) || appConfig.port,

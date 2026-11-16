@@ -4,8 +4,6 @@ import { usePermissions } from "@rephi/shared-components";
 import { ADMIN_PERMISSIONS, ROUTE_PATHS } from "~/config/routes";
 import { useLogout } from "~/hooks/useAuth";
 
-// Each entry of the Admin menu shows for users with the permission of its
-// screen, so a manager with `users:view` gets "User Management" alone.
 const adminLinks = [
   { to: ROUTE_PATHS.admin.users, label: "User Management", permission: ADMIN_PERMISSIONS.users },
   { to: ROUTE_PATHS.admin.roles, label: "Roles Management", permission: ADMIN_PERMISSIONS.roles },

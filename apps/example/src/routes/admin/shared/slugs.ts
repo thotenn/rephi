@@ -24,7 +24,6 @@ export function roleSlugFromName(name: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
-/** "Edit Users" -> "edit:users": the first word becomes the action. */
 export function permissionSlugFromName(name: string): string {
   const words = roleSlugFromName(name).split("_").filter(Boolean);
   if (words.length < 2) return words.join("");

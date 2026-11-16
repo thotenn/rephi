@@ -4,22 +4,15 @@ import { defineConfig, envField } from "astro/config";
 import { loadEnv } from "vite";
 import { appConfig } from "./app.config.ts";
 
-// `astro.config.*` is evaluated before Astro loads `.env`, so the build-time
-// options below are read with Vite's loader (process env wins over `.env` files).
+// astro.config is evaluated before Astro loads `.env`, so read it with Vite's loader.
 const buildEnv = loadEnv(process.env.NODE_ENV ?? "production", process.cwd(), "ASTRO_");
 
 export default defineConfig({
-  // Every page is prerendered to plain HTML: `dist/` is a static site that any
-  // static host (Cloudflare Pages, Workers static assets, a CDN...) serves as-is.
   output: "static",
 
-  // Sub-path the site is served from (app.config.ts); ASTRO_BASE=/some/path
-  // overrides it to host the site under a prefix (see the README).
   base: buildEnv.ASTRO_BASE || appConfig.basename,
 
-  // Pages are emitted as `<route>/index.html`, whose canonical URL ends with a
-  // slash on static hosts. Requiring it everywhere keeps dev and production
-  // consistent and avoids a redirect on every internal navigation.
+  // Static hosts serve `<route>/index.html` at the slash URL: avoids a redirect per link.
   trailingSlash: "always",
   build: { format: "directory" },
 
@@ -27,8 +20,6 @@ export default defineConfig({
 
   integrations: [react()],
 
-  // Public, typed configuration. The values are inlined into the client bundle
-  // when the site is built and handed to `configureRephi()` in src/lib/rephi.ts.
   env: {
     schema: {
       PUBLIC_API_URL: envField.string({

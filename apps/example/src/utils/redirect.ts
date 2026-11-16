@@ -1,10 +1,7 @@
 import type { SessionEndReason } from "@rephi/shared-components";
 
-/** Navigation state the login page understands. */
 export interface LoginLocationState {
-  /** Path (inside the app) the visitor wanted, to return there after login. */
   from?: string;
-  /** Set when the session ended while on a protected page. */
   sessionEnded?: SessionEndReason;
 }
 

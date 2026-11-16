@@ -1,4 +1,3 @@
-/** Badge colors of the seeded roles; any other role is gray. */
 export function roleBadgeClass(roleSlug: string): string {
   switch (roleSlug) {
     case "admin":

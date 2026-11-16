@@ -17,10 +17,8 @@ const columns = [
   { key: "actions", label: "Actions" },
 ];
 
-/** The slug's first segment: "users:edit" -> "users". */
 const categoryOf = (slug: string) => slug.split(":")[0];
 
-/** One page of permissions, grouped by category. */
 export default function PermissionsTable({
   permissions,
   canEdit,

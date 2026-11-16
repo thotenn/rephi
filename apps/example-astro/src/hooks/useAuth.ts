@@ -16,7 +16,6 @@ import type {
 } from "~/lib/rephi";
 import { isInternalPath, ROUTES } from "~/lib/routes";
 
-/** After signing in: back to the protected page that sent the visitor here, or home. */
 function leaveGuestPage(): void {
   const redirectPath = getRedirectPath();
   clearRedirectPath();
@@ -27,22 +26,16 @@ function leaveGuestPage(): void {
   }
 }
 
-/**
- * Signs in. The response carries the roles and permissions, so the session is
- * complete at once; the form then navigates exactly once.
- */
 export function useLogin() {
   const queryClient = useQueryClient();
 
   return useMutation<AuthSession, Error, LoginCredentials>({
-    // Drop anything cached for a previous session before the new one starts.
     onMutate: () => queryClient.clear(),
     mutationFn: login,
     onSuccess: leaveGuestPage,
   });
 }
 
-/** Creates the account (with the server's default role) and signs it in. */
 export function useRegister() {
   const queryClient = useQueryClient();
 
@@ -53,17 +46,11 @@ export function useRegister() {
   });
 }
 
-/** Changes the password; the new session replaces the stored one. */
 export function useChangePassword() {
   return useMutation<AuthSession, Error, ChangePasswordParams>({ mutationFn: changePassword });
 }
 
-/**
- * Ends the session on the server (revokes the token on every device), then
- * locally. Navigation is not done here: `RouteGuard` reacts to the store and
- * sends the visitor to the login page, and `AppRuntime` follows the session
- * for the socket, so every consequence of losing the session lives in one place.
- */
+// No navigation here: RouteGuard and AppRuntime react to the store.
 export function signOut(): Promise<void> {
   return logout();
 }
