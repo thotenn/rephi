@@ -784,7 +784,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     """
 
     The dev server origin http://localhost:#{plan.port} was added to the CORS
-    origins of #{@dev_config}; restart Phoenix to pick it up.
+    origins of #{@dev_config}: restart `mix phx.server` if it is running.
     """
   end
 

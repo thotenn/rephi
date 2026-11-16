@@ -66,8 +66,36 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
         do: {Path.relative_to(path, tmp_dir), File.read!(path)}
   end
 
+  # The dev port given to a Vite app, from the shared env.
+  defp vite_port(tmp_dir, var) do
+    env = read(tmp_dir, "packages/shared-components/src/env.ts")
+    [_, port] = Regex.run(~r/#{var}\s*\|\|\s*'(\d+)'/, env)
+    String.to_integer(port)
+  end
+
+  # Every number that looks like a port in the files the task reads, before
+  # it runs. The project may already have generated apps of its own.
+  defp ports_in_use(tmp_dir) do
+    ~w(packages/shared-components/src/env.ts config/dev.exs apps/example/vite.config.ts
+       apps/example-astro/astro.config.ts)
+    |> Enum.flat_map(&Regex.scan(~r/\b(\d{4,5})\b/, read(tmp_dir, &1), capture: :all_but_first))
+    |> MapSet.new(fn [port] -> String.to_integer(port) end)
+  end
+
+  defp script_keys(tmp_dir) do
+    tmp_dir
+    |> read("package.json")
+    |> Jason.decode!(objects: :ordered_objects)
+    |> Map.fetch!(:values)
+    |> List.keyfind!("scripts", 0)
+    |> elem(1)
+    |> Map.fetch!(:values)
+    |> Enum.map(&elem(&1, 0))
+  end
+
   describe "a Vite app (the default template)" do
     test "copies the template and registers the app", %{tmp_dir: tmp_dir} do
+      in_use = ports_in_use(tmp_dir)
       gen(tmp_dir, ["demo"])
 
       assert %{"name" => "rephi-demo"} = json(tmp_dir, "apps/demo/package.json")
@@ -87,14 +115,16 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
 
       env = read(tmp_dir, "packages/shared-components/src/env.ts")
       assert env =~ ~r/demo: \{\s+basename: "\/app\/demo",/
-      assert env =~ "import.meta.env.VITE_DEMO_PORT || '5002'"
+      assert env =~ "import.meta.env.VITE_DEMO_PORT || '"
+      port = vite_port(tmp_dir, "VITE_DEMO_PORT")
+      refute port in in_use
       # The template's entry is untouched.
       assert env =~ "import.meta.env.VITE_EXAMPLE_PORT || '5001'"
 
       assert read(tmp_dir, "packages/shared-components/src/vite-env.d.ts") =~
                "readonly VITE_DEMO_PORT: number"
 
-      assert read(tmp_dir, "config/dev.exs") =~ ~s("http://localhost:5002")
+      assert read(tmp_dir, "config/dev.exs") =~ ~s("http://localhost:#{port}")
 
       # No leftovers from the temporary copy.
       assert tmp_dir |> Path.join("apps") |> File.ls!() |> Enum.sort() ==
@@ -115,6 +145,15 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       assert original |> Jason.decode!(objects: :ordered_objects) |> Frontend.encode_json() ==
                original
 
+      # The last script of an app of apps/, before the task runs.
+      apps = File.ls!(Path.join(tmp_dir, "apps"))
+
+      last_app_script =
+        tmp_dir
+        |> script_keys()
+        |> Enum.filter(&(String.split(&1, ":") |> hd() |> then(fn app -> app in apps end)))
+        |> List.last()
+
       gen(tmp_dir, ["demo"])
       gen(tmp_dir, ["demo2"])
 
@@ -122,18 +161,9 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       assert {:ok, %{"scripts" => scripts}} = Jason.decode(package)
       assert Map.has_key?(scripts, "demo2:build")
 
-      keys =
-        package
-        |> Jason.decode!(objects: :ordered_objects)
-        |> Map.fetch!(:values)
-        |> List.keyfind!("scripts", 0)
-        |> elem(1)
-        |> Map.fetch!(:values)
-        |> Enum.map(&elem(&1, 0))
-
-      # The new scripts go after the other apps' scripts, in order.
-      assert Enum.drop_while(keys, &(&1 != "example-astro:build")) ==
-               ~w(example-astro:build demo:dev demo:build demo2:dev demo2:build shared:build)
+      # The new scripts go right after the other apps' scripts, in order.
+      assert tmp_dir |> script_keys() |> Enum.drop_while(&(&1 != last_app_script)) |> Enum.take(5) ==
+               [last_app_script | ~w(demo:dev demo:build demo2:dev demo2:build)]
 
       assert String.ends_with?(package, "}\n")
       refute package =~ ",,"
@@ -144,10 +174,11 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       gen(tmp_dir, ["demo2"])
       gen(tmp_dir, ["demo3", "--port", "5050"])
 
-      env = read(tmp_dir, "packages/shared-components/src/env.ts")
-      assert env =~ "VITE_DEMO_PORT || '5002'"
-      assert env =~ "VITE_DEMO2_PORT || '5003'"
-      assert env =~ "VITE_DEMO3_PORT || '5050'"
+      ports =
+        Enum.map(~w(VITE_DEMO_PORT VITE_DEMO2_PORT VITE_DEMO3_PORT), &vite_port(tmp_dir, &1))
+
+      assert [_, _, 5050] = ports
+      assert ports == Enum.uniq(ports)
 
       # config/dev.exs is still valid Elixir, with the three origins added.
       origins =
@@ -156,7 +187,7 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
         |> Config.Reader.read!(env: :dev)
         |> get_in([Mix.Project.config()[:app], :cors_origins])
 
-      for port <- [5002, 5003, 5050], do: assert("http://localhost:#{port}" in origins)
+      for port <- ports, do: assert("http://localhost:#{port}" in origins)
     end
 
     test "a name that is not a JavaScript identifier is quoted", %{tmp_dir: tmp_dir} do
@@ -176,14 +207,15 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
     test "copies the site with its own name and port", %{tmp_dir: tmp_dir} do
       env_before = read(tmp_dir, "packages/shared-components/src/env.ts")
 
+      in_use = ports_in_use(tmp_dir)
       gen(tmp_dir, ["site", "--template", "example-astro"])
 
-      package = json(tmp_dir, "apps/site/package.json")
-      assert package["name"] == "rephi-site"
+      assert json(tmp_dir, "apps/site/package.json")["name"] == "rephi-site"
       # Still a static site that Phoenix does not serve unless asked to.
-      assert package["rephi"] == %{"copyToPhoenix" => false}
+      assert read(tmp_dir, "apps/site/package.json") =~ ~s("copyToPhoenix": false)
 
-      assert read(tmp_dir, "apps/site/astro.config.ts") =~ "port: 4322"
+      [_, port] = Regex.run(~r/port: (\d+)/, read(tmp_dir, "apps/site/astro.config.ts"))
+      refute String.to_integer(port) in in_use
       assert read(tmp_dir, "apps/site/wrangler.jsonc") =~ ~s("name": "rephi-site")
       assert read(tmp_dir, "apps/site/.env.example") =~ "ASTRO_BASE=/app/site"
 
@@ -192,7 +224,7 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
 
       # Astro sites do not use the shared env's APPS.
       assert read(tmp_dir, "packages/shared-components/src/env.ts") == env_before
-      assert read(tmp_dir, "config/dev.exs") =~ ~s("http://localhost:4322")
+      assert read(tmp_dir, "config/dev.exs") =~ ~s("http://localhost:#{port}")
     end
   end
 
