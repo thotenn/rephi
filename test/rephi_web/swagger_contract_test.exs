@@ -139,6 +139,7 @@ defmodule RephiWeb.SwaggerContractTest do
 
   defp cases(%{token: token} = ctx) do
     admin_role = Authorization.get_role_by_slug("admin")
+    manager_role = Authorization.get_role_by_slug("manager")
     system_permission = Authorization.get_permission_by_slug("users:view")
 
     [
@@ -243,6 +244,34 @@ defmodule RephiWeb.SwaggerContractTest do
       {"delete", "/api/users/{user_id}/roles/{role_id}", 409,
        fn -> call(:delete, "/api/users/#{ctx.admin.id}/roles/#{admin_role.id}", token) end},
 
+      # Role hierarchy
+      {"get", "/api/roles/{id}/parents", 200,
+       fn -> call(:get, "/api/roles/#{ctx.child.id}/parents", token) end},
+      {"get", "/api/roles/{id}/children", 200,
+       fn -> call(:get, "/api/roles/#{ctx.parent.id}/children", token) end},
+      {"post", "/api/roles/{role_id}/parents/{parent_id}", 201,
+       fn ->
+         call(:post, "/api/roles/#{create_role().id}/parents/#{ctx.parent.id}", token, %{
+           notes: "Editors can do what authors do"
+         })
+       end},
+      {"post", "/api/roles/{role_id}/parents/{parent_id}", 409,
+       fn -> call(:post, "/api/roles/#{ctx.parent.id}/parents/#{ctx.child.id}", token) end},
+      {"post", "/api/roles/{role_id}/parents/{parent_id}", 422,
+       fn ->
+         call(:post, "/api/roles/#{create_role().id}/parents/#{ctx.parent.id}", token, %{
+           notes: 1
+         })
+       end},
+      {"delete", "/api/roles/{role_id}/parents/{parent_id}", 204,
+       fn ->
+         {child, parent} = {create_role(), create_role()}
+         {:ok, _} = Authorization.assign_parent_role(child, parent)
+         call(:delete, "/api/roles/#{child.id}/parents/#{parent.id}", token)
+       end},
+      {"delete", "/api/roles/{role_id}/parents/{parent_id}", 409,
+       fn -> call(:delete, "/api/roles/#{admin_role.id}/parents/#{manager_role.id}", token) end},
+
       # Permissions
       {"get", "/api/permissions", 200, fn -> call(:get, "/api/permissions", token) end},
       {"get", "/api/permissions", 422,
@@ -319,7 +348,48 @@ defmodule RephiWeb.SwaggerContractTest do
       {"delete", "/api/users/{id}", 409,
        fn -> call(:delete, "/api/users/#{ctx.admin.id}", token) end},
       {"get", "/api/users/{id}/roles", 200,
-       fn -> call(:get, "/api/users/#{ctx.admin.id}/roles", token) end}
+       fn -> call(:get, "/api/users/#{ctx.admin.id}/roles", token) end},
+      {"get", "/api/users/{id}/permissions", 200,
+       fn ->
+         user = create_user()
+         grant_role(user, "manager")
+         grant_permission(user, ctx.inherited.slug)
+         call(:get, "/api/users/#{user.id}/permissions", token)
+       end},
+      {"post", "/api/users/{id}/password", 200,
+       fn -> call(:post, "/api/users/#{create_user().id}/password", token) end},
+      {"post", "/api/users/{id}/password", 409,
+       fn -> call(:post, "/api/users/#{ctx.admin.id}/password", token) end},
+
+      # Direct user permissions
+      {"post", "/api/users/{user_id}/permissions/{permission_id}", 201,
+       fn ->
+         path = "/api/users/#{create_user().id}/permissions/#{system_permission.id}"
+         call(:post, path, token, %{notes: "Audit"})
+       end},
+      {"post", "/api/users/{user_id}/permissions/{permission_id}", 409,
+       fn ->
+         user = create_user()
+         grant_permission(user, system_permission.slug)
+         call(:post, "/api/users/#{user.id}/permissions/#{system_permission.id}", token)
+       end},
+      {"post", "/api/users/{user_id}/permissions/{permission_id}", 422,
+       fn ->
+         path = "/api/users/#{create_user().id}/permissions/#{system_permission.id}"
+         call(:post, path, token, %{notes: []})
+       end},
+      {"delete", "/api/users/{user_id}/permissions/{permission_id}", 204,
+       fn ->
+         user = create_user()
+         grant_permission(user, system_permission.slug)
+         call(:delete, "/api/users/#{user.id}/permissions/#{system_permission.id}", token)
+       end},
+      {"delete", "/api/users/{user_id}/permissions/{permission_id}", 409,
+       fn ->
+         user = create_user()
+         grant_role(user, "manager")
+         call(:delete, "/api/users/#{user.id}/permissions/#{system_permission.id}", token)
+       end}
     ]
   end
 

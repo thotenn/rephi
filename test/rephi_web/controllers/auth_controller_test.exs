@@ -197,6 +197,7 @@ defmodule RephiWeb.AuthControllerTest do
                  "user" => %{
                    "id" => user.id,
                    "email" => "test@example.com",
+                   "must_change_password" => false,
                    "roles" => [],
                    "permissions" => []
                  }

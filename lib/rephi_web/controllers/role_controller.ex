@@ -15,6 +15,11 @@ defmodule RephiWeb.RoleController do
     * `DELETE /api/roles/:id` - Delete role (requires "roles:delete")
     * `POST /api/users/:user_id/roles/:role_id` - Assign role to user (requires "roles:assign")
     * `DELETE /api/users/:user_id/roles/:role_id` - Remove role from user (requires "roles:assign")
+    * `GET /api/roles/:id/parents` - The direct parent roles (requires "roles:view")
+    * `GET /api/roles/:id/children` - The roles that inherit from it directly (requires "roles:view")
+    * `POST /api/roles/:role_id/parents/:parent_id` - Make a role inherit from another
+      (requires "roles:edit")
+    * `DELETE /api/roles/:role_id/parents/:parent_id` - Remove a parent (requires "roles:edit")
 
   `POST` and `PUT` accept the role attributes flat or wrapped under `"role"`.
   An id that is not the id of an existing record (unknown, not a number, out
@@ -30,8 +35,14 @@ defmodule RephiWeb.RoleController do
       cannot change (`422`).
     * Assigning or removing a role requires holding it, or being an admin
       (`403` otherwise, `Rephi.Authorization.can_grant_role?/2`).
-    * Removing the admin role from its last holder, directly or by deleting
-      a role that inherits from it, answers `409`.
+    * Removing the admin role from its last holder, directly, by deleting
+      a role that inherits from it or by unlinking such a role from it,
+      answers `409`.
+    * Linking or unlinking a parent requires holding both roles, or being an
+      admin (`403`, `Rephi.Authorization.can_link_roles?/3`). A link that
+      would make a role inherit from itself (`409`), a parent already linked
+      (`409`) and removing a link of the seeded hierarchy (`409`, system
+      links) are refused.
 
   ## Permission Requirements
 
@@ -41,6 +52,7 @@ defmodule RephiWeb.RoleController do
   - Update actions: `roles:edit`
   - Delete actions: `roles:delete`
   - Assignment actions: `roles:assign`
+  - Hierarchy changes: `roles:edit` (they change what a role grants)
 
   """
   use RephiWeb, :controller
@@ -51,15 +63,25 @@ defmodule RephiWeb.RoleController do
   alias PhoenixSwagger.Schema
   alias Rephi.Accounts
   alias Rephi.Authorization
-  alias Rephi.Authorization.Role
+  alias Rephi.Authorization.{Role, RoleRole}
 
   action_fallback RephiWeb.FallbackController
 
   plug AuthorizationPlug,
-       {:permission, "roles:view"} when action in [:index, :show, :get_role_permissions]
+       {:permission, "roles:view"}
+       when action in [
+              :index,
+              :show,
+              :get_role_permissions,
+              :get_role_parents,
+              :get_role_children
+            ]
 
   plug AuthorizationPlug, {:permission, "roles:create"} when action in [:create]
-  plug AuthorizationPlug, {:permission, "roles:edit"} when action in [:update]
+
+  plug AuthorizationPlug,
+       {:permission, "roles:edit"} when action in [:update, :add_parent, :remove_parent]
+
   plug AuthorizationPlug, {:permission, "roles:delete"} when action in [:delete]
 
   plug AuthorizationPlug,
@@ -299,9 +321,250 @@ defmodule RephiWeb.RoleController do
     end
   end
 
+  swagger_path :get_role_parents do
+    get("/api/roles/{id}/parents")
+    summary("List the parent roles of a role")
+
+    description(
+      "The roles this role inherits from directly (not their own ancestors; the permissions inherited through the whole chain are in inherited_permissions of GET /api/roles/{id}), by slug, each with its link. Not paginated. Requires roles:view."
+    )
+
+    tag("Roles")
+    produces("application/json")
+    bearer_auth()
+    id_param(:id, "Role ID")
+    response(200, "The parent roles", Schema.ref(:RoleLinksResponse))
+    error_response(403, "Forbidden - requires roles:view")
+    error_response(404, "Role not found")
+  end
+
+  def get_role_parents(conn, %{"id" => id}) do
+    with {:ok, role} <- Authorization.fetch_role(id) do
+      render(conn, :links, links: Authorization.list_parent_roles(role))
+    end
+  end
+
+  swagger_path :get_role_children do
+    get("/api/roles/{id}/children")
+    summary("List the child roles of a role")
+
+    description(
+      "The roles that inherit from this role directly, by slug, each with its link. Not paginated. Requires roles:view."
+    )
+
+    tag("Roles")
+    produces("application/json")
+    bearer_auth()
+    id_param(:id, "Role ID")
+    response(200, "The child roles", Schema.ref(:RoleLinksResponse))
+    error_response(403, "Forbidden - requires roles:view")
+    error_response(404, "Role not found")
+  end
+
+  def get_role_children(conn, %{"id" => id}) do
+    with {:ok, role} <- Authorization.fetch_role(id) do
+      render(conn, :links, links: Authorization.list_child_roles(role))
+    end
+  end
+
+  swagger_path :add_parent do
+    post("/api/roles/{role_id}/parents/{parent_id}")
+    summary("Make a role inherit from another")
+
+    description(
+      "Links parent_id as a parent of role_id: every holder of role_id gets the permissions of parent_id and of its ancestors. Requires roles:edit, and holding both roles (assigned or inherited) or being an admin. The body is optional. assigned_by is the caller. Refused (409) when it would make a role inherit from itself (parent_id is role_id or one of its descendants) or the parent is already linked."
+    )
+
+    tag("Roles")
+    consumes("application/json")
+    produces("application/json")
+    bearer_auth()
+    id_param(:role_id, "Role ID (the child)")
+    id_param(:parent_id, "Parent role ID")
+
+    parameters do
+      body(:body, Schema.ref(:AssignmentNotes), "Optional notes", required: false)
+    end
+
+    response(201, "Parent linked", Schema.ref(:RoleParentAssignmentResponse))
+    body_errors()
+
+    error_response(
+      403,
+      "Forbidden - requires roles:edit, and holding both roles or being an admin"
+    )
+
+    error_response(404, "Role or parent role not found")
+
+    error_response(
+      409,
+      "The role would inherit from itself, or the parent is already linked"
+    )
+
+    validation_response("notes is not a string or is too long")
+  end
+
+  def add_parent(conn, %{"role_id" => role_id, "parent_id" => parent_id} = params) do
+    opts = [actor: current_access(conn), notes: params["notes"]]
+
+    with {:ok, role} <- Authorization.fetch_role(role_id),
+         {:ok, parent} <- Authorization.fetch_role(parent_id),
+         {:ok, %RoleRole{} = link} <-
+           role
+           |> Authorization.assign_parent_role(parent, opts)
+           |> conflict_if_taken("The role already inherits from this parent")
+           |> conflict_if_cycle() do
+      conn
+      |> put_status(:created)
+      |> render(:parent_assignment, link: link)
+    end
+  end
+
+  swagger_path :remove_parent do
+    PhoenixSwagger.Path.delete("/api/roles/{role_id}/parents/{parent_id}")
+    summary("Remove a parent from a role")
+
+    description(
+      "role_id stops inheriting from parent_id. Requires roles:edit, and holding both roles (assigned or inherited) or being an admin. The links of the default hierarchy (is_system) cannot be removed, nor a link through which the last admins hold the admin role (409)."
+    )
+
+    tag("Roles")
+    produces("application/json")
+    bearer_auth()
+    id_param(:role_id, "Role ID (the child)")
+    id_param(:parent_id, "Parent role ID")
+    response(204, "Parent removed")
+
+    error_response(
+      403,
+      "Forbidden - requires roles:edit, and holding both roles or being an admin"
+    )
+
+    error_response(404, "Role or parent role not found, or the role does not inherit from it")
+
+    error_response(
+      409,
+      "A link of the default hierarchy, or it would leave nobody with the admin role"
+    )
+  end
+
+  def remove_parent(conn, %{"role_id" => role_id, "parent_id" => parent_id}) do
+    with {:ok, role} <- Authorization.fetch_role(role_id),
+         {:ok, parent} <- Authorization.fetch_role(parent_id),
+         :ok <- Authorization.remove_parent_role(role, parent, actor: current_access(conn)) do
+      send_resp(conn, :no_content, "")
+    end
+  end
+
+  # A cycle is a rule of the data, not an invalid field of the request (the
+  # ids come from the path): 409, like a duplicate link.
+  defp conflict_if_cycle({:error, %Ecto.Changeset{errors: errors}} = result) do
+    cycle? =
+      Enum.any?(errors, fn {_field, {_message, opts}} ->
+        opts[:validation] == :cycle or opts[:constraint] == :check
+      end)
+
+    if cycle?, do: {:error, :hierarchy_cycle}, else: result
+  end
+
+  defp conflict_if_cycle(result), do: result
+
   # Swagger schema definitions
   def swagger_definitions do
     RephiWeb.Swagger.definitions(%{
+      RoleLink: %{
+        type: :object,
+        title: "Role Link",
+        description:
+          "A role linked to another one in the hierarchy (one of its parents or children), with the attributes of the link",
+        properties: %{
+          id: %{type: :integer, description: "The linked role"},
+          name: %{type: :string},
+          slug: %{type: :string},
+          description: %{type: :string, "x-nullable": true},
+          is_system: %{type: :boolean, description: "The linked role is a system role"},
+          system_link: %{
+            type: :boolean,
+            description: "The link is part of the default hierarchy: it cannot be removed"
+          },
+          assigned_by: %{
+            type: :integer,
+            "x-nullable": true,
+            description:
+              "The user who made the link (null for seeded links and once that user is deleted)"
+          },
+          notes: %{type: :string, "x-nullable": true},
+          linked_at: %{type: :string, format: :"date-time"}
+        },
+        required: [
+          :id,
+          :name,
+          :slug,
+          :description,
+          :is_system,
+          :system_link,
+          :assigned_by,
+          :notes,
+          :linked_at
+        ],
+        example: %{
+          id: 3,
+          name: "User",
+          slug: "user",
+          description: "Basic user access",
+          is_system: true,
+          system_link: true,
+          assigned_by: nil,
+          notes: nil,
+          linked_at: "2026-01-03T10:00:00Z"
+        }
+      },
+      RoleLinksResponse: %{
+        type: :object,
+        title: "Role Links Response",
+        description: "The parents or the children of a role, by slug",
+        properties: %{
+          data: %{type: :array, items: Schema.ref(:RoleLink)}
+        },
+        required: [:data]
+      },
+      RoleParentAssignmentResponse: %{
+        type: :object,
+        title: "Role Parent Assignment Response",
+        description: "The link created by making a role inherit from another",
+        properties: %{
+          data: %{
+            type: :object,
+            properties: %{
+              role_id: %{type: :integer, description: "The child role"},
+              parent_id: %{type: :integer, description: "The parent role"},
+              is_system: %{
+                type: :boolean,
+                description: "Part of the default hierarchy (always false for a new link)"
+              },
+              assigned_by: %{
+                type: :integer,
+                "x-nullable": true,
+                description: "The user who made the link (null once that user is deleted)"
+              },
+              notes: %{type: :string, "x-nullable": true},
+              inserted_at: %{type: :string, format: :"date-time"}
+            },
+            required: [:role_id, :parent_id, :is_system, :assigned_by, :notes, :inserted_at]
+          }
+        },
+        required: [:data],
+        example: %{
+          data: %{
+            role_id: 7,
+            parent_id: 2,
+            is_system: false,
+            assigned_by: 1,
+            notes: nil,
+            inserted_at: "2026-01-03T10:00:00Z"
+          }
+        }
+      },
       Role: %{
         type: :object,
         title: "Role",

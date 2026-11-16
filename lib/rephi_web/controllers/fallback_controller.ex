@@ -42,11 +42,21 @@ defmodule RephiWeb.FallbackController do
     system_permission: {:conflict, "System permissions cannot be deleted"},
     last_admin: {:conflict, "At least one user must keep the admin role"},
     self_delete: {:conflict, "You cannot delete your own account"},
+    self_password_reset:
+      {:conflict, "You cannot reset your own password; change it with PUT /api/me/password"},
     inherited_permission:
       {:conflict,
        "The role inherits this permission from a parent role; revoke it from that role"},
+    granted_through_role:
+      {:conflict,
+       "The user holds this permission through a role; revoke it from the role or remove the role from the user"},
+    system_link: {:conflict, "Links of the default role hierarchy cannot be removed"},
+    hierarchy_cycle: {:conflict, "The role would inherit from itself"},
     escalation: {:forbidden, "You can only grant or revoke roles and permissions you hold"},
-    outranked: {:forbidden, "You cannot change a user who holds roles you do not hold"}
+    outranked: {:forbidden, "You cannot change a user who holds roles you do not hold"},
+    password_change_required:
+      {:forbidden,
+       "Your password was reset: set a new one with PUT /api/me/password before continuing"}
   }
 
   @doc """

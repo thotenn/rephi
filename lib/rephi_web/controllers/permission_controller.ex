@@ -1,6 +1,7 @@
 defmodule RephiWeb.PermissionController do
   @moduledoc """
-  Controller for managing permissions and their assignment to roles.
+  Controller for managing permissions and their assignment to roles and
+  users.
 
   ## Endpoints
 
@@ -13,6 +14,10 @@ defmodule RephiWeb.PermissionController do
       to a role (requires "permissions:assign")
     * `DELETE /api/roles/:role_id/permissions/:permission_id` - Remove a permission
       from a role (requires "permissions:assign")
+    * `POST /api/users/:user_id/permissions/:permission_id` - Grant a permission
+      to a user directly (requires "permissions:assign")
+    * `DELETE /api/users/:user_id/permissions/:permission_id` - Revoke a permission
+      granted directly to a user (requires "permissions:assign")
 
   `POST` and `PUT` accept the permission attributes flat or wrapped under
   `"permission"`. An id that is not the id of an existing record (unknown, not
@@ -29,7 +34,12 @@ defmodule RephiWeb.PermissionController do
     * Granting or revoking a permission requires holding it, or being an
       admin (`403` otherwise, `Rephi.Authorization.can_grant_permission?/2`).
     * Revoking from a role a permission it only inherits from a parent role
-      answers `409`: revoke it from that role.
+      answers `409`: revoke it from that role. Likewise, revoking from a user
+      a permission it only holds through a role answers `409`.
+    * Granting a permission to a user directly follows the same rule as
+      assigning a role: the caller must hold it (or be an admin); the user's
+      own roles do not matter (`GET /api/users/:id/permissions` lists what
+      the user may do and why).
   """
   use RephiWeb, :controller
   use PhoenixSwagger
@@ -37,8 +47,9 @@ defmodule RephiWeb.PermissionController do
   import RephiWeb.Swagger
 
   alias PhoenixSwagger.Schema
+  alias Rephi.Accounts
   alias Rephi.Authorization
-  alias Rephi.Authorization.Permission
+  alias Rephi.Authorization.{Permission, UserPermission}
 
   action_fallback RephiWeb.FallbackController
 
@@ -48,7 +59,8 @@ defmodule RephiWeb.PermissionController do
   plug AuthorizationPlug, {:permission, "permissions:delete"} when action in [:delete]
 
   plug AuthorizationPlug,
-       {:permission, "permissions:assign"} when action in [:assign_to_role, :remove_from_role]
+       {:permission, "permissions:assign"}
+       when action in [:assign_to_role, :remove_from_role, :assign_to_user, :remove_from_user]
 
   swagger_path :index do
     get("/api/permissions")
@@ -265,6 +277,88 @@ defmodule RephiWeb.PermissionController do
     end
   end
 
+  swagger_path :assign_to_user do
+    post("/api/users/{user_id}/permissions/{permission_id}")
+    summary("Grant a permission to a user")
+
+    description(
+      "Grants the permission to the user directly, on top of what its roles grant. Requires permissions:assign, and holding the permission or being an admin. The body is optional. assigned_by is the caller."
+    )
+
+    tag("Permissions")
+    consumes("application/json")
+    produces("application/json")
+    bearer_auth()
+    id_param(:user_id, "User ID")
+    id_param(:permission_id, "Permission ID")
+
+    parameters do
+      body(:body, Schema.ref(:AssignmentNotes), "Optional notes", required: false)
+    end
+
+    response(201, "Permission granted", Schema.ref(:UserPermissionAssignmentResponse))
+    body_errors()
+
+    error_response(
+      403,
+      "Forbidden - requires permissions:assign, and holding the permission or being an admin"
+    )
+
+    error_response(404, "User or permission not found")
+    error_response(409, "Permission already granted to the user directly")
+    validation_response("notes is not a string or is too long")
+  end
+
+  def assign_to_user(conn, %{"user_id" => user_id, "permission_id" => permission_id} = params) do
+    opts = [actor: current_access(conn), notes: params["notes"]]
+
+    with {:ok, user} <- Accounts.fetch_user(user_id),
+         {:ok, permission} <- Authorization.fetch_permission(permission_id),
+         {:ok, %UserPermission{} = user_permission} <-
+           user
+           |> Authorization.assign_permission_to_user(permission, opts)
+           |> conflict_if_taken("Permission already granted to the user") do
+      conn
+      |> put_status(:created)
+      |> render(:user_assignment, user_permission: user_permission)
+    end
+  end
+
+  swagger_path :remove_from_user do
+    PhoenixSwagger.Path.delete("/api/users/{user_id}/permissions/{permission_id}")
+    summary("Revoke a permission from a user")
+
+    description(
+      "Revokes a permission granted to the user directly. Requires permissions:assign, and holding the permission or being an admin. A permission the user only holds through a role must be removed from that role, or the role from the user (409)."
+    )
+
+    tag("Permissions")
+    produces("application/json")
+    bearer_auth()
+    id_param(:user_id, "User ID")
+    id_param(:permission_id, "Permission ID")
+    response(204, "Permission revoked")
+
+    error_response(
+      403,
+      "Forbidden - requires permissions:assign, and holding the permission or being an admin"
+    )
+
+    error_response(404, "User or permission not found, or the user does not hold it")
+    error_response(409, "The user only holds the permission through a role")
+  end
+
+  def remove_from_user(conn, %{"user_id" => user_id, "permission_id" => permission_id}) do
+    with {:ok, user} <- Accounts.fetch_user(user_id),
+         {:ok, permission} <- Authorization.fetch_permission(permission_id),
+         :ok <-
+           Authorization.remove_permission_from_user(user, permission,
+             actor: current_access(conn)
+           ) do
+      send_resp(conn, :no_content, "")
+    end
+  end
+
   # Swagger schema definitions
   def swagger_definitions do
     RephiWeb.Swagger.definitions(%{
@@ -397,6 +491,38 @@ defmodule RephiWeb.PermissionController do
           }
         },
         required: [:data]
+      },
+      UserPermissionAssignmentResponse: %{
+        type: :object,
+        title: "User Permission Assignment Response",
+        description: "The grant created by giving a permission to a user directly",
+        properties: %{
+          data: %{
+            type: :object,
+            properties: %{
+              user_id: %{type: :integer},
+              permission_id: %{type: :integer},
+              assigned_by: %{
+                type: :integer,
+                "x-nullable": true,
+                description: "The user who granted it (null once that user is deleted)"
+              },
+              notes: %{type: :string, "x-nullable": true},
+              inserted_at: %{type: :string, format: :"date-time"}
+            },
+            required: [:user_id, :permission_id, :assigned_by, :notes, :inserted_at]
+          }
+        },
+        required: [:data],
+        example: %{
+          data: %{
+            user_id: 5,
+            permission_id: 12,
+            assigned_by: 1,
+            notes: "Temporary access for the audit",
+            inserted_at: "2026-01-03T10:00:00Z"
+          }
+        }
       }
     })
   end

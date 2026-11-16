@@ -26,6 +26,7 @@ defmodule RephiWeb.AuthJSON do
     %{
       id: user.id,
       email: user.email,
+      must_change_password: user.must_change_password,
       roles: Enum.map(access.roles, &summary/1),
       permissions: Enum.map(access.permissions, &summary/1)
     }
