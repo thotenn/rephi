@@ -16,8 +16,6 @@ export default defineConfig([
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
-      // One ESLint process can lint every workspace (the editor integration
-      // does): anchor typescript-eslint to this package's tsconfig.
       parserOptions: { tsconfigRootDir: import.meta.dirname },
     },
   },
