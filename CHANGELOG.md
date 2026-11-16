@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   covering sign-in, registration, logout, password change, the dashboard quick actions, the
   administration screens on throwaway data and a "no dead controls" check that clicks every link
   and button of every page. Optional CI workflow `e2e-example.yml`
+- **Browser tests of `apps/example-astro`** - the same kind of Playwright suite
+  (`apps/example-astro/e2e/`, `yarn example-astro:e2e`), plus a performance check: on a production
+  build a navigation goes through the client router and downloads no JavaScript twice
 
 ### Fixed
 - **Dashboard quick actions (`apps/example`)** - "Create New Item" and "View Reports" did nothing.
@@ -22,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opened directly; it now goes home. The error page (including unknown paths) links back home
 - **`apps/example`** - ESLint resolves its TypeScript config and `~/` imports when run from the
   repository root, as an editor does
+- **Dashboard quick actions and "Go Back" (`apps/example-astro`)** - the same fixes as in
+  `apps/example`
+- **`apps/example-astro`** - the sign-in and registration forms could be submitted before their
+  island was hydrated, which sent the password in the URL; their buttons (and Logout) stay
+  disabled until then
+- **`apps/example-astro` dev server** - each navigation loaded the next page twice (Astro renders
+  pages with `client:only` islands again in a hidden iframe), with all its modules and API calls;
+  and the first page view could trigger a dependency re-optimization and a full reload. A
+  navigation now requests only the next page's HTML and its new modules
+- **`apps/example-astro`** - ESLint resolves its TypeScript config and `~/` imports when run from
+  the repository root
 
 ## [0.2.0] - 2026-11-16
 
