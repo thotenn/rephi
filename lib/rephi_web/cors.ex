@@ -1,40 +1,11 @@
 defmodule RephiWeb.CORS do
   @moduledoc """
-  Decides which browser origins may call the API (CORS).
+  Decides which browser origins may call the API (CORS), from
+  `config :rephi, :cors_origins` (`CORS_ORIGINS` in production), read per request.
 
-  The allowed origins are plain configuration, read on every request, so a
-  release picks them up from the environment without being rebuilt:
-
-      # config/dev.exs
-      config :rephi, :cors_origins, ["http://localhost:3000"]
-
-      # production: comma separated, read by config/runtime.exs
-      CORS_ORIGINS=https://app.example.com,https://*.example.pages.dev
-
-  An entry is one of:
-
-    * an exact origin - scheme, host and, if it is not the default one, port:
-      `https://app.example.com`, `http://localhost:5173`. No path and no
-      trailing slash, exactly what the browser sends in the `Origin` header.
-    * a wildcard for subdomains - `https://*.example.pages.dev` matches
-      `https://abc123.example.pages.dev` and `https://a.b.example.pages.dev`,
-      but not `https://example.pages.dev` nor another scheme or port. This is
-      meant for preview deployments, whose host name changes on every build.
-      The `*` must be the whole first label of the host.
-
-  A bare `*` is rejected: responses allow credentials
-  (`Access-Control-Allow-Credentials: true`), and browsers refuse that
-  combined with a wildcard origin - besides it being a bad idea.
-
-  Origins that do not match get no CORS headers, so the browser blocks the
-  response. Requests without an `Origin` header (curl, server to server) are
-  not affected: CORS is a browser mechanism, not access control.
-
-  `validate!/1` runs when the application starts, so a typo in `CORS_ORIGINS`
-  stops the boot with a clear message instead of silently blocking a frontend.
-
-  In production the same list is also added to the WebSocket origin check
-  (see `config/runtime.exs`).
+  An entry is an exact origin (`https://app.example.com`) or a subdomain wildcard
+  (`https://*.example.pages.dev`, the `*` being the whole first label). A bare `*`
+  is rejected: responses allow credentials.
   """
 
   @doc """
@@ -58,15 +29,6 @@ defmodule RephiWeb.CORS do
   @doc """
   Whether `origin` matches one of `patterns` (the configured origins by
   default).
-
-  ## Examples
-
-      iex> RephiWeb.CORS.allowed?("https://pr-7.example.pages.dev", ["https://*.example.pages.dev"])
-      true
-
-      iex> RephiWeb.CORS.allowed?("https://example.pages.dev.evil.test", ["https://*.example.pages.dev"])
-      false
-
   """
   @spec allowed?(String.t(), [String.t()]) :: boolean()
   def allowed?(origin, patterns \\ origins()) when is_binary(origin) and is_list(patterns) do
@@ -91,8 +53,7 @@ defmodule RephiWeb.CORS do
     end
   end
 
-  # One or more DNS labels and nothing else: no "/", ":", "@" or empty label
-  # that could smuggle a different host in front of the allowed suffix.
+  # DNS labels only: no "/", ":", "@" or empty label that could smuggle in another host.
   defp subdomain?(labels) do
     labels =~ ~r/\A[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\z/
   end

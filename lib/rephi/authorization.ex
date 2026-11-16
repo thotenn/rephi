@@ -1,90 +1,10 @@
 defmodule Rephi.Authorization do
   @moduledoc """
-  Role-based access control: roles, permissions, who holds what, and the
-  checks.
-
-  ## Model
-
-    * A **permission** is a single right, identified by its slug
-      (`"users:edit"`). The `category:action` form is a naming convention:
-      there are no wildcards.
-    * A **role** groups permissions. A role can have **parent roles**: it
-      grants its own permissions plus every permission of its ancestors,
-      transitively (`admin → manager → user` in the default seed).
-    * A **user** holds roles and, optionally, permissions granted directly.
-
-  What a user may do is the union of its direct permissions and the
-  permissions of every role it holds, directly or through the hierarchy.
-  Both `can?/2` and `has_role?/2` follow the hierarchy (an `admin` *is* a
-  `manager`); `has_direct_role?/2` only looks at assigned roles.
-
-  `admin` is not a superuser: it can do what its permissions say. A new
-  permission has to be granted to it like to any other role. It is special
-  in three ways only: its slug is configurable (`admin_role_slug/0`), at
-  least one user must always hold it (`preserving_admins/1`), and its
-  holders can grant any role or permission (`can_grant_role?/2`).
-
-  ## Checking
-
-  Every check resolves the hierarchy in **one query** (a recursive CTE). In
-  a request, prefer the `Rephi.Authorization.Access` loaded once by the
-  authentication pipeline: the same functions accept it and answer without
-  querying.
-
-      Authorization.can?(user, "users:edit")              # 1 query
-      access = Authorization.load_access(user)            # 1 query
-      Authorization.can?(access, "users:edit")            # 0 queries
-      Authorization.can_all?(access, ["roles:view", "roles:edit"])
-
-  Checks never raise: a `nil` or unsaved user, a slug that is not a string
-  or a permission that does not exist is simply `false`.
-
-  ## Integrity guarantees
-
-    * The hierarchy has no cycles (`assign_parent_role/3`); reads terminate
-      even if one is inserted by hand.
-    * System roles and permissions (`is_system`, set by `Rephi.Seeds`) cannot
-      be deleted nor have their slug changed, and the links of the seeded
-      hierarchy (system links) cannot be removed.
-    * The last user holding the admin role cannot lose it, through any path
-      (`remove_role_from_user/3`, `Rephi.Accounts.delete_user/1`,
-      `delete_role/1`, `remove_parent_role/3`).
-    * With the `:actor` option, assignments refuse to grant what the actor
-      does not hold (`can_grant_role?/2`, `can_grant_permission?/2`,
-      `can_link_roles?/3`).
-
-  ## Assignment options
-
-  The functions that grant or revoke (`assign_*`, `remove_*`) accept these
-  options, as a keyword list or a map (`remove_*` only reads `:actor`):
-
-    * `:actor` - the user (or its `Access`) making the change. When given,
-      the change is refused with `{:error, :escalation}` unless the actor can
-      grant what is being granted or revoked (`can_grant_role?/2`,
-      `can_grant_permission?/2`, `can_link_roles?/3` for the hierarchy), and
-      `assigned_by` defaults to its id. Without it nothing is checked: that
-      is for seeds and trusted code. The controllers always pass it.
-    * `:assigned_by` - id of the user recorded as the one who granted it (an
-      existing user)
-    * `:notes` - free text, at most 2000 characters
-
-  ## Errors
-
-  Besides `{:error, %Ecto.Changeset{}}` and `{:error, :not_found}`, functions
-  return these reasons (rendered by `RephiWeb.FallbackController`):
-
-    * `:system_role`, `:system_permission` - it cannot be deleted
-    * `:system_link` - the link is part of the seeded hierarchy
-    * `:last_admin` - nobody would hold the admin role any more
-    * `:escalation` - the actor cannot grant or revoke what it does not hold
-    * `:inherited_permission` - the role gets the permission from a parent
-      role, it is not assigned to the role itself
-    * `:granted_through_role` - the user gets the permission from a role, it
-      is not granted to the user directly
-
-  A cycle in the hierarchy is a changeset error on `:parent_role_id` whose
-  options carry `validation: :cycle` (or `constraint: :check` for a role
-  linked to itself, caught by the database).
+  Role-based access control: permissions (slugs), roles with transitive parent
+  roles, and the users holding them. Checks take a user (one query) or a loaded
+  `Rephi.Authorization.Access` (no query) and never raise; assignments accept
+  `:actor` (refused with `{:error, :escalation}` beyond its rights),
+  `:assigned_by` and `:notes`.
   """
 
   import Ecto.Query, warn: false
@@ -105,8 +25,6 @@ defmodule Rephi.Authorization do
   @typedoc "Whose authorization is checked: a user, or its loaded `Access`."
   @type subject :: User.t() | Access.t() | nil
 
-  ## Configuration
-
   @doc """
   The slug of the administrator role: `config :rephi, Rephi.Authorization,
   admin_role: "admin"` (the default).
@@ -115,8 +33,6 @@ defmodule Rephi.Authorization do
   def admin_role_slug do
     :rephi |> Application.get_env(__MODULE__, []) |> Keyword.get(:admin_role, "admin")
   end
-
-  ## Roles
 
   @doc """
   Returns every role, ordered by slug.
@@ -156,10 +72,6 @@ defmodule Rephi.Authorization do
 
   @doc """
   Creates a role. `is_system` cannot be set this way.
-
-      iex> Authorization.create_role(%{name: "Editor", slug: "editor"})
-      {:ok, %Role{slug: "editor"}}
-
   """
   def create_role(attrs \\ %{}) do
     %Role{}
@@ -190,8 +102,6 @@ defmodule Rephi.Authorization do
   def delete_role(%Role{} = role) do
     preserving_admins(fn -> Repo.delete(role) end)
   end
-
-  ## Permissions
 
   @doc """
   Returns every permission, ordered by slug.
@@ -230,10 +140,6 @@ defmodule Rephi.Authorization do
 
   @doc """
   Creates a permission. `is_system` cannot be set this way.
-
-      iex> Authorization.create_permission(%{name: "Export", slug: "reports:export"})
-      {:ok, %Permission{slug: "reports:export"}}
-
   """
   def create_permission(attrs \\ %{}) do
     %Permission{}
@@ -260,14 +166,12 @@ defmodule Rephi.Authorization do
   def delete_permission(%Permission{is_system: true}), do: {:error, :system_permission}
   def delete_permission(%Permission{} = permission), do: Repo.delete(permission)
 
-  ## Assignments
-
   @doc """
   Assigns a role to a user.
 
   Returns `{:ok, %UserRole{}}`, `{:error, changeset}` (already assigned:
   unique constraint on `:user_id`; unknown user, role or assigner) or
-  `{:error, :escalation}`. See "Assignment options".
+  `{:error, :escalation}`.
 
       iex> Authorization.assign_role_to_user(user, role, actor: current_user, notes: "Promoted")
       {:ok, %UserRole{}}
@@ -426,11 +330,9 @@ defmodule Rephi.Authorization do
 
   def remove_permission_from_role(_role, _permission, _opts), do: {:error, :not_found}
 
-  ## Hierarchy
-
   @doc """
   Makes `child` inherit every permission of `parent`. Accepts the
-  "Assignment options"; a cycle is a changeset error tagged `validation: :cycle`.
+  assignment options; a cycle is a changeset error tagged `validation: :cycle`.
   """
   def assign_parent_role(%Role{} = child, %Role{} = parent, opts \\ []) do
     with :ok <- check_actor(opts, &can_link_roles?(&1, child, parent)) do
@@ -522,14 +424,11 @@ defmodule Rephi.Authorization do
 
   def list_child_roles(_role), do: []
 
-  # Whether `role_id` is `of_id` or one of its ancestors.
   defp ancestor?(role_id, of_id) do
     from(t in "role_tree", where: t.id == ^role_id, select: 1)
     |> with_role_tree(role_seed(of_id))
     |> Repo.exists?()
   end
-
-  ## Checks
 
   @doc """
   Loads everything a user may do (`Rephi.Authorization.Access`) in a single
@@ -852,15 +751,8 @@ defmodule Rephi.Authorization do
   def get_role_permissions(_role), do: []
 
   @doc """
-  The permissions of a role split by where they come from, in one query:
-
-    * `direct` - assigned to the role itself (`[%Permission{}]`), the ones
-      `remove_permission_from_role/3` can revoke;
-    * `inherited` - granted by an ancestor and **not** assigned to the role
-      itself, as `{%Permission{}, [%{id, name, slug}]}` with the ancestor
-      roles that grant it.
-
-  Both are ordered by slug.
+  A role's permissions by slug, in one query: `direct` (assigned to it) and
+  `inherited` (only from ancestors, as `{%Permission{}, [%{id, name, slug}]}`).
   """
   def get_role_permission_sources(%Role{id: role_id}) when is_integer(role_id) do
     rows =
@@ -914,16 +806,12 @@ defmodule Rephi.Authorization do
     |> Repo.exists?()
   end
 
-  ## Admin guard
-
   @doc """
   Runs `fun` (which returns `{:ok, _}` or `{:error, _}`) in a transaction
   and rolls it back with `{:error, :last_admin}` if, after it, no user holds
   the admin role while someone did before.
 
-  The admin role row is locked (`FOR UPDATE`) for the whole transaction, so
-  two concurrent calls (two admins removing each other) are serialized and
-  the second one sees the first. Without an admin role nothing is checked.
+  The admin role row is locked, so concurrent calls are serialized.
   """
   def preserving_admins(fun) when is_function(fun, 0) do
     Repo.transact(fn ->
@@ -945,8 +833,6 @@ defmodule Rephi.Authorization do
     end)
   end
 
-  # Users holding the admin role directly or through a role that inherits
-  # from it (its descendants in the hierarchy).
   defp count_admins(admin_role_id) do
     descendants =
       from rr in RoleRole,
@@ -966,11 +852,7 @@ defmodule Rephi.Authorization do
     |> Repo.one()
   end
 
-  ## Query building blocks
-
-  # `role_tree` holds the seed roles and all their ancestors. `UNION` (not
-  # `UNION ALL`) drops rows that were already produced, so the recursion
-  # ends even if `role_roles` contains a cycle.
+  # UNION (not UNION ALL) so the recursion ends even if `role_roles` has a cycle.
   defp with_role_tree(query, seed) do
     ancestors =
       from rr in RoleRole,
@@ -995,16 +877,13 @@ defmodule Rephi.Authorization do
       select: rp.permission_id
   end
 
-  # Permissions granted to the user directly or through `role_tree`. The
-  # caller adds `with_role_tree(user_seed(user_id))` to the outermost query.
+  # The caller must add `with_role_tree(user_seed(user_id))` to the outermost query.
   defp effective_permissions(user_id) do
     direct = from up in UserPermission, where: up.user_id == ^user_id, select: up.permission_id
 
     from p in Permission,
       where: p.id in subquery(direct) or p.id in subquery(role_tree_permission_ids())
   end
-
-  ## Helpers
 
   defp check_actor(opts, allowed?) do
     case opts[:actor] do
@@ -1021,9 +900,7 @@ defmodule Rephi.Authorization do
     end
   end
 
-  # Deletes the rows of `query`: `{:ok, :removed}` or `{:error, :not_found}`.
-  # A single DELETE, so two concurrent removals cannot both "find" the row
-  # and then fail on a stale entry: the loser deletes nothing.
+  # A single DELETE: of two concurrent removals, the loser just deletes nothing.
   defp delete_one(query) do
     case Repo.delete_all(query) do
       {0, _} -> {:error, :not_found}

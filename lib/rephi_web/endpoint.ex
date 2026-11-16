@@ -9,7 +9,6 @@ defmodule RephiWeb.Endpoint do
     key: "_rephi_key",
     signing_salt: "vZra/yRC",
     same_site: "Lax",
-    # HTTPS only in production (config/prod.exs)
     secure: Application.compile_env(:rephi, :secure_session_cookie, false)
   ]
 
@@ -17,14 +16,12 @@ defmodule RephiWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
-  # `auth_token: true` lets clients send their token with the `authToken`
-  # option of the JS client instead of in the URL. See `RephiWeb.UserSocket`.
+  # `auth_token: true` lets the JS client's `authToken` keep the token out of the URL.
   socket "/socket", RephiWeb.UserSocket,
     websocket: true,
     longpoll: false,
     auth_token: true
 
-  # HTTP -> HTTPS redirect and HSTS, when enabled (production by default)
   plug RephiWeb.Plugs.ForceSSL
 
   # Serve at "/" the static files from "priv/static" directory.
@@ -54,19 +51,13 @@ defmodule RephiWeb.Endpoint do
     event_prefix: [:phoenix, :endpoint],
     log: {__MODULE__, :log_level, []}
 
-  # CORS goes before the body parser so the errors it answers (400 for
-  # malformed JSON, 413 for a body over the limit) carry the headers too;
-  # otherwise a browser reports them as a CORS failure. The allowed origins
-  # are runtime configuration, see `RephiWeb.CORS`.
+  # Before the body parser, so its 400/413 errors carry the CORS headers too.
   plug CORSPlug,
     origin: &RephiWeb.CORS.origin/1,
     credentials: true,
     expose: ["retry-after"]
 
-  # The API only takes small JSON documents, so bodies are capped at 1 MB
-  # (the default is 8 MB). An endpoint that accepts uploads needs a higher
-  # limit for its parser: `{:multipart, length: 20_000_000}`.
-  # `RephiWeb.Plugs.BodyParser` is `Plug.Parsers` answering its own errors.
+  # 1 MB instead of the default 8 MB: the API only takes small JSON documents.
   plug RephiWeb.Plugs.BodyParser,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
@@ -80,10 +71,7 @@ defmodule RephiWeb.Endpoint do
   plug RephiWeb.Router
 
   @doc """
-  Log level of a request, or `false` to keep it out of the logs.
-
-  Health checks are polled every few seconds by load balancers and
-  orchestrators, so they are not logged.
+  Log level of a request, or `false` for the health checks polled by load balancers.
   """
   def log_level(%Plug.Conn{path_info: ["api", "health" | _]}), do: false
   def log_level(_conn), do: :info

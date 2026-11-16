@@ -1,23 +1,8 @@
 defmodule RephiWeb.NotificationController do
   @moduledoc """
-  Sends notifications to connected clients.
-
-  ## Endpoints
-
-    * `POST /api/notifications/broadcast` - Send `message` to every connected
-      client (attributes flat or wrapped under `"notification"`)
-    * `POST /api/notifications/me` - Send `message` to the caller's own
-      connections only, to try the realtime channel without broadcasting
-
-  ## Permission Requirements
-
-  A broadcast requires `notifications:broadcast`: it reaches every connected
-  user, so it is not something any signed-in account may do. The seeds grant it
-  to the `admin` role only. Any signed-in user may notify itself, throttled per
-  user (bucket `:self_notification` of `RephiWeb.Plugs.RateLimit`).
-
-  The event itself (topic, payload, validation) lives in
-  `RephiWeb.Notifications`.
+  Sends notifications: `broadcast` to every connected client (requires
+  `notifications:broadcast`), `me` to the caller's own connections (rate limited
+  per user).
   """
   use RephiWeb, :controller
   use OpenApiSpex.ControllerSpecs

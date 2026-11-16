@@ -1,13 +1,7 @@
 defmodule RephiWeb.HealthController do
   @moduledoc """
-  Unauthenticated health checks for load balancers and orchestrators.
-
-  ## Endpoints
-
-    * `GET /api/health` - Liveness: the application is up and answering HTTP.
-      Never touches the database.
-    * `GET /api/health/ready` - Readiness: the application can serve requests,
-      which requires the database. Answers `503` when it cannot be reached.
+  Unauthenticated health checks: `GET /api/health` (liveness, no database) and
+  `GET /api/health/ready` (readiness, `503` without the database).
   """
   use RephiWeb, :controller
   use OpenApiSpex.ControllerSpecs

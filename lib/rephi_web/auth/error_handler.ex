@@ -1,9 +1,7 @@
 defmodule RephiWeb.Auth.ErrorHandler do
   @moduledoc """
-  Answers requests rejected by the Guardian pipeline (missing, malformed or
-  expired token) with a `401` in the API error envelope:
-
-      {"errors": {"detail": "Authentication required"}}
+  Answers requests rejected by the Guardian pipeline with a `401` in the API error
+  envelope.
   """
 
   @behaviour Guardian.Plug.ErrorHandler

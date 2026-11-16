@@ -5,15 +5,8 @@ defmodule Rephi.Accounts do
   This module provides functions for user management including
   creation, retrieval, authentication, and listing users.
 
-  ## Token revocation
-
-  Every JWT carries the `token_version` of its user (see
-  `RephiWeb.Auth.Guardian`). Four things end the sessions of a user: a
-  password change (`change_password/3`), a password reset by an
-  administrator (`reset_password/1`), an explicit logout (`revoke_tokens/1`)
-  and deleting the account (`delete_user/1`). Each of them also closes the
-  WebSocket connections the user has open, by broadcasting `"disconnect"` on
-  `socket_id/1`.
+  Password changes and resets, logout (`revoke_tokens/1`) and deletion revoke
+  the user's tokens (`token_version`) and close its WebSocket connections.
   """
 
   import Ecto.Query, warn: false
@@ -21,10 +14,7 @@ defmodule Rephi.Accounts do
   alias Rephi.Accounts.User
 
   @doc """
-  Gets a user by id, or `nil`.
-
-  Never raises: an id that cannot be a primary key (`"abc"`, out of range) is
-  not found. Associations are not loaded; see `preload_grants/1`.
+  Gets a user by id, or `nil` (also for an id that cannot be a primary key).
   """
   def get_user(id) do
     case fetch_user(id) do
@@ -40,19 +30,14 @@ defmodule Rephi.Accounts do
   def fetch_user(id), do: Repo.fetch(User, id)
 
   @doc """
-  Loads the roles assigned to the user and the permissions granted to it
-  directly (`user.roles`, `user.permissions`), ordered by slug. What the user
-  is allowed to do overall is `Rephi.Authorization.load_access/1`.
+  Loads `user.roles` and the directly granted `user.permissions`, ordered by slug.
   """
   def preload_grants(user_or_users) do
     Repo.preload(user_or_users, [:roles, :permissions], force: true)
   end
 
   @doc """
-  Gets a user by email, or `nil`.
-
-  The lookup ignores case and surrounding whitespace, like the changeset does
-  when the email is stored. Anything that is not a string is `nil`.
+  Gets a user by email (ignoring case and surrounding whitespace), or `nil`.
   """
   def get_user_by_email(email) when is_binary(email) do
     Repo.get_by(User, email: User.normalize_email(email))
@@ -74,9 +59,7 @@ defmodule Rephi.Accounts do
   Signs a user up: creates it and assigns it the default role, in one
   transaction (if the role cannot be assigned, no user is created).
 
-  The default role is `config :rephi, Rephi.Accounts, default_role: "user"`
-  (the default). `nil` assigns none; a slug with no role behind it is
-  skipped.
+  The role is `config :rephi, Rephi.Accounts, default_role: "user"` (`nil` for none).
   """
   def register_user(attrs) do
     Repo.transact(fn ->
@@ -105,13 +88,10 @@ defmodule Rephi.Accounts do
   end
 
   @doc """
-  Checks an email and password pair.
+  Checks an email and password: `{:ok, user}` or `{:error, :invalid_credentials}`.
 
-  Returns `{:ok, user}` or `{:error, :invalid_credentials}`. Both failures
-  (unknown email, wrong password) are indistinguishable from outside: the
-  unknown email path still spends the time of a password check
-  (`Bcrypt.no_user_verify/0`), so response times do not reveal which emails
-  are registered. Arguments that are not strings are invalid credentials.
+  An unknown email still spends a password check's time, so response times do
+  not reveal which emails are registered.
   """
   def authenticate_user(email, password) when is_binary(email) and is_binary(password) do
     case get_user_by_email(email) do
@@ -146,10 +126,6 @@ defmodule Rephi.Accounts do
   @doc """
   Changes the email of a user. Only the email: anything else in `attrs`
   (a `password`, for instance) is ignored. See `change_password/3`.
-
-      iex> update_user(user, %{email: "new@example.com"})
-      {:ok, %User{}}
-
   """
   def update_user(%User{} = user, attrs) do
     user
@@ -158,15 +134,9 @@ defmodule Rephi.Accounts do
   end
 
   @doc """
-  Sets a new password for a user who proves the current one.
-
-  `attrs` holds `password` (and optionally `password_confirmation`). On
-  success every token issued before is revoked and the user's WebSocket
-  connections are closed; the returned user carries the new
-  `token_version`, to sign a fresh token with.
-
-  Returns `{:ok, user}` or `{:error, changeset}` (a wrong current password is
-  an error on `:current_password`).
+  Sets a new password for a user who proves the current one, revoking every
+  earlier token and closing its sockets. The returned user carries the new
+  `token_version`.
   """
   def change_password(%User{} = user, current_password, attrs) do
     if is_binary(current_password) and
@@ -229,10 +199,8 @@ defmodule Rephi.Accounts do
   @doc """
   Deletes a user.
 
-  Its tokens stop working (there is no user to load any more) and its open
-  WebSocket connections are closed. Returns `{:error, :last_admin}`, and
-  deletes nothing, if it is the last user holding the admin role (see
-  `Rephi.Authorization.preserving_admins/1`).
+  Also closes its sockets. Returns `{:error, :last_admin}`, deleting nothing,
+  for the last user holding the admin role.
 
       iex> delete_user(user)
       {:ok, %User{}}
@@ -246,18 +214,8 @@ defmodule Rephi.Accounts do
   end
 
   @doc """
-  Revokes every token issued to the user so far, on every device, and closes
-  its open WebSocket connections. This is what logging out does.
-
-  Returns `{:ok, user}` with the new `token_version`, or
-  `{:error, :not_found}` if the user no longer exists. Tokens issued after
-  the call are valid.
-
-  ## Examples
-
-      iex> revoke_tokens(user)
-      {:ok, %User{token_version: 1}}
-
+  Revokes every token issued to the user so far and closes its sockets (logout).
+  Returns `{:ok, user}` with the new `token_version`, or `{:error, :not_found}`.
   """
   def revoke_tokens(%User{id: id}) do
     query = from u in User, where: u.id == ^id, select: u
@@ -281,8 +239,7 @@ defmodule Rephi.Accounts do
   def socket_id(%User{id: id}), do: socket_id(id)
   def socket_id(user_id) when is_integer(user_id), do: "user_socket:#{user_id}"
 
-  # Sent through PubSub directly so the context does not depend on the web
-  # layer; it is the same message `RephiWeb.Endpoint.broadcast/3` would send.
+  # Via PubSub so the context does not depend on the web layer.
   defp disconnect_sockets(%User{} = user) do
     topic = socket_id(user)
 

@@ -1,11 +1,6 @@
 defmodule RephiWeb.AuthJSON do
   @moduledoc """
   Renders the responses of `RephiWeb.AuthController`.
-
-  Register, login, "me" and a password change all describe the signed-in user
-  the same way (the roles assigned to it and its effective permissions, from
-  its `Rephi.Authorization.Access`), so a client can build its session from
-  any of them.
   """
 
   @doc """

@@ -1,62 +1,18 @@
 defmodule RephiWeb.Plugs.FrontendAppPlug do
   @moduledoc """
-  Serves the built frontend applications found in `priv/static/apps`.
+  Serves the built frontend apps in `priv/static/apps/<name>` under the mount
+  point (`forward "/", RephiWeb.Plugs.FrontendAppPlug` in an `/app` scope).
 
-  Mount it once; every directory `priv/static/apps/<name>` becomes available
-  under `<mount>/<name>` without touching the router again:
-
-      scope "/app" do
-        forward "/", RephiWeb.Plugs.FrontendAppPlug
-      end
-
-  With `priv/static/apps/example/` on disk, `GET /app/example/...` resolves as
-  follows (first match wins):
-
-    1. **The file itself** - `/app/example/assets/index-3f9a.js`.
-    2. **A directory index**, for paths without a file extension -
-       `/app/example/login/` serves `login/index.html`, and the slash-less
-       `/app/example/login` redirects (`301`) to it, so the page has a single
-       URL and its relative links resolve. The root of the app works the same
-       way: `/app/example` redirects to `/app/example/`. This is what a
-       multi-page static site (Astro with `build.format: "directory"`,
-       VitePress…) builds.
-    3. **Not found**:
-         * a path with a file extension (a missing asset) is a real `404`, so a
-           stale chunk never receives HTML with a `200`;
-         * if the app ships a `404.html` at its root it is a multi-page site:
-           that page is served with status `404`;
-         * otherwise the app is a single-page application: extension-less
-           paths fall back to its `index.html`, so client-side routes such as
-           `/app/example/admin/users` survive a reload.
-
-  Whether an app is a multi-page site or a single-page application is detected
-  per app, by the presence of that `404.html`; there is nothing to configure.
-
-  Files are read through `Plug.Static`, which gives content types, `ETag`/`304`,
-  `Range` and `HEAD` support and rejects path traversal (the one exception is
-  the app's own `404.html`, sent from a fixed path because it needs a `404`
-  status). On top of that this plug:
-
-    * only answers `GET` and `HEAD` (anything else is a `405`);
-    * only serves apps whose directory name is made of lowercase letters,
-      digits, `-` and `_`, starts with a letter or a digit and is at most 64
-      characters long;
-    * never serves dotfiles (`.env`, `.git/config`…);
-    * sets `cache-control: public, max-age=31536000, immutable` for the
-      fingerprinted bundles (`assets/` for Vite, `_astro/` for Astro) and
-      `no-cache` (revalidate with the `ETag`) for everything else, HTML
-      included, so a deploy is picked up on the next navigation.
-
-  Errors use the JSON envelope of the API (`RephiWeb.FallbackController`).
+  A path is served as the file itself, then as a directory index (redirecting
+  to the trailing slash), then as not found: a missing asset is a `404`, an app
+  with a root `404.html` serves it, any other app falls back to `index.html`.
 
   ## Options
 
-    * `:from` - directory that holds one sub-directory per app. Defaults to
-      `config :rephi, :frontend_apps_dir`, and then to `priv/static/apps`
-      inside the application directory (`Application.app_dir/2`), which is
-      correct both under `mix` and in a release started from any directory.
-    * `:fingerprinted` - top-level directories of an app whose files are
-      content-hashed by the bundler. Defaults to `["assets", "_astro"]`.
+    * `:from` - the apps directory (default: `config :rephi, :frontend_apps_dir`,
+      then `priv/static/apps` in the application directory)
+    * `:fingerprinted` - top-level directories cached as immutable
+      (default: `["assets", "_astro"]`)
   """
 
   @behaviour Plug
@@ -98,10 +54,6 @@ defmodule RephiWeb.Plugs.FrontendAppPlug do
       Application.app_dir(:rephi, "priv/static/apps")
   end
 
-  # -- Request resolution ----------------------------------------------------
-
-  # Splits the request path into the app and the (decoded) path inside it, and
-  # refuses anything that must never reach the filesystem.
   defp resolve([app | segments], opts) do
     root = root(opts)
 
@@ -133,15 +85,12 @@ defmodule RephiWeb.Plugs.FrontendAppPlug do
     end
   end
 
-  # Same rule `Plug.Static` enforces (it raises on these); checked up front so
-  # the client gets a plain 400 instead of an exception.
+  # Plug.Static raises on these; checked first to answer a plain 400.
   defp unsafe?(segment) do
     segment in [".", ".."] or String.contains?(segment, ["/", "\\", ":", <<0>>])
   end
 
   defp hidden?(segment), do: String.starts_with?(segment, ".")
-
-  # -- Serving ---------------------------------------------------------------
 
   defp serve(conn, %{path: path} = request) do
     case kind(path) do
@@ -150,25 +99,16 @@ defmodule RephiWeb.Plugs.FrontendAppPlug do
     end
   end
 
-  # `/app/x/login/` (or `/app/x/`): the index of that directory.
   defp serve_route(conn, %{path: path} = request, true = _trailing_slash?) do
     static(conn, request, path ++ ["index.html"]) || not_found(conn, request, :route)
   end
 
-  # `/app/x/login`: a file without extension, or a directory whose canonical
-  # URL ends with a slash.
   defp serve_route(conn, %{path: path} = request, false = _trailing_slash?) do
     static(conn, request, path) ||
       redirect_to_directory(conn, request) ||
       not_found(conn, request, :route)
   end
 
-  # What the path looks like it is asking for:
-  #
-  #   * `:route` - no file extension: a page of a multi-page site or a
-  #     client-side route of a single-page application
-  #   * `:page`  - an explicit HTML file
-  #   * `:asset` - any other file
   defp kind([]), do: :route
 
   defp kind(path) do
@@ -191,8 +131,6 @@ defmodule RephiWeb.Plugs.FrontendAppPlug do
       reject(conn, :not_found)
   end
 
-  # Serves `path` (relative to the app) through `Plug.Static`. Returns the
-  # halted conn when the file exists and `nil` otherwise.
   defp static(conn, %{root: root, app: app} = request, path) do
     opts =
       Plug.Static.init(
@@ -222,11 +160,8 @@ defmodule RephiWeb.Plugs.FrontendAppPlug do
     if kind(path) == :page, do: %{"content-type" => "text/html; charset=utf-8"}, else: %{}
   end
 
-  # Redirects to the same URL with a trailing slash when the path is a directory
-  # that has an index. The filesystem path is built from segments `check_path/1`
-  # validated, and is only probed, never sent. The location is rebuilt from the
-  # path segments (not from the raw request path), so it always points to this
-  # host.
+  # The location is rebuilt from the validated segments, never the raw path,
+  # so it always points to this host.
   defp redirect_to_directory(conn, %{root: root, app: app, path: path}) do
     if File.regular?(Path.join([root, app | path] ++ ["index.html"])) do
       conn
@@ -245,8 +180,7 @@ defmodule RephiWeb.Plugs.FrontendAppPlug do
     end
   end
 
-  # The app's own `404.html`, sent with a 404 status. The path is built from
-  # the validated app name and a constant, never from the request path.
+  # Built from the validated app name and a constant, never the request path.
   defp not_found_page(conn, %{root: root, app: app}) do
     file = Path.join([root, app, "404.html"])
 

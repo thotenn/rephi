@@ -2,61 +2,15 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   @shortdoc "Generates a new frontend app from one of the apps in apps/"
 
   @moduledoc """
-  Generates a new frontend app by copying a template app from `apps/`.
+  Generates `apps/NAME` by copying a template app, and adds its root
+  `package.json` scripts and its dev CORS origin.
 
       mix rephi.gen.frontend NAME [--template TEMPLATE] [--port PORT]
 
-  ## Examples
-
-      mix rephi.gen.frontend dashboard
-      mix rephi.gen.frontend admin-panel --port 5020
-      mix rephi.gen.frontend site --template example-astro
-
   ## Options
 
-    * `--template` - the app to copy (default: `example`). Every app keeps
-      the settings that depend on where it runs in its own `app.config.ts`:
-
-          export const appConfig = {
-            basename: "/app/example",
-            port: 5001,
-          } as const;
-
-      Two kinds of apps are understood, by the config file that reads it:
-
-        * a Vite single-page app (`vite.config.ts`), like `apps/example`. It
-          is built into `priv/static/apps/NAME` by `yarn build` and served by
-          Phoenix at `/app/NAME/`, so its `basename` becomes `/app/NAME`.
-
-        * an Astro site (`astro.config.ts`), like `apps/example-astro`. It is
-          a static site meant for any static host: it keeps its `basename`
-          (`/`) and `"rephi": { "copyToPhoenix": false }`, so `yarn build`
-          does not copy it into Phoenix (see the printed instructions to
-          serve it from Phoenix anyway).
-
-    * `--port` - the port of the app's dev server. By default the first port
-      not used by another app, starting at 5001 for Vite apps and at 4322 for
-      Astro sites.
-
-  ## What it changes
-
-    * `apps/NAME/` - the copy of the template, with its package name
-      (`rephi-NAME`) and its `app.config.ts` (`basename`, `port`). Build
-      output, `node_modules`, caches and local `.env` files are not copied.
-      Mentions of the template's package, scripts, path and dev port in the
-      copied sources and docs are renamed too.
-    * `package.json` - the `NAME:dev` and `NAME:build` scripts.
-    * `config/dev.exs` - the dev server's origin in the development CORS list,
-      so the app can call the API while it runs on its own port.
-
-  Nothing in `packages/` changes, and Phoenix needs no change either:
-  `RephiWeb.Plugs.FrontendAppPlug` serves any directory of
-  `priv/static/apps/`.
-
-  NAME uses lowercase letters, digits, `_` and `-`, starts with a letter or a
-  digit and has at most 64 characters (the names `FrontendAppPlug` serves).
-  Everything is checked before anything is written: when the task fails, it
-  has changed nothing.
+    * `--template` - the app to copy (default: `example`; `example-astro` for an Astro site)
+    * `--port` - the dev server port (default: the first free one from 5001, or 4322 for Astro)
   """
 
   use Mix.Task
@@ -69,17 +23,13 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   # Same pattern as RephiWeb.Plugs.FrontendAppPlug.
   @name_pattern ~r/\A[a-z0-9][a-z0-9_-]{0,63}\z/
 
-  # Names that would clash with something that is not an app.
   @reserved ~w(shared packages node_modules)
 
-  # Left out of the copy: build output, dependencies, caches and local env files.
   @skip_copy ~w(node_modules dist .astro .vite .wrangler .cache .turbo .env .env.local .dev.vars)
 
-  # The two values of app.config.ts the task rewrites. Each must appear once.
   @basename_line ~r/\bbasename:\s*(["'])[^"'\n]*\1/
   @port_line ~r/\bport:\s*\d+/
 
-  # Copied files whose text is checked for mentions of the template.
   @text_extensions ~w(.ts .tsx .mts .js .jsx .mjs .cjs .astro .md .html .json .jsonc .toml)
   @text_files ~w(.env.example)
 
@@ -118,8 +68,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     exit({:shutdown, 1})
   end
 
-  ## Validation
-
   defp validate_name(name) do
     cond do
       name =~ @name_pattern and name not in @reserved ->
@@ -138,8 +86,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
            "starting with a letter or a digit (at most 64 characters)."}
     end
   end
-
-  ## Planning: read and check everything, compute every change in memory
 
   defp plan(name, template, port) do
     template_dir = Path.join(@apps_dir, template)
@@ -234,10 +180,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     end
   end
 
-  ## app.config.ts
-
-  # The template's app.config.ts, checked: the Vite/Astro config imports it,
-  # and it has exactly one `basename: "..."` and one `port: N`.
   defp read_app_config(template_dir, config_file) do
     path = Path.join(template_dir, @app_config)
 
@@ -250,9 +192,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     end
   end
 
-  # The templates import "./app.config.ts" (Vite's native config loader needs
-  # the extension); an import without it, from a template of an older version,
-  # works as well.
+  # Older templates import ./app.config without the extension.
   defp check_imports_app_config(config, path) do
     if config =~ ~r/from\s+(["'])\.\/app\.config(?:\.[mc]?[jt]s)?\1/ do
       :ok
@@ -293,8 +233,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     String.to_integer(port)
   end
 
-  # A Vite app is served by Phoenix at /app/NAME; an Astro site keeps the
-  # template's basename ("/", for a static host).
   defp set_app_config(app_config, kind, name, port) do
     app_config =
       if kind == :vite do
@@ -306,12 +244,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     Regex.replace(@port_line, app_config, "port: #{port}")
   end
 
-  ## The rest of the copy: mentions of the template in texts and docs
-
-  # Renames, in every text file of the template, its package name, its root
-  # scripts (`yarn example:dev`), its path under Phoenix (`/app/example`) and
-  # its dev server origin. An Astro site's Wrangler project, `.env.example`
-  # and README also name the template itself (`example-astro`).
   defp renamed_texts(kind, template, name, package, port) do
     template.dir
     |> text_files()
@@ -331,7 +263,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     end)
   end
 
-  # Text files of the template, relative to it, as `copy_tree/2` copies them.
   defp text_files(dir, prefix \\ "") do
     dir
     |> File.ls!()
@@ -355,8 +286,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     end)
   end
 
-  # `VITE_PORT=5001` in a Vite app's .env.example; the template's own name in
-  # the files of an Astro site that name its Cloudflare project or document it.
   defp rename_in_file(text, ".env.example", :vite, _template, _name, port),
     do: Regex.replace(~r/\b(VITE_PORT=)\d+/, text, "\\g{1}#{port}")
 
@@ -366,8 +295,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
 
   defp rename_in_file(text, _file, _kind, _template, _name, _port), do: text
 
-  # `token` when it is not part of a longer name: `/app/example` but not
-  # `/app/example-astro`, `rephi-example` but not `rephi-example-astro`.
+  # Whole token only: `/app/example` but not `/app/example-astro`.
   defp replace_token(text, token, replacement) do
     Regex.replace(
       ~r/(?<![a-z0-9_-])#{Regex.escape(token)}(?![a-z0-9_-])/,
@@ -375,8 +303,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
       fn _ -> replacement end
     )
   end
-
-  ## package.json files
 
   defp read_json(path) do
     with {:ok, contents} <- read(path),
@@ -398,7 +324,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     end
   end
 
-  # `rephi-example` (template `example`) -> `rephi-`.
   defp package_prefix(template_pkg, template) do
     with name when is_binary(name) <- template_pkg["name"],
          true <- String.ends_with?(name, template) do
@@ -454,8 +379,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   defp add_scripts(_root, _name, _package),
     do: {:error, "#{@root_package} is not a JSON object."}
 
-  # After the last `<app>:*` script of an existing app, so the app scripts stay
-  # together; at the end when there is none.
   defp insert_scripts(scripts, new) do
     apps = existing_apps()
 
@@ -494,10 +417,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   end
 
   @doc false
-  # Two-space indentation and a final newline, like npm and Yarn write it.
   def encode_json(json), do: Jason.encode!(json, pretty: true) <> "\n"
-
-  ## Ports
 
   defp pick_port(_kind, port) when is_integer(port) do
     cond do
@@ -513,9 +433,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     {:ok, Enum.find(first..65_535, &(&1 not in used))}
   end
 
-  # The ports of every app's app.config.ts, any port written in the apps'
-  # Vite/Astro configs or local env files (`VITE_PORT=`), the origins of the
-  # dev CORS list, plus Phoenix's own (dev and test).
   defp used_ports do
     sources =
       [@dev_config] ++
@@ -543,9 +460,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     MapSet.new([4000, 4002 | from_files])
   end
 
-  ## Development CORS
-
-  # Adds "http://localhost:PORT" to the `:cors_origins` list of config/dev.exs.
   defp dev_cors(port) do
     origin = ~s("http://localhost:#{port}")
 
@@ -584,11 +498,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
       new <> binary_part(text, start + length, byte_size(text) - start - length)
   end
 
-  ## Applying the plan
-
-  # The app is assembled in a temporary directory and moved into place in one
-  # rename; the root files are written afterwards, and restored if writing
-  # one of them fails.
+  # Assembled in a temp dir and renamed into place, so a failure leaves nothing behind.
   defp apply_plan(plan) do
     tmp_dir = Path.join(@apps_dir, ".#{plan.name}.tmp-#{System.unique_integer([:positive])}")
 
@@ -639,13 +549,10 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
       case File.lstat!(from).type do
         :directory -> copy_tree(from, to)
         :regular -> File.cp!(from, to)
-        # Symlinks and special files are not part of a template.
         _ -> :ok
       end
     end)
   end
-
-  ## Output
 
   defp next_steps(%{kind: :vite} = plan) do
     """
@@ -689,7 +596,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     """
   end
 
-  # Aligns the comments with the other lines ("yarn shared:build     # ...").
   defp dev_padding(name), do: String.duplicate(" ", max(1, 13 - String.length(name)))
   defp build_padding(name), do: String.duplicate(" ", max(1, 11 - String.length(name)))
 

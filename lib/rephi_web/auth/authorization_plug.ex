@@ -11,23 +11,8 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
         plug AuthorizationPlug, {:role, "manager"}
       end
 
-  `{:role, slug}` follows the role hierarchy, like
-  `Rephi.Authorization.has_role?/2`: an `admin` passes `{:role, "manager"}`.
-  Prefer permissions: a role check hard-codes who may do something, a
-  permission can be granted to any role later.
-
-  The checks read `conn.assigns.current_access`, loaded once per request by
-  `RephiWeb.Auth.Pipeline`, so they cost no query. If the conn has a
-  `current_user` but no access (a pipeline of your own), it is loaded and
-  assigned on the first check.
-
-  ## Responses
-
-    * `401` - nobody is signed in
-    * `403` - the user lacks the permission or role
-
-  Both are rendered by `RephiWeb.FallbackController`, in the API error
-  envelope: `{"errors": {"detail": "Forbidden"}}`.
+  `{:role, slug}` follows the role hierarchy: an `admin` passes `{:role, "manager"}`.
+  Failures answer `401` (nobody signed in) or `403`.
   """
 
   import Plug.Conn
@@ -67,8 +52,6 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
     end
   end
 
-  # Lets the request through when `allowed?` holds for the current access.
-  # Otherwise halts it with a 401 (nobody is signed in) or a 403.
   defp authorize(conn, allowed?) do
     conn = ensure_access(conn)
 

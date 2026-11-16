@@ -1,34 +1,7 @@
 defmodule RephiWeb.UserController do
   @moduledoc """
-  User management.
-
-  ## Endpoints
-
-    * `GET /api/users` - List users, paginated (`users:view`)
-    * `GET /api/users/:id` - Get a user (`users:view`)
-    * `GET /api/users/:id/roles` - The roles assigned to a user (`users:view`)
-    * `GET /api/users/:id/permissions` - Direct and effective permissions (`users:view`)
-    * `PUT /api/users/:id` - Change the email of a user (`users:edit`)
-    * `DELETE /api/users/:id` - Delete a user (`users:delete`)
-    * `POST /api/users/:id/password` - Reset another user's password
-      (`users:reset_password`)
-
-  ## Rules
-
-    * `PUT` only changes the email; the body may be flat or wrapped under
-      `"user"`. A `password` in it is refused (`422`): users change their own
-      password with `PUT /api/me/password`; an administrator resets someone
-      else's with `POST /api/users/:id/password`.
-    * `PUT`, `DELETE` and the password reset on a user who holds a role the
-      caller does not hold (assigned or inherited) answer `403`, unless the
-      caller is an admin (`Rephi.Authorization.can_manage_user?/2`).
-    * Nobody can delete their own account (`409`) nor reset their own
-      password (`409`) here, and the last user holding the admin role cannot
-      be deleted (`409`).
-
-  An `:id` that is not the id of an existing user (unknown, not a number, out
-  of range) answers `404`. Lists accept `page` and `page_size` (see
-  `Rephi.Pagination`).
+  User management (`/api/users`). Only an admin may change a user holding a role
+  the caller does not hold (`Rephi.Authorization.can_manage_user?/2`).
   """
 
   use RephiWeb, :controller

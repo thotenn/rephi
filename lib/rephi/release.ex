@@ -1,14 +1,7 @@
 defmodule Rephi.Release do
   @moduledoc """
-  Database tasks for a release, where Mix is not available.
-
-      bin/migrate        # = bin/rephi eval Rephi.Release.migrate
-      bin/seed           # = bin/rephi eval Rephi.Release.seed
-
-  `seed/0` runs `Rephi.Seeds.run/1`: idempotent, and in production it needs
-  `ADMIN_EMAIL` and `ADMIN_PASSWORD` to create the first administrator. Run
-  it once after the first `migrate`, and again after an upgrade that adds
-  default roles or permissions.
+  Database tasks for a release, where Mix is not available (`bin/migrate`,
+  `bin/seed`).
   """
 
   @app :rephi

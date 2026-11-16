@@ -1,35 +1,16 @@
 defmodule RephiWeb.Auth.AuthorizationHelpers do
   @moduledoc """
   Authorization checks for the body of a controller action, imported by
-  `use RephiWeb, :controller`.
-
-  They read `conn.assigns.current_access`, loaded once per request by
-  `RephiWeb.Auth.Pipeline`, so they cost no query. Without a signed-in user
-  every check is `false`.
-
-      def show(conn, %{"id" => id}) do
-        with {:ok, report} <- Reports.fetch_report(id) do
-          render(conn, :show, report: report, can_edit: can?(conn, "reports:edit"))
-        end
-      end
-
-      def publish(conn, params) do
-        with true <- can_all?(conn, ["reports:edit", "reports:publish"]) || {:error, :forbidden},
-             ... do
-        end
-      end
-
-  To guard a whole action, use `RephiWeb.Auth.AuthorizationPlug` instead.
+  `use RephiWeb, :controller`. To guard a whole action, use
+  `RephiWeb.Auth.AuthorizationPlug`.
   """
 
   alias Rephi.Authorization
   alias Rephi.Authorization.Access
 
   @doc """
-  The `Rephi.Authorization.Access` of the signed-in user, or `nil`.
-
-  It comes from the conn when the pipeline loaded it; otherwise it is loaded
-  (one query, not stored: the helpers return booleans, not a conn).
+  The `Rephi.Authorization.Access` of the signed-in user (loaded if the pipeline
+  did not), or `nil`.
   """
   @spec current_access(Plug.Conn.t()) :: Access.t() | nil
   def current_access(conn) do

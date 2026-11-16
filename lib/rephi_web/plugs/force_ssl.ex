@@ -1,31 +1,11 @@
 defmodule RephiWeb.Plugs.ForceSSL do
   @moduledoc """
-  Redirects plain HTTP to HTTPS and sends HSTS, when enabled at runtime.
+  Redirects plain HTTP to HTTPS and sends HSTS with the `Plug.SSL` options in
+  `config :rephi, :force_ssl` (or `false`), read per request because Phoenix's
+  `:force_ssl` endpoint option is fixed at compile time.
 
-  Phoenix has a `:force_ssl` endpoint option, but it is fixed when the
-  endpoint is compiled, so a release cannot switch it. This plug reads its
-  options on every request instead:
-
-      config :rephi, :force_ssl,
-        rewrite_on: [:x_forwarded_proto],
-        hsts: true,
-        exclude: [
-          hosts: ["localhost", "127.0.0.1"],
-          paths: ["/api/health", "/api/health/ready"]
-        ]
-
-  The value is `false` (the default: do nothing) or the options of
-  `Plug.SSL`, which does the actual work. `config/runtime.exs` turns it on in
-  production unless `FORCE_SSL=false`.
-
-  With `rewrite_on: [:x_forwarded_proto]` the scheme is taken from the
-  `X-Forwarded-Proto` header, which is what makes this usable behind a proxy
-  that terminates TLS. Only keep it if such a proxy is really in front of the
-  application: a client connecting directly could send the header itself and
-  skip the redirect.
-
-  Health checks are excluded because orchestrators probe them over plain
-  HTTP from inside the network.
+  Keep `rewrite_on: [:x_forwarded_proto]` only behind a TLS-terminating proxy: a
+  client connecting directly could send the header and skip the redirect.
   """
   @behaviour Plug
 
@@ -40,8 +20,7 @@ defmodule RephiWeb.Plugs.ForceSSL do
     end
   end
 
-  # `Plug.SSL.init/1` validates the options and builds the HSTS header; cache
-  # its result per configuration value instead of redoing it on every request.
+  # Plug.SSL.init/1 is not free: cache its result per configuration value.
   defp ssl_options(options) do
     key = {__MODULE__, options}
 

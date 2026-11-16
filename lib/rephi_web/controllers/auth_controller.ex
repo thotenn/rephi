@@ -1,24 +1,7 @@
 defmodule RephiWeb.AuthController do
   @moduledoc """
-  Registration, login, logout and the "who am I" endpoint.
-
-  ## Endpoints
-
-    * `POST /api/users/register` - Create an account and get a token
-    * `POST /api/users/login` - Exchange credentials for a token
-    * `POST /api/users/logout` - Revoke every token of the signed-in user
-    * `GET /api/me` - The signed-in user with roles and permissions
-    * `PUT /api/me/password` - Change the password of the signed-in user
-
-  A new account gets the default role (`Rephi.Accounts.register_user/1`).
-  The user in every response carries the roles assigned to it and its
-  effective permissions, from `Rephi.Authorization.load_access/1`: one query,
-  shared with the claims of the token.
-
-  Register and login accept their attributes flat (`{"email": ..., "password": ...}`)
-  or wrapped under `"user"`. Both are throttled per client IP
-  (`RephiWeb.Plugs.RateLimit`): past the limit they answer `429` with a
-  `retry-after` header.
+  Registration, login, logout, `/api/me` and password change. Register and login
+  are rate limited per client IP.
   """
   use RephiWeb, :controller
   use OpenApiSpex.ControllerSpecs

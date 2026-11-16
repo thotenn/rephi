@@ -1,16 +1,8 @@
 defmodule RephiWeb.Plugs.BodyParser do
   @moduledoc """
-  `Plug.Parsers` that answers a body it cannot accept itself, in the API error
-  envelope, instead of raising.
-
-  `Plug.Parsers` raises on malformed JSON (400), a body over the size limit
-  (413) or an unsupported content type (415). Phoenix then renders the error
-  from the connection as it was when the request *entered* the endpoint,
-  which loses the headers earlier plugs had set - notably CORS: the browser
-  reports a CORS failure and the frontend never sees the real status.
-
-  Here the error is answered from the current connection, so it keeps those
-  headers. It takes the same options as `Plug.Parsers`.
+  `Plug.Parsers` that answers its own 400/413/415 errors in the API envelope
+  instead of raising: Phoenix would render them from the conn as it entered the
+  endpoint, without the CORS headers.
   """
   @behaviour Plug
 

@@ -1,11 +1,7 @@
 defmodule Rephi.Health do
   @moduledoc """
-  Checks whether the application can do its job right now.
-
-  Used by the readiness endpoint (`GET /api/health/ready`), which load
-  balancers and orchestrators poll to decide if an instance should receive
-  traffic. Add a function here for every dependency that must be reachable
-  (cache, message broker, third-party API…).
+  Readiness checks for `GET /api/health/ready`: one per dependency that must be
+  reachable.
   """
 
   alias Ecto.Adapters.SQL
@@ -14,12 +10,8 @@ defmodule Rephi.Health do
   @default_timeout 1_000
 
   @doc """
-  Runs a trivial query against the database.
-
-  Returns `:ok`, or `{:error, :database_unavailable}` when the query fails or
-  does not answer within `timeout` milliseconds. It never raises and never
-  takes longer than `timeout`, even when no connection can be checked out of
-  the pool.
+  Runs a trivial query: `:ok`, or `{:error, :database_unavailable}` within
+  `timeout` ms. Never raises, even when no connection can be checked out.
   """
   @spec check_database(timeout :: pos_integer()) :: :ok | {:error, :database_unavailable}
   def check_database(timeout \\ @default_timeout) do

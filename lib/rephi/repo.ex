@@ -7,21 +7,8 @@ defmodule Rephi.Repo do
   @max_id 9_223_372_036_854_775_807
 
   @doc """
-  Fetches a record by its integer primary key without raising.
-
-  Ids usually arrive straight from a URL, so anything that cannot be the id of
-  an existing row (`"abc"`, `"1e3"`, `"-1"`, a number that does not fit in a
-  `bigint`, `nil`) is reported as missing instead of raising
-  `Ecto.Query.CastError` or `DBConnection.EncodeError`.
-
-  ## Examples
-
-      iex> Rephi.Repo.fetch(Rephi.Accounts.User, "42")
-      {:ok, %Rephi.Accounts.User{id: 42}}
-
-      iex> Rephi.Repo.fetch(Rephi.Accounts.User, "not-an-id")
-      {:error, :not_found}
-
+  Fetches a record by its integer primary key. An id that cannot exist (`"abc"`,
+  beyond `bigint`, `nil`) is `{:error, :not_found}` instead of raising.
   """
   @spec fetch(Ecto.Queryable.t(), term()) :: {:ok, Ecto.Schema.t()} | {:error, :not_found}
   def fetch(queryable, id) do

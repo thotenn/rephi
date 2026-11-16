@@ -1,9 +1,7 @@
 defmodule RephiWeb.UserJSON do
   @moduledoc """
-  Renders users: the roles assigned to them and the permissions granted to
-  them directly (`Rephi.Accounts.preload_grants/1`). What a user may do
-  overall is not part of this view; the signed-in user gets it from
-  `GET /api/me`.
+  Renders users with their assigned roles and direct permissions
+  (`Rephi.Accounts.preload_grants/1`), not their effective rights.
   """
 
   alias Rephi.Accounts.User
@@ -97,6 +95,5 @@ defmodule RephiWeb.UserJSON do
     for grant <- grants, do: %{id: grant.id, name: grant.name, slug: grant.slug}
   end
 
-  # Not loaded: render nothing rather than guess.
   defp grants(%Ecto.Association.NotLoaded{}), do: []
 end

@@ -1,24 +1,8 @@
 defmodule Rephi.Authorization.Permission do
   @moduledoc """
-  A single access right (`"users:view"`), granted to roles or directly to
-  users.
-
-  ## Fields
-
-    * `name` - human-readable name (`"View Users"`), at most 255 characters
-    * `slug` - unique identifier that code refers to, `<category>:<action>`
-      (`"users:view"`, `"reports:export"`): lowercase segments of letters and
-      digits (words separated by `_` or `-`) joined by `:`, at least two of
-      them, at most 100 characters. The category is only a naming
-      convention: there are no wildcards, `users:*` grants nothing.
-    * `description` - optional, at most 2000 characters
-    * `parent_id` - optional parent permission, **for grouping only** (a
-      panel can show permissions as a tree). Holding a parent permission
-      grants none of its children. A permission cannot be its own parent;
-      deleting a parent clears the field of its children.
-    * `is_system` - the permission is part of the application (created by
-      `Rephi.Seeds`): it cannot be deleted and its slug cannot change. It is
-      never set from user input.
+  A single access right (`"users:view"`), granted to roles or directly to users.
+  There are no wildcards, and `parent_id` only groups permissions for display:
+  holding a parent grants none of its children.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -44,13 +28,6 @@ defmodule Rephi.Authorization.Permission do
 
   @doc """
   Changeset to create a permission.
-
-      iex> Permission.create_changeset(%Permission{}, %{name: "Export", slug: "reports:export"}).valid?
-      true
-
-      iex> Permission.create_changeset(%Permission{}, %{name: "Export", slug: "export"}).valid?
-      false
-
   """
   def create_changeset(permission, attrs) do
     permission

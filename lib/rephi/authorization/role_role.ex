@@ -1,13 +1,7 @@
 defmodule Rephi.Authorization.RoleRole do
   @moduledoc """
-  Role hierarchy: the child role inherits every permission of the parent role.
-
-  A role cannot be its own parent (validated here and by the
-  `role_roles_no_self_parent` check constraint). Longer cycles are rejected by
-  `Rephi.Authorization.assign_parent_role/3`, which is the only supported way
-  to insert rows.
-
-  `is_system` marks the seeded links, which cannot be removed.
+  Role hierarchy link: the child role inherits every permission of the parent.
+  Insert only through `Rephi.Authorization.assign_parent_role/3`, which rejects cycles.
   """
   use Ecto.Schema
   import Ecto.Changeset

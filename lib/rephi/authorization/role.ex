@@ -1,24 +1,7 @@
 defmodule Rephi.Authorization.Role do
   @moduledoc """
-  A named set of permissions that can be assigned to users.
-
-  ## Fields
-
-    * `name` - human-readable name (`"Administrator"`), at most 255 characters
-    * `slug` - unique identifier that code refers to (`"admin"`): lowercase
-      letters and digits, words separated by `_` or `-`, at most 100
-      characters
-    * `description` - optional, at most 2000 characters
-    * `is_system` - the role is part of the application (created by
-      `Rephi.Seeds`): it cannot be deleted and its slug cannot change. It is
-      never set from user input.
-
-  ## Hierarchy
-
-  A role can have parent roles (`role_roles`): it grants its own permissions
-  plus every permission of its ancestors, transitively. Holding a role also
-  means holding all its ancestors, for `Rephi.Authorization.has_role?/2`.
-  See `Rephi.Authorization.assign_parent_role/2`.
+  A named set of permissions assigned to users. A role also grants every
+  permission of its parent roles (`role_roles`), transitively.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -49,13 +32,6 @@ defmodule Rephi.Authorization.Role do
 
   @doc """
   Changeset to create a role.
-
-      iex> Role.create_changeset(%Role{}, %{name: "Editor", slug: "editor"}).valid?
-      true
-
-      iex> Role.create_changeset(%Role{}, %{name: "Editor", slug: "Editor!"}).valid?
-      false
-
   """
   def create_changeset(role, attrs) do
     role

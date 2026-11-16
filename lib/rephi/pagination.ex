@@ -1,22 +1,8 @@
 defmodule Rephi.Pagination do
   @moduledoc """
-  Offset pagination for list endpoints.
-
-  `paginate/2` takes an `Ecto.Queryable` with a stable `order_by` and the
-  request parameters (`"page"`, `"page_size"`; string or integer values) and
-  returns `{:ok, %Rephi.Pagination.Page{}}` or `{:error, changeset}` when a
-  parameter is not a positive integer (`RephiWeb.FallbackController` renders
-  it as a `422`).
-
-    * `page` starts at 1 (default 1). A page past the end is empty.
-    * `page_size` defaults to 50 and is capped at 100: a bigger value is
-      not an error, it is lowered to the cap.
-
-  It costs two queries: the total count and the page itself.
-
-      with {:ok, page} <- Rephi.Pagination.paginate(from(u in User, order_by: u.id), params) do
-        page.entries
-      end
+  Offset pagination: `paginate/2` takes a query with a stable `order_by` and the
+  `"page"`/`"page_size"` params (default 50, capped at 100), and returns
+  `{:ok, %Rephi.Pagination.Page{}}` or `{:error, changeset}`.
   """
   import Ecto.Changeset
   import Ecto.Query, only: [exclude: 2, limit: 3, offset: 3]

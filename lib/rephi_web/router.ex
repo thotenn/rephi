@@ -10,8 +10,6 @@ defmodule RephiWeb.Router do
     }
   end
 
-  # A valid access token of an existing user, or a 401. See
-  # `RephiWeb.Auth.Pipeline`.
   pipeline :authenticated do
     plug RephiWeb.Auth.Pipeline
   end
@@ -20,8 +18,6 @@ defmodule RephiWeb.Router do
     plug RephiWeb.Auth.PasswordChangeGate
   end
 
-  # The API documentation is only served where it is enabled
-  # (`config :rephi, :swagger_enabled`, SWAGGER_ENABLED at runtime).
   pipeline :api_docs do
     plug :ensure_api_docs_enabled
     plug OpenApiSpex.Plug.PutApiSpec, module: RephiWeb.ApiSpec
@@ -31,8 +27,6 @@ defmodule RephiWeb.Router do
     plug :put_secure_browser_headers
   end
 
-  # Service descriptor. The backend has no HTML pages of its own: unknown
-  # paths answer 404 as JSON (see `RephiWeb.ErrorJSON`).
   scope "/", RephiWeb do
     pipe_through :api
 
@@ -42,7 +36,6 @@ defmodule RephiWeb.Router do
   scope "/api", RephiWeb do
     pipe_through :api
 
-    # Health checks for load balancers and orchestrators (no authentication)
     get "/health", HealthController, :live, log: false
     get "/health/ready", HealthController, :ready, log: false
 
@@ -84,7 +77,6 @@ defmodule RephiWeb.Router do
     post "/users/:user_id/permissions/:permission_id", PermissionController, :assign_to_user
     delete "/users/:user_id/permissions/:permission_id", PermissionController, :remove_from_user
 
-    # User management endpoints (users:view / users:edit / users:delete)
     resources "/users", UserController, only: [:index, :show, :update, :delete]
     get "/users/:id/roles", UserController, :get_user_roles
     get "/users/:id/permissions", UserController, :get_user_permissions
@@ -105,17 +97,13 @@ defmodule RephiWeb.Router do
     get "/swagger", OpenApiSpex.Plug.SwaggerUI, path: "/api/openapi", title: "Rephi API"
   end
 
-  # Frontend apps: every directory in priv/static/apps/<name> is served at
-  # /app/<name>. Adding an app does not require a new route.
   scope "/app" do
     pipe_through :frontend
 
     forward "/", RephiWeb.Plugs.FrontendAppPlug
   end
 
-  # Answers 404, as if the routes did not exist, unless the documentation is
-  # enabled. Read on every request so a release can switch it with an
-  # environment variable.
+  # 404 unless enabled; read per request so a release can switch it at runtime.
   defp ensure_api_docs_enabled(conn, _opts) do
     if Application.get_env(:rephi, :swagger_enabled, false) do
       conn

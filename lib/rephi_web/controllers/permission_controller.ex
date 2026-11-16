@@ -1,39 +1,8 @@
 defmodule RephiWeb.PermissionController do
   @moduledoc """
-  Controller for managing permissions and their assignment to roles and
-  users.
-
-  ## Endpoints
-
-    * `GET /api/permissions` - List all permissions (requires "permissions:view")
-    * `POST /api/permissions` - Create a permission (requires "permissions:create")
-    * `GET /api/permissions/:id` - Get a permission (requires "permissions:view")
-    * `PUT /api/permissions/:id` - Update a permission (requires "permissions:edit")
-    * `DELETE /api/permissions/:id` - Delete a permission (requires "permissions:delete")
-    * `POST /api/roles/:role_id/permissions/:permission_id` - Assign a permission
-      to a role (requires "permissions:assign")
-    * `DELETE /api/roles/:role_id/permissions/:permission_id` - Remove a permission
-      from a role (requires "permissions:assign")
-    * `POST/DELETE /api/users/:user_id/permissions/:permission_id` - Grant or revoke
-      a permission of a user directly (requires "permissions:assign")
-
-  `POST` and `PUT` accept the permission attributes flat or wrapped under
-  `"permission"`. An id that is not the id of an existing record (unknown, not
-  a number, out of range) answers `404`. `GET /api/permissions` is paginated
-  (`page`, `page_size`, see `Rephi.Pagination`).
-
-  ## Rules
-
-    * `parent_id` only groups permissions for display; holding a parent
-      grants none of its children. Deleting a parent clears it on its
-      children.
-    * System permissions (`is_system`) cannot be deleted (`409`) and their
-      slug cannot change (`422`).
-    * Granting or revoking a permission requires holding it, or being an
-      admin (`403` otherwise, `Rephi.Authorization.can_grant_permission?/2`).
-    * Revoking from a role a permission it only inherits from a parent role
-      answers `409`: revoke it from that role. Likewise for a user and a
-      permission it only holds through a role.
+  Permissions CRUD (`/api/permissions`) and their grants to roles and users.
+  `parent_id` only groups permissions for display: holding a parent grants none
+  of its children. Granting or revoking requires holding the permission, or admin.
   """
   use RephiWeb, :controller
   use OpenApiSpex.ControllerSpecs

@@ -1,11 +1,7 @@
 defmodule RephiWeb.PaginationJSON do
   @moduledoc """
-  Renders a `Rephi.Pagination.Page` in the shape every paginated endpoint
-  shares:
-
-      {"data": [...], "meta": {"page": 1, "page_size": 50, "total": 120, "total_pages": 3}}
-
-  A client that only reads `data` keeps working; it just sees the first page.
+  Renders a `Rephi.Pagination.Page` as
+  `{"data": [...], "meta": {"page", "page_size", "total", "total_pages"}}`.
   """
 
   alias Rephi.Pagination.Page

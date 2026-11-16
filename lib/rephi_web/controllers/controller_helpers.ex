@@ -1,32 +1,13 @@
 defmodule RephiWeb.ControllerHelpers do
   @moduledoc """
-  Small conveniences shared by the JSON controllers.
-
-  Imported by `use RephiWeb, :controller`.
+  Conveniences imported by `use RephiWeb, :controller`.
   """
 
   alias Plug.Conn
 
   @doc """
-  Returns the attributes sent in the body of a write request.
-
-  Clients may send them flat or wrapped under the resource name; both are
-  accepted on every write endpoint:
-
-      {"name": "Editor", "slug": "editor"}
-      {"role": {"name": "Editor", "slug": "editor"}}
-
-  Only the request body is considered, so path and query parameters never leak
-  into the attributes.
-
-  ## Examples
-
-      def create(conn, _params) do
-        with {:ok, role} <- Authorization.create_role(resource_params(conn, "role")) do
-          ...
-        end
-      end
-
+  Returns the write attributes from the request body, flat or wrapped under
+  `resource` (`{"role": {...}}`). Path and query parameters are never included.
   """
   @spec resource_params(Conn.t(), String.t()) :: map()
   def resource_params(%Conn{body_params: body_params}, key) when is_binary(key) do
@@ -38,21 +19,9 @@ defmodule RephiWeb.ControllerHelpers do
   end
 
   @doc """
-  Maps the result of an insert that hit a unique constraint to a `409 Conflict`.
-
-  Meant for "link" endpoints (assign a role to a user, a permission to a
-  role…) where a duplicate is not a validation problem of any field: the
-  relationship already exists. Any other result is returned untouched.
-
-  ## Examples
-
-      with {:ok, user_role} <-
-             user
-             |> Authorization.assign_role_to_user(role)
-             |> conflict_if_taken("Role already assigned to user") do
-        ...
-      end
-
+  Maps a unique-constraint error to `{:error, :conflict, message}`, for link
+  endpoints where a duplicate means the link already exists. Anything else
+  passes through.
   """
   @spec conflict_if_taken(result, String.t()) :: result | {:error, :conflict, String.t()}
         when result: {:ok, term()} | {:error, term()}

@@ -1,42 +1,15 @@
 defmodule RephiWeb.FallbackController do
   @moduledoc """
-  Turns error values into JSON responses, always in the API error envelope.
-
-  Controllers declare `action_fallback RephiWeb.FallbackController` and simply
-  return the error from the action (typically the unmatched clause of a `with`):
-
-      def show(conn, %{"id" => id}) do
-        with {:ok, role} <- Authorization.fetch_role(id) do
-          render(conn, :show, role: role)
-        end
-      end
-
-  Supported values:
-
-    * `{:error, %Ecto.Changeset{}}` - `422` with one entry per invalid field:
-      `{"errors": {"slug": ["has already been taken"]}}`
-    * `{:error, reason}` - a domain error of `Rephi.Authorization` or the
-      controllers, with its own status and message (see `domain_errors/0`):
-      `{"errors": {"detail": "System roles cannot be deleted"}}`
-    * `{:error, status}` - any `Plug.Conn.Status` atom (`:not_found`,
-      `:unauthorized`, `:forbidden`, `:conflict`, `:bad_request`…) with the
-      standard status text: `{"errors": {"detail": "Not Found"}}`
-    * `{:error, status, message}` - the same with a specific message:
-      `{"errors": {"detail": "Invalid email or password"}}`
-
-  Plugs that need to stop a request reuse it directly, so there is a single
-  place that knows the envelope:
-
-      conn |> RephiWeb.FallbackController.call({:error, :forbidden}) |> halt()
+  Renders `{:error, changeset | reason | status}` and `{:error, status, message}`
+  in the API error envelope. Plugs reuse it:
+  `conn |> RephiWeb.FallbackController.call({:error, :forbidden}) |> halt()`.
   """
   use RephiWeb, :controller
 
   alias RephiWeb.{ChangesetJSON, ErrorJSON}
 
-  # Status convention: 403 when the actor lacks the rights for this
-  # particular change, 409 when the change conflicts with the current state
-  # of the data (it would break an invariant), 422 when a field is invalid
-  # (changesets).
+  # 403: the actor lacks the rights for this change; 409: it would break an
+  # invariant of the data; 422: a field is invalid.
   @domain_errors %{
     system_role: {:conflict, "System roles cannot be deleted"},
     system_permission: {:conflict, "System permissions cannot be deleted"},

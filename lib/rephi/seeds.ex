@@ -1,54 +1,12 @@
 defmodule Rephi.Seeds do
   @moduledoc """
-  The data every installation starts with: the default roles and permissions,
-  and the first administrator.
+  Default roles, permissions and first administrator. Idempotent, in one
+  transaction, and never revokes: grants it no longer makes are reported as
+  `:stale_grants`.
 
-  `priv/repo/seeds.exs` calls `run/1` (so does `mix ecto.setup`). It lives in
-  `lib/` so a running release can seed too:
-
-      bin/rephi rpc "Rephi.Seeds.run() |> IO.inspect()"
-
-  ## Guarantees
-
-    * **Idempotent** - running it again changes nothing. A missing role,
-      permission or assignment is added back; what already exists is left
-      untouched (a role renamed by hand keeps its new name).
-    * **All or nothing** - everything happens in one transaction.
-    * **No hardcoded administrator outside development** - see below.
-
-  Roles, permissions and the grants between them are plain data in this
-  module (`roles/0`, `permissions/0`): adding a permission is one line, and
-  seeding again adds it to an existing database.
-
-  Every seeded role and permission is marked `is_system` (it cannot be
-  deleted nor have its slug changed), including rows that already existed
-  with the same slug, and so is every link of the seeded hierarchy (it
-  cannot be removed): that is the one thing seeding changes on existing
-  rows.
-
-  ## Grants the seed no longer makes
-
-  Seeding never revokes anything. When the seed stops granting a permission
-  to a role (as `users:view` stopped being granted to `user`), an existing
-  database keeps the old grant. `run/1` reports them as `:stale_grants`
-  (`[{role_slug, permission_slug}]`, only between seeded roles and seeded
-  permissions) and `priv/repo/seeds.exs` prints how to revoke them. Review
-  them: a grant you made on purpose looks the same.
-
-  ## The administrator
-
-  `ADMIN_EMAIL` and `ADMIN_PASSWORD` name the administrator (a user with the
-  `admin` role). If the user already exists it only gets the role; its
-  password is never changed.
-
-  Without those variables the outcome depends on
-  `config :rephi, Rephi.Seeds, admin: mode`:
-
-    * `:required` (default, production) - `run/1` fails and seeds nothing;
-    * `:default` (development) - the well-known development account
-      `admin@admin.com` / `password123!!` is used, and the result says so
-      (`seeds.exs` prints a warning);
-    * `:optional` (test) - no administrator is created.
+  Without `ADMIN_EMAIL`/`ADMIN_PASSWORD`, `config :rephi, Rephi.Seeds, admin:`
+  decides: `:required` fails, `:default` uses the development account
+  `admin@admin.com` / `password123!!`, `:optional` creates none.
   """
 
   import Ecto.Query, warn: false
@@ -65,13 +23,8 @@ defmodule Rephi.Seeds do
     %{slug: "user", name: "User", description: "Basic user access"}
   ]
 
-  # {child, parent}: the child role inherits every permission of the parent.
   @role_hierarchy [{"admin", "manager"}, {"manager", "user"}]
 
-  # {slug, name, description, roles granted it directly}. Admin gets every
-  # permission directly, on top of what it inherits. The `user` role, which
-  # every new account gets (`Rephi.Accounts.register_user/1`), holds no
-  # permission over other users.
   @permissions [
     {"users:view", "View Users", "View user profiles and listings", ["manager"]},
     {"users:create", "Create Users", "Create new user accounts", ["manager"]},
@@ -127,17 +80,9 @@ defmodule Rephi.Seeds do
   end
 
   @doc """
-  Seeds the database.
-
-  ## Options
-
-    * `:admin_email`, `:admin_password` - the administrator; default to the
-      `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables
-    * `:admin` - `:required`, `:default` or `:optional`; defaults to the
-      application configuration (see the module documentation)
-
-  Returns `{:ok, %{admin: admin_result, stale_grants: [stale_grant]}}`, or
-  `{:error, message}` without having changed anything.
+  Seeds the database. Options: `:admin_email`, `:admin_password` (default: the
+  environment variables) and `:admin` (the mode). Returns
+  `{:ok, %{admin: _, stale_grants: _}}`, or `{:error, message}` having changed nothing.
   """
   @spec run(keyword()) ::
           {:ok, %{admin: admin_result(), stale_grants: [stale_grant()]}} | {:error, String.t()}
@@ -177,8 +122,6 @@ defmodule Rephi.Seeds do
     end
   end
 
-  # Inserts the row identified by `slug` unless it exists, and returns it,
-  # marked as a system row either way.
   defp ensure!(schema, %{slug: slug} = attrs) do
     case Repo.get_by(schema, slug: slug) do
       nil ->
@@ -197,8 +140,7 @@ defmodule Rephi.Seeds do
 
   @doc """
   Grants between seeded roles and seeded permissions that exist in the
-  database but that the seed does not make. See "Grants the seed no longer
-  makes".
+  database but that the seed does not make.
   """
   @spec stale_grants() :: [stale_grant()]
   def stale_grants do

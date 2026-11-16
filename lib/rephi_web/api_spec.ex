@@ -72,7 +72,6 @@ defmodule RephiWeb.ApiSpec do
         version: @version,
         description: @description
       },
-      # Relative: "Try it out" calls the host that serves the document.
       servers: [%Server{url: "/", description: "The host serving this document"}],
       paths: RephiWeb.Router |> OpenApiSpex.Paths.from_router() |> operation_per_verb(),
       components: %Components{

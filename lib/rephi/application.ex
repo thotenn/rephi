@@ -7,8 +7,7 @@ defmodule Rephi.Application do
 
   @impl true
   def start(_type, _args) do
-    # Fail the boot on a malformed CORS_ORIGINS instead of silently blocking
-    # a frontend later.
+    # Fail the boot on a malformed CORS_ORIGINS rather than block a frontend later.
     RephiWeb.CORS.validate!(RephiWeb.CORS.origins())
 
     children = [
@@ -19,7 +18,6 @@ defmodule Rephi.Application do
       RephiWeb.Presence,
       # Start the Finch HTTP client for sending emails
       {Finch, name: Rephi.Finch},
-      # Counters for the rate limited routes (login, register)
       RephiWeb.RateLimiter,
       # Start a worker by calling: Rephi.Worker.start_link(arg)
       # {Rephi.Worker, arg},

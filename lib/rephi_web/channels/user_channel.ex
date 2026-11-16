@@ -1,36 +1,13 @@
 defmodule RephiWeb.UserChannel do
   @moduledoc """
-  Server-to-client channel for notifications.
-
-  ## Topics
-
-    * `"user:lobby"` - any authenticated socket may join. Carries the
-      notifications meant for everybody.
-    * `"user:<id>"` - only the user with that id may join. Carries the
-      notifications meant for that user.
-
-  Any other `user:*` topic is refused with `%{reason: "unauthorized"}`.
-
-  ## Events
-
-  The server pushes `"new_notification"` (see `RephiWeb.Notifications`). On the
-  lobby it also pushes `"presence_state"` after the join and `"presence_diff"`
-  on every change (`RephiWeb.Presence`): each socket is tracked under its user
-  id with the metas `user_id` and `joined_at`. Never put more in the metas
-  (an email, for instance): every lobby member receives them.
-
-  Clients cannot broadcast: the only event they may send is `"ping"`, whose
-  payload is echoed back to the sender alone. Anything else gets an
-  `%{reason: "unknown_event"}` error reply instead of crashing the channel.
-  To let clients publish something, add a `handle_in/3` clause that validates
-  the payload and checks a permission.
+  Notifications channel: `"user:lobby"` (any authenticated socket, with presence)
+  and `"user:<id>"` (only that user). Presence metas reach every lobby member, so
+  never put private data in them. Clients may only send `"ping"`.
   """
   use RephiWeb, :channel
 
   alias RephiWeb.{Notifications, Presence}
 
-  # Every socket that reaches this point was already authenticated in
-  # `RephiWeb.UserSocket.connect/3`.
   @impl true
   def join("user:lobby", _payload, socket) do
     send(self(), :after_lobby_join)
@@ -59,7 +36,6 @@ defmodule RephiWeb.UserChannel do
     {:noreply, socket}
   end
 
-  # Liveness check: echoes the payload to the sender only.
   @impl true
   def handle_in("ping", payload, socket) do
     {:reply, {:ok, payload}, socket}

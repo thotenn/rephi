@@ -1,10 +1,6 @@
 defmodule RephiWeb.RoleJSON do
   @moduledoc """
   Renders roles, their permissions and user-role assignments.
-
-  The permissions of a role come from
-  `Rephi.Authorization.get_role_permission_sources/1`: the ones assigned to
-  the role itself, and the ones it only inherits from its parent roles.
   """
 
   alias Rephi.Authorization.{Role, RoleRole, UserRole}

@@ -1,20 +1,7 @@
 defmodule Rephi.Accounts.User do
   @moduledoc """
-  A user account.
-
-  ## Fields
-
-    * `email` - stored trimmed and lowercased; unique regardless of case
-    * `password` / `password_confirmation` - virtual, only present while a
-      password is being set
-    * `hashed_password` - bcrypt hash of the password
-    * `token_version` - counter embedded in every JWT of the user. A token is
-      only valid while its version matches, so incrementing it revokes every
-      token issued before (see `Rephi.Accounts.revoke_tokens/1`)
-    * `must_change_password` - set by `Rephi.Accounts.reset_password/1`
-
-  The three password fields are redacted, so they never show up when a user
-  is inspected or logged.
+  A user account. `email` is stored trimmed and lowercased; incrementing
+  `token_version` revokes every token issued before. Password fields are redacted.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -32,9 +19,7 @@ defmodule Rephi.Accounts.User do
     field :token_version, :integer, default: 0
     field :must_change_password, :boolean, default: false
 
-    # Assigned roles and direct permissions only. What a user is allowed to
-    # do (inherited roles, permissions through roles) is
-    # `Rephi.Authorization.load_access/1`.
+    # Assigned only; effective rights are `Rephi.Authorization.load_access/1`.
     many_to_many :roles, Role, join_through: UserRole, preload_order: [asc: :slug]
 
     many_to_many :permissions, Permission,
@@ -67,10 +52,7 @@ defmodule Rephi.Accounts.User do
   end
 
   @doc """
-  Changeset to set a new password.
-
-  It increments `token_version`, which revokes every token issued with the
-  previous password (see `Rephi.Accounts.change_password/3`).
+  Changeset to set a new password; increments `token_version`, revoking older tokens.
   """
   def password_changeset(user, attrs) do
     user
@@ -98,10 +80,7 @@ defmodule Rephi.Accounts.User do
   end
 
   @doc """
-  Returns the canonical form of an email: trimmed and lowercased.
-
-  Emails are stored and looked up in this form, so `Jane@Example.com ` and
-  `jane@example.com` are the same account.
+  Trims and lowercases an email: the form it is stored and looked up in.
   """
   @spec normalize_email(String.t()) :: String.t()
   def normalize_email(email) when is_binary(email) do
@@ -122,7 +101,6 @@ defmodule Rephi.Accounts.User do
     end
   end
 
-  # A new password on an existing account invalidates its outstanding tokens.
   defp revoke_tokens_if_persisted(%Ecto.Changeset{data: %__MODULE__{} = user} = changeset) do
     case Ecto.get_meta(user, :state) do
       :loaded -> put_change(changeset, :token_version, user.token_version + 1)

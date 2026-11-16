@@ -1,18 +1,8 @@
 defmodule RephiWeb.RateLimiter do
   @moduledoc """
-  Fixed-window request counter kept in an ETS table.
-
-  It answers one question: "has this key been seen more than `limit` times in
-  the current window?". `RephiWeb.Plugs.RateLimit` is the plug built on it;
-  call `hit/3` directly to throttle anything else (a channel event, a job).
-
-  The process only owns the table and removes expired entries once a minute.
-  Counting happens in the caller, with atomic ETS updates, so the limiter is
-  never a bottleneck.
-
-  Counters live in the memory of one node and are lost on restart. With
-  several nodes each one counts on its own, so the effective limit is
-  `limit × nodes`.
+  Fixed-window request counter in an ETS table, counted in the caller with atomic
+  updates; the process only owns the table and sweeps expired entries. Per node
+  and in memory.
   """
   use GenServer
 
@@ -24,17 +14,8 @@ defmodule RephiWeb.RateLimiter do
   end
 
   @doc """
-  Counts one hit for `key` and says whether it is within `limit` hits per
-  `window_ms` milliseconds.
-
-  Returns `{:allow, count}` with the hits counted so far in the window, or
-  `{:deny, retry_after}` with the seconds left until the window ends.
-
-  ## Examples
-
-      iex> RephiWeb.RateLimiter.hit({:login, {127, 0, 0, 1}}, 10, 60_000)
-      {:allow, 1}
-
+  Counts one hit for `key`: `{:allow, count}` within `limit` hits per `window_ms`,
+  or `{:deny, retry_after_seconds}`.
   """
   @spec hit(term(), pos_integer(), pos_integer()) ::
           {:allow, pos_integer()} | {:deny, pos_integer()}

@@ -18,25 +18,7 @@ defmodule RephiWeb.RoleController do
     * `GET /api/roles/:id/parents`, `GET /api/roles/:id/children` (requires "roles:view")
     * `POST/DELETE /api/roles/:role_id/parents/:parent_id` (requires "roles:edit")
 
-  `POST` and `PUT` accept the role attributes flat or wrapped under `"role"`.
-  An id that is not the id of an existing record (unknown, not a number, out
-  of range) answers `404`. `GET /api/roles` is paginated (`page`,
-  `page_size`, see `Rephi.Pagination`).
-
-  ## Rules
-
-    * A role's detail separates the permissions assigned to it
-      (`permissions`) from the ones it inherits from its parent roles
-      (`inherited_permissions`, each with the roles it comes from).
-    * System roles (`is_system`) cannot be deleted (`409`) and their slug
-      cannot change (`422`).
-    * Assigning or removing a role requires holding it, or being an admin
-      (`403` otherwise, `Rephi.Authorization.can_grant_role?/2`).
-    * Removing the admin role from its last holder, directly, by deleting
-      a role that inherits from it or by unlinking such a role from it,
-      answers `409`.
-    * Linking or unlinking a parent requires holding both roles, or being an
-      admin (`403`); cycles, duplicates and system links are `409`.
+  Assigning, removing or linking a role requires holding it, or being an admin.
 
   ## Permission Requirements
 

@@ -1,27 +1,11 @@
 defmodule RephiWeb.ErrorJSON do
   @moduledoc """
-  Renders the body of every non-validation error of the API.
-
-  All errors share one envelope:
-
-      {"errors": {"detail": "Not Found"}}
-
-  Validation errors use the same `errors` key with one entry per field and are
-  rendered by `RephiWeb.ChangesetJSON`.
-
-  This module is invoked in two ways:
-
-    * by the endpoint (`render_errors` in `config/config.exs`) when a request
-      raises: unknown route, malformed JSON body, unhandled exception…
-    * by `RephiWeb.FallbackController`, which passes an optional `:detail`
-      assign with a message more specific than the HTTP status text.
+  Renders every non-validation API error as `{"errors": {"detail": "Not Found"}}`,
+  for the endpoint (`render_errors`) and `RephiWeb.FallbackController`.
   """
 
   @doc """
-  Renders `"<status>.json"`.
-
-  Uses the `:detail` assign when it is a string and falls back to the standard
-  status message otherwise, so `"404.json"` becomes `"Not Found"`.
+  Renders `"<status>.json"` with the `:detail` assign, or the standard status text.
   """
   def render(template, assigns) do
     %{errors: %{detail: detail(assigns) || status_message(template)}}

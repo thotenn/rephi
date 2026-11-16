@@ -1,35 +1,8 @@
 defmodule RephiWeb.Notifications do
   @moduledoc """
-  Real-time notifications pushed to connected clients over `RephiWeb.UserChannel`.
-
-  This is the only place that knows the topics and the shape of the event, so
-  HTTP endpoints, background jobs and `iex` all send the same thing. Every send
-  is recorded with `Rephi.Notifications` before it is pushed.
-
-  ## Topics
-
-    * `"user:lobby"` - every connected client (`broadcast/2`)
-    * `"user:<id>"` - the connections of one user (`notify_self/2`, `notify_user/3`)
-
-  ## Event
-
-  Clients receive `"new_notification"` with this payload:
-
-      %{
-        message: "Deploy finished",
-        type: "general",
-        timestamp: ~U[2025-01-01 12:00:00Z],
-        from: %{id: 1, email: "admin@example.com"}
-      }
-
-  `message` is plain text of at most `max_message_length/0` characters; clients
-  must render it as text. `from` is the user that sent it, or `nil` for
-  notifications sent by the system.
-
-  ## Configuration
-
-      config :rephi, RephiWeb.Notifications, max_message_length: 500
-
+  Real-time notifications pushed over `RephiWeb.UserChannel` (`"user:lobby"` for
+  everyone, `"user:<id>"` per user) as `"new_notification"` events, each recorded
+  with `Rephi.Notifications` first. `message` is plain text: render it as text.
   """
 
   import Ecto.Changeset
@@ -73,9 +46,8 @@ defmodule RephiWeb.Notifications do
   @doc """
   Sends a notification to every connected client (scope `"broadcast"`).
 
-  `attrs` are untrusted (they usually come from a request body): `"message"`
-  must be a non-blank string within the length limit. `sender` is the user
-  sending it, or `nil`. Nothing is recorded nor sent when they are invalid.
+  `attrs` are untrusted: `"message"` must be a non-blank string within the length
+  limit, or nothing is recorded nor sent. `sender` is the user, or `nil`.
   """
   @spec broadcast(map(), %User{} | nil) :: result()
   def broadcast(attrs, sender \\ nil) do

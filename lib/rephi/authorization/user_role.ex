@@ -2,8 +2,6 @@ defmodule Rephi.Authorization.UserRole do
   @moduledoc """
   A role assigned to a user. `assigned_by` is the user who assigned it
   (cleared if that user is deleted); `notes` is free text.
-
-  Each user holds a given role at most once.
   """
   use Ecto.Schema
   import Ecto.Changeset

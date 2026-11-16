@@ -2,9 +2,7 @@ defmodule RephiWeb.Auth.Guardian do
   @moduledoc """
   Guardian implementation for JWT token management with authorization support.
 
-  Tokens are short-lived access tokens (`ttl` in the configuration, 24 hours
-  by default, `TOKEN_TTL_SECONDS` at runtime). There is no refresh token: when
-  a token expires or is revoked the client logs in again.
+  Access tokens live `ttl` (24 hours by default); there is no refresh token.
 
   ## Token Claims
 
@@ -15,8 +13,8 @@ defmodule RephiWeb.Auth.Guardian do
   - `permissions` - Array of the slugs of every effective permission (direct,
     through roles, inherited)
 
-  `roles` and `permissions` are a convenience for clients. The server never
-  trusts them: every request is authorized against the database.
+  The server never trusts `roles` and `permissions`: every request is
+  authorized against the database.
 
   ## Example Token Claims
 
@@ -30,17 +28,9 @@ defmodule RephiWeb.Auth.Guardian do
         "permissions": ["users:view", "users:create", "roles:view"]
       }
 
-  ## What makes a token valid
-
-    * the signature, with the configured `secret_key`;
-    * `exp` is present and in the future, and `iss` is the configured issuer
-      (`verify_claims/2`);
-    * `sub` is the id of an existing user and `ver` equals that user's current
-      `token_version` (`resource_from_claims/1`). Changing the password,
-      logging out (`Rephi.Accounts.revoke_tokens/1`) or deleting the user
-      therefore invalidates every token issued before;
-    * callers additionally require `typ` to be `"access"`
-      (`RephiWeb.Auth.Pipeline`, `RephiWeb.UserSocket`).
+  A token is valid with a good signature, a future `exp`, the configured `iss`
+  and a `ver` equal to its user's current `token_version`; callers also require
+  `typ` to be `"access"`.
 
   ## Usage
 
@@ -61,11 +51,8 @@ defmodule RephiWeb.Auth.Guardian do
   end
 
   @doc """
-  Loads the user a token belongs to.
-
-  Fails when the user no longer exists, when the token was issued before the
-  user's tokens were last revoked, or when the claims do not identify a user
-  at all. Malformed claims are an error, never an exception.
+  Loads the user a token belongs to. Fails, never raises, when the user is gone,
+  `ver` is outdated or the claims are malformed.
   """
   def resource_from_claims(%{"sub" => id, "ver" => version}) when is_integer(version) do
     case Accounts.get_user(id) do
@@ -78,10 +65,7 @@ defmodule RephiWeb.Auth.Guardian do
   def resource_from_claims(_claims), do: {:error, :invalid_claims}
 
   @doc """
-  Rejects tokens that never expire or that do not say who issued them.
-
-  Guardian only validates `exp` and `iss` when they are present; this makes
-  them mandatory.
+  Rejects tokens without `exp` or `iss` (Guardian only checks them when present).
   """
   def verify_claims(%{"exp" => exp, "iss" => iss} = claims, _opts)
       when is_integer(exp) and is_binary(iss) do
@@ -91,13 +75,8 @@ defmodule RephiWeb.Auth.Guardian do
   def verify_claims(_claims, _opts), do: {:error, :invalid_claims}
 
   @doc """
-  Adds the token version, the assigned role slugs and the effective
-  permission slugs to the claims of a new token.
-
-  Called by Guardian when a token is signed. Pass the user's
-  `Rephi.Authorization.Access` as the `:access` option of
-  `encode_and_sign/3` when it is already loaded; otherwise it is loaded here
-  (one query).
+  Adds `ver`, the assigned role slugs and the effective permission slugs. Pass
+  `access:` to `encode_and_sign/3` when the user's `Access` is already loaded.
   """
   def build_claims(claims, %User{} = resource, opts) do
     access = Keyword.get(opts, :access) || Authorization.load_access(resource)
