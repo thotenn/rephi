@@ -18,6 +18,10 @@ export default defineConfig(({ mode }) => {
       port: Number(env.VITE_PORT) || appConfig.port,
       // Another port would not be on the backend's CORS list: fail instead.
       strictPort: true,
+      watch: {
+        // Playwright writes its results under e2e/: each write reloaded the page under test.
+        ignored: ["**/e2e/**"],
+      },
     },
     build: {
       outDir: "dist",

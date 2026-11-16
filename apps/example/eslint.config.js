@@ -12,9 +12,10 @@ import tseslint from "typescript-eslint";
 const tsconfigRootDir = import.meta.dirname;
 
 export default defineConfig([
-  globalIgnores(["dist"]),
+  globalIgnores(["dist", "e2e/.results"]),
   {
     files: ["**/*.{ts,tsx}"],
+    ignores: ["e2e/**", "playwright.config.ts"],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,
@@ -46,6 +47,23 @@ export default defineConfig([
       "@eslint-react/static-components": "off",
       "@eslint-react/unsupported-syntax": "off",
       "@eslint-react/use-memo": "off",
+    },
+  },
+  {
+    files: ["e2e/**/*.ts", "playwright.config.ts"],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      importX.flatConfigs.recommended,
+      importX.flatConfigs.typescript,
+    ],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node,
+      parserOptions: { tsconfigRootDir },
+    },
+    settings: {
+      "import-x/resolver-next": [createTypeScriptImportResolver({ project: `${tsconfigRootDir}/e2e/tsconfig.json` })],
     },
   },
   {

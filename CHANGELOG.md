@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Browser tests of `apps/example`** - a Playwright suite (`apps/example/e2e/`, `yarn example:e2e`)
+  covering sign-in, registration, logout, password change, the dashboard quick actions, the
+  administration screens on throwaway data and a "no dead controls" check that clicks every link
+  and button of every page. Optional CI workflow `e2e-example.yml`
+
 ### Fixed
 - **Dashboard quick actions (`apps/example`)** - "Create New Item" and "View Reports" did nothing.
   They are now links, each shown only with the permissions it needs: "New role" (opens the

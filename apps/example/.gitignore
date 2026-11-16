@@ -32,3 +32,6 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Playwright (e2e/) output
+e2e/.results
