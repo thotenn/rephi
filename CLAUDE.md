@@ -1,142 +1,178 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for coding agents working in this repository. `README.md` is the user documentation;
+this file is how the code is put together, the conventions to follow and the traps.
 
-## Project Overview
+## What this is
 
-Rephi is a Phoenix/Elixir backend with multi-frontend React SPAs (Yarn workspaces), featuring JWT authentication, RBAC authorization, and real-time WebSocket communication.
+Rephi: a Phoenix 1.8 JSON API (JWT auth with Guardian, RBAC, Phoenix Channels) plus a Yarn 4
+workspace of frontends (`packages/shared-components`, `apps/example` Vite SPA,
+`apps/example-astro` static Astro site). It is also a template: `installer/` builds the
+`mix rephi.new` archive that clones and renames it, so everything named `rephi` / `Rephi` must
+survive a whole-word rename (npm names `@rephi/*`, `rephi-*` and `mix rephi.*` tasks are kept).
 
-## Environment Setup
+## Commands
 
 ```bash
-./setup.sh   # checks the toolchain, writes .env secrets, mix setup, builds the frontends
+./setup.sh                   # toolchain check, .env secrets, mix setup, yarn install + builds
+mix phx.server               # API on :4000; apps at /app/<name>/, Swagger at /api/swagger
+mix precommit                # what CI runs: format check, warnings as errors, unused deps, tests
+mix test path/to/test.exs:42 # one test
+mix test --cover             # threshold 90 % (mix.exs)
+mix phx.swagger.generate     # priv/static/swagger.json (build artifact, not committed)
+cd installer && mix test     # the installer (also generates a project from the committed HEAD)
+
+yarn shared:build            # ALWAYS first: apps, lint and typecheck read its compiled dist/
+yarn example:dev             # :5001/app/example/
+yarn example-astro:dev       # :4321
+yarn build                   # every workspace, then scripts/copy-builds.js -> priv/static/apps/
+yarn lint && yarn typecheck
+mix rephi.gen.frontend NAME [--template example|example-astro] [--port N]
 ```
 
-`.env` (git-ignored) is loaded in development only; `.env.example` lists every variable.
+Toolchain: Elixir 1.20.5 / OTP 29.1.2, Node 26 (>= 22.22), Yarn 4.18 via Corepack (on Node 25+
+`npm install -g corepack`). `tsc` is TypeScript 7; the `typescript` import is the TS 6 API (npm
+aliases, needed by typescript-eslint). Import router APIs from `react-router`, never
+`react-router-dom`.
 
-## Common Commands
+## Backend layout
 
-### Backend (Phoenix/Elixir)
-```bash
-mix setup                    # Phoenix only: deps, database, seeds, swagger.json
-mix precommit                # What CI runs: format check, warnings, unused deps, tests
-mix phx.server               # Start server (port 4000)
-iex -S mix phx.server        # Start with interactive shell
-mix test                     # Run all tests
-mix test path/to/test.exs    # Run specific test file
-mix test path/to/test.exs:42 # Run specific test at line
-mix format                   # Format code
-mix phx.swagger.generate     # Regenerate Swagger docs
-mix docs                     # Generate ExDoc documentation
-mix ecto.reset               # Drop and recreate database with seeds
+```
+lib/rephi/
+  accounts/accounts.ex, user.ex    Accounts: register_user (default role), change_password, revoke_tokens
+  authorization.ex                 RBAC context: load_access, can?, has_role?, assign_*/remove_*, preserving_admins
+  authorization/                   Role, Permission, UserRole, UserPermission, RolePermission, RoleRole, Access
+  seeds.ex                         default roles/permissions/admin as data (@roles, @permissions); run/1
+  release.ex                       migrate/0, seed/0 for bin/migrate, bin/seed
+  pagination.ex, health.ex, repo.ex (fetch/2, cast_id/1)
+lib/rephi_web/
+  router.ex                        /api (pipelines :api, :authenticated), /api/swagger, /app forward
+  auth/                            Guardian, Pipeline, AuthorizationPlug, AuthorizationHelpers, ErrorHandler
+  controllers/                     *_controller.ex + *_json.ex views, FallbackController, ControllerHelpers
+  swagger.ex                       shared swagger definitions and swagger_path helpers
+  plugs/                           FrontendAppPlug, RateLimit, ForceSSL, BodyParser
+  notifications.ex, channels/      topics user:lobby / user:<id>, event new_notification
+  cors.ex, rate_limiter.ex
+config/runtime.exs                 every environment variable (documented in .env.example)
 ```
 
-### Frontend (Yarn Workspaces)
-```bash
-yarn install                 # Install all workspace dependencies
-yarn shared:build            # Build shared-components (required first!)
-yarn example:dev             # Start example app dev server
-yarn example-astro:dev       # Start the Astro example (port 4321)
-yarn example-astro:build     # Static build -> apps/example-astro/dist (not copied to priv/static)
-yarn build                   # Build all apps (copies to priv/static/apps/)
-yarn lint                    # Lint all apps
-yarn typecheck               # TypeScript check all apps
-mix rephi.gen.frontend NAME  # New app (--template example|example-astro, --port N)
-```
+## Conventions
 
-> **Important:** Run `yarn shared:build` before `yarn example:dev`, `yarn typecheck` or `yarn lint` - apps resolve the shared-components package from its compiled `dist/`.
+**Responses.** Success with a body: `{"data": ...}`; paginated lists add `meta`
+(`RephiWeb.PaginationJSON.render(page, &data/1)`). Errors: `{"errors": {"detail": "..."}}` or,
+for a changeset (422), `{"errors": {"field": ["..."]}}`. Never build an error body by hand:
 
-Toolchain notes: Node.js 26 LTS (>= 22.22) and Yarn 4.18 via Corepack (on Node 25+ Corepack is no longer bundled: `npm install -g corepack`). `tsc` is TypeScript 7; the `typescript` import is the TS 6 API (npm aliases in each workspace, needed by typescript-eslint). Import router APIs from `react-router`, never `react-router-dom`.
+- in an action, return `{:error, changeset}`, `{:error, :not_found}`, `{:error, :forbidden}`,
+  `{:error, status_atom, "message"}` or a domain reason; every controller declares
+  `action_fallback RephiWeb.FallbackController`;
+- domain reasons (`:system_role`, `:last_admin`, `:escalation`, ...) map to status and message in
+  `FallbackController` `@domain_errors`: add new ones there. Convention: 403 = the caller lacks
+  the right for *this* change, 409 = it conflicts with the data, 422 = an invalid field;
+- in a plug: `conn |> RephiWeb.FallbackController.call({:error, :too_many_requests}) |> halt()`.
 
-`apps/example-astro` is Astro 7 (static output, React islands): type-check with `astro check`, import the shared library only through `~/lib/rephi` (it applies `configureRephi` with `PUBLIC_API_URL` / `PUBLIC_WS_URL`), and keep `"rephi": { "copyToPhoenix": false }` in its package.json unless you build it with the Phoenix base path. The backend must allow its origin (CORS + `check_origin`).
+**Requests.** Read write bodies with `resource_params(conn, "role")` (flat or wrapped under the
+resource name; body only, never path/query). `conflict_if_taken(result, "message")` turns a
+unique violation into 409.
 
-## Architecture
+**Ids and getters.** Use the non-raising getters: `Accounts.fetch_user/1`,
+`Authorization.fetch_role/1`, `fetch_permission/1` (`{:ok, struct} | {:error, :not_found}`, any
+garbage id is a 404); `get_*` return `nil`. Built on `Rephi.Repo.fetch/2` / `cast_id/1`. There
+are no `get_*!` functions; do not add raising lookups to request paths.
 
-### Backend Structure
-```
-lib/rephi/                   # Core business logic
-├── accounts/                # User management (Accounts context)
-└── authorization/           # RBAC system (Authorization context)
-    ├── role.ex, permission.ex
-    ├── user_role.ex, user_permission.ex
-    └── role_permission.ex, role_role.ex
+**Authorization.** `RephiWeb.Auth.Pipeline` assigns `current_user` (a `%User{}`, never nil
+behind the pipeline, associations NOT loaded) and `current_access`
+(`%Rephi.Authorization.Access{}`: assigned roles, held role slugs incl. ancestors, effective
+permissions). Read access, never `user.roles` / `user.permissions`.
 
-lib/rephi_web/               # Web layer
-├── auth/                    # Authentication (Guardian, Pipeline, AuthorizationPlug)
-├── controllers/             # API controllers
-├── channels/                # WebSocket (UserSocket, UserChannel)
-└── plugs/                   # Custom plugs (FrontendAppPlug)
-```
+- whole action: `plug AuthorizationPlug, {:permission, "x:y"} when action in [...]`
+  (`{:any_permission, [...]}`, `{:all_permissions, [...]}`, `{:role, slug}` follow the hierarchy);
+- inside an action: `can?(conn, slug)`, `has_role?/2`, `can_any?/2`, `can_all?/2`,
+  `current_access(conn)` (imported by `use RephiWeb, :controller`);
+- assignments always get `actor: current_access(conn)` (escalation checks, `assigned_by`);
+- anything that can remove the admin role from someone goes through
+  `Authorization.preserving_admins/1`;
+- anything that must end sessions calls `Accounts.revoke_tokens/1` (bumps `token_version`,
+  broadcasts `"disconnect"` on `Accounts.socket_id/1`).
 
-### Frontend Structure
-```
-apps/                        # Frontend applications (Vite + React)
-├── example/                 # Template app
-├── example-astro/           # Same app as a static Astro site (Cloudflare Pages), see its README
-└── [generated-apps]/
+**Seeds.** Data in `Rephi.Seeds` (`@roles`, `@permissions`, `@role_hierarchy`): a new default
+permission is one line; seeding is idempotent, insert-only, and marks seeded rows `is_system`.
+It never revokes; grants it stopped making show up in `stale_grants`.
 
-packages/
-└── shared-components/       # Common React components, hooks, utilities
+**Migrations.** Never edit an existing migration: existing projects must be able to apply new
+ones. Make them reversible.
 
-priv/static/apps/            # Built frontends served by Phoenix
-```
+## Adding an endpoint
 
-### Key Files
-- `lib/rephi_web/router.ex` - All API routes under `/api/*`, frontend routes at `/app/*`
-- `lib/rephi/authorization.ex` - Main RBAC context with `can?/2`, `has_role?/2`
-- `lib/rephi_web/auth/authorization_plug.ex` - Controller authorization
-- `priv/repo/seeds.exs` - Default roles, permissions, admin user
+1. Context function returning `{:ok, _}` / `{:error, _}` (paginated lists: `paginate_x(params)`
+   with `Rephi.Pagination.paginate/2` and a stable `order_by`).
+2. Route in `router.ex` under the right pipeline; controller action with `with`, a JSON view
+   module rendering `%{data: ...}`.
+3. Permission: add it to `@permissions` in `Rephi.Seeds` (and the roles that get it), guard the
+   action with `plug AuthorizationPlug, {:permission, "things:do"} when action in [:do]`.
+4. Swagger: a `swagger_path :action` block (`import RephiWeb.Swagger` gives `bearer_auth/1`,
+   `id_param/3`, `page_params/1`, `body_errors/1`, `rate_limited/1`, `error_response/3`,
+   `validation_response/2`), schemas in `swagger_definitions/0` wrapped in
+   `RephiWeb.Swagger.definitions(%{...})`. An action routed by several verbs (`resources`
+   PUT+PATCH) leaves the verb/path out and overrides the generated function with
+   `operation_per_verb/1` (see `RoleController`).
+5. Add the requests that produce each documented status to `cases/1` of
+   `test/rephi_web/swagger_contract_test.exs` (it fails on undocumented routes, undocumented
+   statuses, and on fields missing from or extra to the schema), then `mix phx.swagger.generate`.
+6. Tests with `RephiWeb.ConnCase`; if the endpoint is hot, a query budget in
+   `test/rephi_web/query_budget_test.exs`.
 
-### Authentication Flow
-1. Login/register: `POST /api/users/{login|register}` returns JWT
-2. JWT includes user roles and permissions for client-side authorization
-3. Frontend stores token in Zustand (persisted) + localStorage
-4. Axios interceptor adds `Authorization: Bearer {token}` header
-5. Protected routes use `RephiWeb.Auth.Pipeline` + `Guardian.Plug.EnsureAuthenticated`
+## Tests
 
-### Authorization Usage
-```elixir
-# In controllers - use plugs
-plug AuthorizationPlug, {:permission, "users:edit"}
-plug AuthorizationPlug, {:role, "admin"}
-plug AuthorizationPlug, {:any_permission, ["users:create", "users:edit"]}
+- Helpers (`Rephi.AuthTestHelpers`, imported by `ConnCase`): `create_user/1`,
+  `create_user_with_token/1`, `create_user_with_token_and(roles: [...], permissions: [...])`,
+  `authenticate_conn/2`, `grant_role/2`, `grant_permission/2`, `create_role/1`,
+  `create_permission/1`, `invalid_ids/0`, `error_detail(conn, status)` (asserts the envelope),
+  `forge_token(user, claims)` (tokens Guardian would not issue), `put_app_env/3` (restored on
+  exit; `async: false` only).
+- Seeds in a test: `Rephi.Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)`
+  (do not depend on the shell's `ADMIN_*`).
+- Query budgets: `import Rephi.QueryCounter`; `count_queries(fn -> ... end)` returns
+  `{result, count}`. Login 2, `/api/me` 2, `/api/roles/:id` 4: if a number grows, something
+  queries per check again.
+- Channels: `connect(UserSocket, %{}, connect_info: %{auth_token: token})`.
+- Rate limiting is off in test; turn it on per test with `put_app_env(RephiWeb.Plugs.RateLimit,
+  ...)` + `RephiWeb.RateLimiter.reset/0`.
+- `config :bcrypt_elixir, log_rounds: 1` in test; the test user password is `"password123"`.
 
-# In code - use helpers
-if can?(conn, "users:edit"), do: # ...
-if Authorization.has_role?(user, "admin"), do: # ...
-```
+## Frontends
 
-### Default Seed Data
-- **Roles**: admin (inherits manager), manager (inherits user), user
-- **Permissions**: 17 permissions across `users:*`, `roles:*`, `permissions:*`, `system:*`
-- **Admin**: admin@admin.com / password123!!
+- `@rephi/shared-components` is the only code that talks to the backend. Apps configure it with
+  `configureRephi({apiUrl, wsUrl, debug})` in `apps/<app>/src/lib/rephi.ts`, imported first;
+  nothing is baked in when the library is built (no `env.ts`, no `VITE_SERVER_API_URL`). The SPA
+  reads `VITE_API_URL` / `VITE_WS_URL`, the Astro app `PUBLIC_API_URL` / `PUBLIC_WS_URL`
+  (`astro:env`) and imports the library only through `~/lib/rephi`.
+- Per-app `basename` and dev `port` live only in `apps/<app>/app.config.ts` (read by
+  `vite.config.ts` / `astro.config.ts`; the generator rewrites them). A new dev port's origin must
+  be in `:cors_origins` of `config/dev.exs`; restart `mix phx.server` after changing config.
+- Phoenix serves every `priv/static/apps/<name>` at `/app/<name>/` (`FrontendAppPlug`, no router
+  change). An app with a root `404.html` is multi-page (real 404s); without one, extension-less
+  paths fall back to `index.html` (SPA). A SPA must not ship a root `404.html`.
+- `"rephi": {"copyToPhoenix": false}` in an app's `package.json` keeps it out of
+  `priv/static/apps` (the Astro app: it targets a static host).
+- Authorize the UI by `permissions` (effective); `roles` in the session are only the assigned
+  ones. Any 401 on the current token ends the session.
 
-## API Documentation
+## Traps
 
-- Swagger UI: `http://localhost:4000/api/swagger`
-- Swagger JSON: `http://localhost:4000/api/swagger/swagger.json`
-
-When adding endpoints, use `swagger_path` macro and define schemas in `swagger_definitions/0`, then run `mix phx.swagger.generate`.
-
-## Testing
-
-Tests use ExUnit in `/test`. For authenticated endpoints, use helpers from `test/support/auth_test_helpers.ex`:
-
-```elixir
-import Rephi.AuthTestHelpers
-
-# In tests
-{user, token} = create_user_with_token()
-conn = authenticate_conn(conn, token)
-# or
-conn = authenticate_user(conn)  # creates user + authenticates in one step
-```
-
-## Development Workflow
-
-1. Start PostgreSQL
-2. Run backend: `mix phx.server` (port 4000)
-3. Run frontend: `yarn example:dev` (or other app)
-4. API: `http://localhost:4000/api`
-5. WebSocket: `ws://localhost:4000/socket`
-6. Frontend apps: `http://localhost:4000/app/{app_name}`
+- `mix setup` does not build frontends; `./setup.sh` does. A fresh clone needs
+  `yarn shared:build` before `typecheck`, `lint` or any app.
+- `.env` is loaded in development only (`config/dotenv.exs`) and never overrides the shell;
+  `mix test` reads no environment variable (`config/test.exs` is the whole configuration).
+- Production refuses to boot without `DATABASE_URL`, `SECRET_KEY_BASE`, `GUARDIAN_SECRET_KEY`
+  (>= 32 bytes) and `PHX_HOST`; `CORS_ORIGINS` with `*` also stops the boot.
+- `FORCE_SSL` is on in prod: a local prod smoke over plain HTTP gets 301s except on
+  `localhost` / `127.0.0.1` and `/api/health*`.
+- `swagger.json` must exist before `mix release` (the `Dockerfile` generates it); the route
+  answers 404 while it does not, and Swagger is off in prod unless `SWAGGER_ENABLED=true`.
+- A changed `config/*.exs` needs a server restart (Phoenix does not reload config).
+- Client routes of a SPA must not end in something extension-like (`/users/john.doe` is a 404).
+- `phoenix_swagger` emits Swagger 2.0: use `"x-nullable": true`, not `nullable`.
+- The installer refuses to generate if the template does not have exactly the expected
+  secrets and salts (2 `secret_key_base`, 2 Guardian `secret_key`, 2 `signing_salt`): keep that
+  shape when touching `config/*.exs` or `endpoint.ex`.
+- Repo is public: no real hosts, IPs or personal paths in code, comments or docs.
