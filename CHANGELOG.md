@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Breaking** - **API documentation in OpenAPI 3.0** (`open_api_spex` 3.22) instead of Swagger
+  2.0 (`phoenix_swagger`). The document is now `GET /api/openapi`; the Swagger UI stays at
+  `GET /api/swagger`. `/api/swagger/swagger.json` and `/api/swagger/index.html` are gone (404):
+  a client or generator that read `swagger.json` must point at `/api/openapi` and read OpenAPI 3
+  (`nullable` instead of `x-nullable`, `components/schemas` instead of `definitions`,
+  `requestBody`, a `bearerAuth` HTTP bearer scheme instead of the `Bearer` API key). No alias
+  was kept on purpose: an old URL serving a different format would fail later and less clearly.
+  Operation ids (`RephiWeb.RoleController.update`, `...update.patch` for PATCH) and schema
+  names (`AuthResponse`, `RoleDetailResponse`, ...) are kept; nested objects that had no name
+  now have one (`Session`, `RoleDetail`, `RolePermissionEntry`, `UserRoleAssignment`,
+  `RolePermissionAssignment`, `Notification`)
+- Endpoints are documented with an `operation` next to each controller action
+  (`OpenApiSpex.ControllerSpecs`, helpers in `RephiWeb.ApiSpec.Operations`) and one schema module
+  per body (`RephiWeb.Schemas.*`); `RephiWeb.ApiSpec` builds the document from the router at
+  runtime and caches it (rebuilt on every request in development). `SWAGGER_ENABLED` still turns
+  the documentation on and off (off in production)
+- The Swagger UI loads its scripts and styles from cdnjs instead of serving them from the
+  dependency
+- `test/rephi_web/api_contract_test.exs` (was `swagger_contract_test.exs`) checks the OpenAPI
+  document: every route documented, a valid document (`$ref`s, unique operation ids, tags,
+  security schemes, examples that match their schemas) and, for every documented response, a
+  real request whose status, headers and body (cast with `open_api_spex` against strict schemas,
+  plus JSON types) match it both ways
+
+### Removed
+- `phoenix_swagger`, `RephiWeb.Swagger`, `RephiWeb.SwaggerController` and the Jason encoder shim
+  for `PhoenixSwagger.Schema`
+- The generated `priv/static/swagger.json`: `mix phx.swagger.generate` is no longer run by
+  `mix setup`, `./setup.sh` or the `Dockerfile`, and `mix release` does not need it. To export
+  the document for a client generator: `mix openapi.spec.json --spec RephiWeb.ApiSpec
+  --start-app=false --vendor-extensions=false`
+
 ## [0.2.0] - 2026-11-16
 
 A toolchain upgrade and a full audit of the boilerplate: security, RBAC, the API contract, the

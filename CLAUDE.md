@@ -15,11 +15,11 @@ survive a whole-word rename (npm names `@rephi/*`, `rephi-*` and `mix rephi.*` t
 
 ```bash
 ./setup.sh                   # toolchain check, .env secrets, mix setup, yarn install + builds
-mix phx.server               # API on :4000; apps at /app/<name>/, Swagger at /api/swagger
+mix phx.server               # API on :4000; apps at /app/<name>/, Swagger UI at /api/swagger
 mix precommit                # what CI runs: format check, warnings as errors, unused deps, tests
 mix test path/to/test.exs:42 # one test
 mix test --cover             # threshold 90 % (mix.exs)
-mix phx.swagger.generate     # priv/static/swagger.json (build artifact, not committed)
+mix openapi.spec.json --spec RephiWeb.ApiSpec --start-app=false  # export openapi.json (optional)
 cd installer && mix test     # the installer (also generates a project from the committed HEAD)
 
 yarn shared:build            # ALWAYS first: apps, lint and typecheck read its compiled dist/
@@ -46,10 +46,12 @@ lib/rephi/
   release.ex                       migrate/0, seed/0 for bin/migrate, bin/seed
   pagination.ex, health.ex, repo.ex (fetch/2, cast_id/1)
 lib/rephi_web/
-  router.ex                        /api (pipelines :api, :authenticated), /api/swagger, /app forward
+  router.ex                        /api (pipelines :api, :authenticated, :api_docs), /app forward
   auth/                            Guardian, Pipeline, AuthorizationPlug, AuthorizationHelpers, ErrorHandler
   controllers/                     *_controller.ex + *_json.ex views, FallbackController, ControllerHelpers
-  swagger.ex                       shared swagger definitions and swagger_path helpers
+  api_spec.ex                      the OpenAPI 3 document (paths from the router, schemas, bearerAuth)
+  api_spec/operations.ex           helpers for `operation`: bearer_auth, id_param, page_params, body, responses
+  schemas.ex, schemas/*.ex         RephiWeb.Schemas.* (one module per body) + data/page/timestamp helpers
   plugs/                           FrontendAppPlug, RateLimit, ForceSSL, BodyParser
   notifications.ex, channels/      topics user:lobby / user:<id>, event new_notification
   cors.ex, rate_limiter.ex
@@ -109,17 +111,86 @@ ones. Make them reversible.
    module rendering `%{data: ...}`.
 3. Permission: add it to `@permissions` in `Rephi.Seeds` (and the roles that get it), guard the
    action with `plug AuthorizationPlug, {:permission, "things:do"} when action in [:do]`.
-4. Swagger: a `swagger_path :action` block (`import RephiWeb.Swagger` gives `bearer_auth/1`,
-   `id_param/3`, `page_params/1`, `body_errors/1`, `rate_limited/1`, `error_response/3`,
-   `validation_response/2`), schemas in `swagger_definitions/0` wrapped in
-   `RephiWeb.Swagger.definitions(%{...})`. An action routed by several verbs (`resources`
-   PUT+PATCH) leaves the verb/path out and overrides the generated function with
-   `operation_per_verb/1` (see `RoleController`).
+4. OpenAPI: an `operation` next to the action (see "Documenting an endpoint" below); a schema
+   module per new body in `lib/rephi_web/schemas/`.
 5. Add the requests that produce each documented status to `cases/1` of
-   `test/rephi_web/swagger_contract_test.exs` (it fails on undocumented routes, undocumented
-   statuses, and on fields missing from or extra to the schema), then `mix phx.swagger.generate`.
+   `test/rephi_web/api_contract_test.exs` (it fails on undocumented routes, undocumented
+   statuses, and on fields missing from or extra to the schema). 400/401/403/404/413/429 are
+   generated from the document; write the 2xx, 409 and 422 ones.
 6. Tests with `RephiWeb.ConnCase`; if the endpoint is hot, a query budget in
    `test/rephi_web/query_budget_test.exs`.
+
+## Documenting an endpoint (OpenAPI 3, `open_api_spex`)
+
+`RephiWeb.ApiSpec` reads the paths from the router: a route is documented when its controller
+declares an `operation` for the action. The document is served at `/api/openapi` (Swagger UI at
+`/api/swagger`); no file is generated. Example, `POST /api/things/:id/archive`:
+
+```elixir
+# lib/rephi_web/schemas/things.ex - one module per body; the last segment is the component name
+defmodule RephiWeb.Schemas.Thing do
+  require OpenApiSpex
+  alias OpenApiSpex.Schema
+
+  OpenApiSpex.schema(
+    %{
+      type: :object,
+      properties: %{
+        id: %Schema{type: :integer},
+        name: %Schema{type: :string},
+        archived_at: RephiWeb.Schemas.timestamp(nullable: true)
+      },
+      required: [:id, :name, :archived_at]  # responses: EVERY property, nullable ones too
+    },
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.ThingResponse do
+  require OpenApiSpex
+  OpenApiSpex.schema(RephiWeb.Schemas.data(RephiWeb.Schemas.Thing), struct?: false)
+end
+
+# the controller
+use OpenApiSpex.ControllerSpecs
+import RephiWeb.ApiSpec.Operations
+alias RephiWeb.Schemas
+
+tags ["Things"]            # declared in @tags of RephiWeb.ApiSpec
+security bearer_auth()     # every action needs a token; otherwise `security:` per operation
+
+operation :archive,
+  summary: "Archive a thing",
+  description: "Requires things:archive.",
+  parameters: [id_param(:id, "Thing ID")],
+  request_body: body("Optional notes", Schemas.AssignmentNotes, required: false),
+  responses:
+    responses([
+      :unauthorized,       # 401 (every authenticated operation)
+      :body_errors,        # 400 + 413 (every operation that reads a body)
+      ok: {"Archived", Schemas.ThingResponse},
+      forbidden: "Forbidden - requires things:archive",
+      not_found: "Thing not found",
+      conflict: "Already archived",
+      unprocessable_entity: "notes is not a string"
+    ])
+
+def archive(conn, %{"id" => id}), do: ...
+```
+
+- `responses/1`: an error is just its description (`ErrorResponse`; `ValidationErrors` for 422;
+  `ErrorResponse` + `retry-after` for 429); `"..."` on a 2xx is a response without a body
+  (`no_content: "Deleted"`); `{"desc", Schema}` / `{"desc", Schema, headers: ...}` is a JSON body.
+  Other standard entries: `:invalid_page` (422 of `page_params()`), `:too_many_requests`.
+- Envelopes: `RephiWeb.Schemas.data(schema)` (`{"data": ...}`), `page(item)` (`data` + `meta`).
+  Nullable: `nullable: true` (OpenAPI 3.0), never `x-nullable`; not on a `$ref` (inline the
+  object instead).
+- PUT and PATCH of `resources` share one `operation :update`; `RephiWeb.ApiSpec` gives PATCH
+  the id `<Controller>.update.patch`.
+- Request bodies are not cast nor validated by the spec (no `CastAndValidate`): the controller
+  validates and the `FallbackController` answers. Do not add it to one controller only.
+- Formatting: `:open_api_spex` is in `import_deps`, so `operation`/`tags`/`security` take no
+  parentheses.
 
 ## Tests
 
@@ -167,11 +238,15 @@ ones. Make them reversible.
   (>= 32 bytes) and `PHX_HOST`; `CORS_ORIGINS` with `*` also stops the boot.
 - `FORCE_SSL` is on in prod: a local prod smoke over plain HTTP gets 301s except on
   `localhost` / `127.0.0.1` and `/api/health*`.
-- `swagger.json` must exist before `mix release` (the `Dockerfile` generates it); the route
-  answers 404 while it does not, and Swagger is off in prod unless `SWAGGER_ENABLED=true`.
+- The API documentation (`/api/openapi`, `/api/swagger`) is off in prod unless
+  `SWAGGER_ENABLED=true` (404 otherwise). The document is cached after the first request
+  (persistent_term) except in dev (`NoneCache` in `config/dev.exs`).
 - A changed `config/*.exs` needs a server restart (Phoenix does not reload config).
 - Client routes of a SPA must not end in something extension-like (`/users/john.doe` is a 404).
-- `phoenix_swagger` emits Swagger 2.0: use `"x-nullable": true`, not `nullable`.
+- A controller that `use OpenApiSpex.ControllerSpecs` warns at runtime ("No operation spec
+  defined") for a routed action without `operation`; the contract test fails on it.
+- The Swagger UI route is not under `:api` (its HTML needs a CSP that allows its CDN scripts);
+  `/api/openapi` is, with the strict CSP.
 - The installer refuses to generate if the template does not have exactly the expected
   secrets and salts (2 `secret_key_base`, 2 Guardian `secret_key`, 2 `signing_salt`): keep that
   shape when touching `config/*.exs` or `endpoint.ex`.

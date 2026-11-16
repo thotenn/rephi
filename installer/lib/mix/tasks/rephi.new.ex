@@ -315,7 +315,7 @@ defmodule Mix.Tasks.Rephi.New do
 
     - http://localhost:4000/app/example/ - the example frontend (log in with the
       development administrator that `./setup.sh` prints)
-    - http://localhost:4000/api/swagger - the API documentation
+    - http://localhost:4000/api/swagger - the API documentation (OpenAPI 3: /api/openapi)
     - http://localhost:4000/api/health - liveness check
 
     The development database is `#{app}_dev`; `.env.example` lists every setting.
@@ -323,7 +323,7 @@ defmodule Mix.Tasks.Rephi.New do
     ## Useful commands
 
     ```bash
-    mix setup                         # Phoenix only: deps, database, seeds, swagger.json
+    mix setup                         # Phoenix only: deps, database, seeds
     mix precommit                     # format check, warnings, unused deps, tests
     mix test
     yarn shared:build && yarn build   # build the frontends into priv/static/apps

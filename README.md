@@ -5,7 +5,7 @@ real-time notifications over Phoenix Channels, and any number of frontends in a 
 React single-page apps served by Phoenix, or static sites hosted anywhere.
 
 - **API** - Phoenix 1.8 JSON API under `/api`, one response and error envelope, paginated lists,
-  Swagger documentation checked against the real endpoints
+  OpenAPI 3 documentation (Swagger UI) checked against the real endpoints
 - **Authentication** - JWT access tokens (24 hours) that can be revoked: logout on every device,
   password change, deleted users; rate-limited login and registration
 - **RBAC** - hierarchical roles, permissions, system records, protection against privilege
@@ -79,14 +79,15 @@ pull. It:
    and that PostgreSQL answers;
 2. writes a git-ignored `.env` with a new `SECRET_KEY_BASE` and `GUARDIAN_SECRET_KEY` for
    development (`elixir scripts/dev_env.exs`; existing values are kept);
-3. runs `mix setup`: dependencies, database, migrations, seeds and `swagger.json`;
+3. runs `mix setup`: dependencies, database, migrations and seeds;
 4. runs `yarn install`, `yarn shared:build` and `yarn build`, which copies the apps into
    `priv/static/apps/`.
 
 Then open:
 
 - `http://localhost:4000/app/example/` - the example SPA, served by Phoenix
-- `http://localhost:4000/api/swagger` - the API documentation
+- `http://localhost:4000/api/swagger` - the API documentation (Swagger UI; the OpenAPI 3
+  document is `/api/openapi`)
 - `http://localhost:4000/api/health` - the liveness check
 
 The development seeds create the administrator `admin@admin.com` / `password123!!` when
@@ -95,7 +96,7 @@ The development seeds create the administrator `admin@admin.com` / `password123!
 The same steps by hand (`mix setup` prepares the Phoenix side only):
 
 ```bash
-mix setup                 # deps, database, migrations, seeds, swagger.json
+mix setup                 # deps, database, migrations, seeds
 yarn install
 yarn shared:build         # required before any app
 yarn build                # every app, copied to priv/static/apps/
@@ -130,7 +131,7 @@ Everything that changes between environments comes from environment variables, r
 | `CORS_ORIGINS` | Browser origins allowed to call the API, comma separated: exact origins or `https://*.example.com` wildcards, never `*` | the local dev servers (`:cors_origins` in `config/dev.exs`) | none | no |
 | `CHECK_ORIGIN` | WebSocket origin check: `true`, `false` or a list of origins | off | `PHX_HOST` plus `CORS_ORIGINS` | no |
 | `FORCE_SSL` | Redirect HTTP to HTTPS and send HSTS; the scheme comes from `X-Forwarded-Proto`; `/api/health*` and `localhost` are never redirected | not read (off) | `true` | no |
-| `SWAGGER_ENABLED` | Serve `/api/swagger` and `swagger.json` | `true` | `false` | no |
+| `SWAGGER_ENABLED` | Serve the API documentation: `/api/openapi` and the Swagger UI at `/api/swagger` | `true` | `false` | no |
 | `RATE_LIMIT_ENABLED` | Throttle login, password change and registration | `true` | `true` | no |
 | `RATE_LIMIT_LOGIN_MAX` / `RATE_LIMIT_REGISTER_MAX` / `RATE_LIMIT_WINDOW_SECONDS` | Requests per window and client IP | `10` / `5` / `60` | `10` / `5` / `60` | no |
 | `RATE_LIMIT_TRUSTED_PROXIES` | Reverse proxies whose `X-Forwarded-For` entry gives the client IP | `0` (header ignored) | `0` | no |
@@ -248,16 +249,35 @@ Outside a request (a context, a job, a channel), use `Rephi.Authorization` direc
 
 ## The API
 
-The interactive documentation is at `/api/swagger` and the document at
-`/api/swagger/swagger.json` (Swagger 2.0), both on in development and off in production unless
-`SWAGGER_ENABLED=true`. `swagger.json` is a build artifact: `mix phx.swagger.generate` writes it
-to `priv/static/swagger.json` (`mix setup` and the `Dockerfile` run it).
-`test/rephi_web/swagger_contract_test.exs` fails when a route is not documented or a documented
-response is not what the endpoint answers.
+The API is described by an OpenAPI 3.0 document built from the code with
+[`open_api_spex`](https://hexdocs.pm/open_api_spex): each controller action declares its
+`operation` next to it, the request and response bodies are schema modules
+(`RephiWeb.Schemas.*`), and `RephiWeb.ApiSpec` puts them together from the router.
+
+- `GET /api/openapi` - the document (JSON);
+- `GET /api/swagger` - Swagger UI on top of it ("Authorize" takes the bare token, without
+  `Bearer `). The page loads Swagger UI's scripts and styles from cdnjs.
+
+Both are on in development and test and off in production unless `SWAGGER_ENABLED=true` (they
+answer `404` when off). Nothing is generated at build time: the document is built from the code
+when first requested and cached (in development it is rebuilt on every request). To hand it to a
+client generator or keep it in CI, export it to a file:
+
+```bash
+mix openapi.spec.json --spec RephiWeb.ApiSpec --start-app=false --vendor-extensions=false --pretty=true
+# writes openapi.json (git-ignored); --filename PATH to choose another one
+```
+
+`test/rephi_web/api_contract_test.exs` fails when a route is not documented, the document is
+not valid, or a documented response is not what the endpoint answers (status, headers and every
+field of the body, both ways). Requests are not validated against the document: the controllers
+validate them and answer with the envelopes below (`OpenApiSpex.Plug.CastAndValidate` could do
+it, but would answer with its own error format).
 
 | Area | Endpoints | Permission |
 |---|---|---|
 | Service | `GET /`, `GET /api/health`, `GET /api/health/ready` | none |
+| Documentation | `GET /api/openapi`, `GET /api/swagger` (where `SWAGGER_ENABLED`) | none |
 | Auth | `POST /api/users/register`, `POST /api/users/login` | none |
 | | `GET /api/me`, `PUT /api/me/password`, `POST /api/users/logout` | signed in |
 | Users | `GET /api/users`, `GET /api/users/:id`, `GET /api/users/:id/roles` | `users:view` |
@@ -446,10 +466,10 @@ yarn example-astro:dev       # the Astro dev server, http://localhost:4321
 
 | Command | What it does |
 |---|---|
-| `mix setup` | Dependencies, database, migrations, seeds and `swagger.json` |
+| `mix setup` | Dependencies, database, migrations and seeds |
 | `mix ecto.reset` | Drop the database and set it up again with the seeds |
 | `mix run priv/repo/seeds.exs` | Seed again (idempotent) |
-| `mix phx.swagger.generate` | Regenerate `priv/static/swagger.json` after changing a `swagger_path` |
+| `mix openapi.spec.json --spec RephiWeb.ApiSpec --start-app=false` | Export the OpenAPI document to `openapi.json` (the server does not need it) |
 | `mix rephi.gen.frontend NAME` | Add a frontend app |
 | `mix format` | Format the Elixir code |
 | `mix docs` | Generate the ExDoc documentation |
@@ -473,8 +493,8 @@ cd installer && mix test # the installer
 
 The suite needs PostgreSQL with `postgres` / `postgres` on `localhost` (`config/test.exs`) and
 reads no environment variable. Among others it pins the number of database queries of the main
-endpoints (`test/rephi_web/query_budget_test.exs`) and checks the Swagger document against the
-API (`test/rephi_web/swagger_contract_test.exs`).
+endpoints (`test/rephi_web/query_budget_test.exs`) and checks the OpenAPI document against the
+API (`test/rephi_web/api_contract_test.exs`).
 
 CI (`.github/workflows/ci.yml`) runs `mix precommit` against PostgreSQL 17 and the installer's
 tests, and, for the frontends, `yarn install --immutable`, `yarn shared:build`,
@@ -484,7 +504,7 @@ tests, and, for the frontends, `yarn install --immutable`, `yarn shared:build`,
 
 ### With Docker
 
-The `Dockerfile` builds the frontends, `swagger.json` and the release into one image. The apps
+The `Dockerfile` builds the frontends and the release into one image. The apps
 call `/api` and `/socket` on the origin that serves them.
 
 ```bash
@@ -507,7 +527,6 @@ docker run -p 4000:4000 -e DATABASE_URL -e SECRET_KEY_BASE -e GUARDIAN_SECRET_KE
 yarn install --immutable && yarn shared:build && yarn build
 MIX_ENV=prod mix deps.get --only prod
 MIX_ENV=prod mix compile
-MIX_ENV=prod mix phx.swagger.generate
 MIX_ENV=prod mix release
 
 _build/prod/rel/rephi/bin/migrate      # migrations (Rephi.Release.migrate/0)
