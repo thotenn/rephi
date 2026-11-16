@@ -46,6 +46,7 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
 - **👮 RBAC Authorization**: Complete Role-Based Access Control with hierarchical permissions
 - **🔌 WebSocket Support**: Real-time communication via Phoenix Channels
 - **⚛️ Multi-Frontend Architecture**: Support for multiple React SPAs (dashboard, admin, e-commerce, landing)
+- **🚀 Astro Example**: The same example app as a static Astro site, ready for Cloudflare Pages
 - **📚 API Documentation**: Auto-generated Swagger/OpenAPI documentation
 - **🏗️ Production Ready**: Configured for scalability and best practices
 - **🛡️ CSRF Protection**: Built-in CSRF token injection for SPAs
@@ -84,6 +85,9 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
    - Frontend (dev): `http://localhost:5001`
    - Swagger UI: `http://localhost:4000/api/swagger`
 
+   The Astro version of the example runs with `yarn example-astro:dev` on
+   `http://localhost:4321` (see [`apps/example-astro`](apps/example-astro/README.md)).
+
 #### Alternative: Step-by-step setup
 
 If you prefer to run each step manually:
@@ -121,6 +125,7 @@ yarn shared:build
 
 # Start a specific app in development mode
 yarn example:dev
+yarn example-astro:dev
 yarn dashboard:dev
 
 # Build all apps
@@ -170,12 +175,33 @@ http://localhost:4000/app/APP_NAME
 
 ### Frontend Architecture
 
-Each frontend app:
+Each frontend app generated from the example template:
 - Is served at `/app/APP_NAME` with automatic CSRF token injection
 - Has its own development port configured
 - Uses React Router with the correct basename
 - Shares common components from `packages/shared-components`
 - Builds to `priv/static/apps/APP_NAME` for Phoenix to serve
+
+### Astro Example (static site for Cloudflare Pages)
+
+[`apps/example-astro`](apps/example-astro/README.md) is the example app rebuilt with
+[Astro](https://astro.build): prerendered pages, React islands for the interactive parts and
+the same Phoenix integrations (JWT auth, RBAC guards, admin screens, channel notifications)
+through `packages/shared-components`.
+
+It is meant to be hosted apart from Phoenix, on a static host such as Cloudflare Pages:
+- It is **not** copied to `priv/static/apps/` and has no `/app/...` route
+- The API and socket URLs come from its own `PUBLIC_API_URL` / `PUBLIC_WS_URL` variables
+- The backend must allow its origin (CORS and the WebSocket `check_origin`)
+
+```bash
+yarn shared:build
+yarn example-astro:dev      # http://localhost:4321
+yarn example-astro:build    # static site in apps/example-astro/dist
+```
+
+Its README covers the architecture, the environment variables and the deployment to
+Cloudflare Pages.
 
 ### Building and Deploying Frontends
 
@@ -189,6 +215,15 @@ yarn APP_NAME:build
 # Clean all builds
 yarn clean
 ```
+
+`yarn build` ends with `scripts/copy-builds.js`, which copies every `apps/*/dist` to
+`priv/static/apps/`. An app that is deployed elsewhere opts out in its `package.json`:
+
+```json
+"rephi": { "copyToPhoenix": false }
+```
+
+`node scripts/copy-builds.js --app APP_NAME` copies a single app explicitly, opted out or not.
 
 ## Architecture
 
@@ -207,7 +242,8 @@ lib/
 ### Frontend Structure
 ```
 apps/                         # Frontend applications
-├── example/                  # Example app (template)
+├── example/                  # Example app (template, Vite + React SPA)
+├── example-astro/            # Same app as a static Astro site (Cloudflare Pages)
 └── [your-apps]/             # Generated apps
 
 packages/                     # Shared packages
@@ -262,6 +298,9 @@ yarn typecheck
 
 # Preview the production build of one app
 yarn workspace rephi-example preview
+
+# Serve the Astro build with the local Cloudflare Pages emulator
+yarn workspace rephi-example-astro pages:dev
 ```
 
 ## Technology Stack
@@ -274,7 +313,8 @@ yarn workspace rephi-example preview
 - **Documentation** automatic with Phoenix Swagger
 
 ### Frontend (React)
-- **SPA Mode** without SSR
+- **SPA Mode** without SSR (`apps/example`), or **static pages + React islands** with Astro
+  (`apps/example-astro`)
 - **Global State** with Zustand (persisted)
 - **Forms** with React Hook Form + Zod
 - **Styling** with Tailwind CSS v4

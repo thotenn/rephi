@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Socket, Channel } from 'phoenix';
-import { env } from '../env';
+import { getRephiConfig } from '../config';
 
 interface PhoenixContextType {
   socket: Socket | null;
@@ -21,7 +21,7 @@ interface PhoenixProviderProps {
 
 export const PhoenixProvider: React.FC<PhoenixProviderProps> = ({
   children,
-  socketUrl = env.WS_URL,
+  socketUrl = getRephiConfig().wsUrl,
   autoConnect = false,
   token
 }) => {

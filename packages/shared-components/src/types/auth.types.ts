@@ -15,6 +15,9 @@ export interface User {
   email: string;
   roles?: Role[];
   permissions?: Permission[];
+  /** Creation timestamp as sent by the Phoenix API (Ecto's `inserted_at`). */
+  inserted_at?: string;
+  /** @deprecated The API never sends this field; use `inserted_at`. */
   created_at?: string;
   updated_at?: string;
 }

@@ -31,10 +31,37 @@ VITE_SERVER_API_URL=http://localhost:4000/api
 VITE_WS_URL=ws://localhost:4000/socket
 ```
 
+These values are inlined **when the library is built**, so every consumer of the same build
+shares them.
+
+### Runtime configuration
+
+A consumer that needs its own endpoints (a site hosted on another origin, a second
+environment, tests) overrides them at runtime, once, before the first request or socket
+connection:
+
+```ts
+import { configureRephi, getRephiConfig } from '@rephi/shared-components';
+
+configureRephi({
+  apiUrl: 'https://api.example.com/api',     // used by the `api` axios instance
+  wsUrl: 'wss://api.example.com/socket',     // used by `PhoenixSocket` and `PhoenixProvider`
+});
+
+getRephiConfig(); // { apiUrl, wsUrl } currently in effect
+```
+
+Keys that are omitted keep their current value, and without any call the build-time values of
+`env` apply. `apps/example-astro` does this in `src/lib/rephi.ts` with its own public
+environment variables.
+
+The library can be imported where there is no browser (server-side rendering, prerendering):
+`localStorage` / `sessionStorage` are only touched when they exist.
+
 ## Components
 
 ### PhoenixProvider
-Provider component for Phoenix WebSocket connections. Uses `env.WS_URL` by default.
+Provider component for Phoenix WebSocket connections. Uses the configured `wsUrl` by default.
 
 ```tsx
 import { PhoenixProvider } from '@rephi/shared-components';

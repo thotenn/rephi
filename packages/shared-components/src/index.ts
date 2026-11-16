@@ -19,9 +19,11 @@ export type {
   RouteConfig
 } from './utils/routes';
 
-// Environment
+// Environment (build-time defaults) and runtime configuration
 export { env } from './env';
 export type { Env } from './env';
+export { configureRephi, getRephiConfig } from './config';
+export type { RephiConfig } from './config';
 
 export {
   getCsrfToken,

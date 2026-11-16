@@ -1,0 +1,22 @@
+---
+import Card from "~/components/Card.astro";
+import NotificationSender from "~/islands/NotificationSender";
+import UserInfoCard from "~/islands/UserInfoCard";
+import AppLayout from "~/layouts/AppLayout.astro";
+---
+
+<AppLayout title="Home">
+  {/* client:only - shows the signed-in user, who is only known in the browser. */}
+  <UserInfoCard client:only="react" />
+
+  {/* client:only - displays the live socket state, which has no build-time value. */}
+  <NotificationSender client:only="react" />
+
+  <Card title="Welcome!" class="mt-8">
+    <p class="text-gray-600">
+      You have successfully logged into your Rephi account. This is your
+      home dashboard where you can manage your account and access all the
+      features of the application.
+    </p>
+  </Card>
+</AppLayout>

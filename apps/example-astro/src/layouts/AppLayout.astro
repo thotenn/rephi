@@ -1,0 +1,39 @@
+---
+import AppHeader from "~/components/AppHeader.astro";
+import RouteGuard from "~/islands/RouteGuard";
+import BaseLayout from "./BaseLayout.astro";
+
+interface Props {
+  /** Document title. */
+  title: string;
+  /** Heading shown in the header bar. */
+  heading?: string;
+  /** Who may see the page: any signed-in user, or admins only. */
+  access?: "auth" | "admin";
+}
+
+const { title, heading, access = "auth" } = Astro.props;
+---
+
+<BaseLayout title={title} noindex>
+  {/*
+    client:only - whether the visitor may see the page depends on the session
+    stored in the browser, which does not exist at build time. The page below is
+    shipped as inert HTML inside the island and inserted once the guard allows
+    it; until then the "fallback" slot is displayed.
+  */}
+  <RouteGuard client:only="react" access={access}>
+    <div class="min-h-screen bg-gray-50">
+      <AppHeader heading={heading} />
+      <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+          <slot />
+        </div>
+      </main>
+    </div>
+
+    <div slot="fallback" class="min-h-screen flex items-center justify-center">
+      <div class="animate-pulse text-lg text-gray-600">Loading...</div>
+    </div>
+  </RouteGuard>
+</BaseLayout>

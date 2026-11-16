@@ -1,0 +1,12 @@
+// Cloudflare Pages configuration for this app.
+//
+// The site is fully static: there are no Pages Functions and no bindings, so
+// this file only names the project, points Wrangler at the build output and
+// pins the compatibility date. It is used by `wrangler pages dev` and
+// `wrangler pages deploy` (see the `pages:*` scripts in package.json).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "rephi-example-astro",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-11-01"
+}

@@ -1,0 +1,24 @@
+# Cloudflare Pages response headers
+# https://developers.cloudflare.com/pages/configuration/headers/
+#
+# Rules are applied in order and a request inherits the headers of every rule
+# it matches. Paths assume the site is served from the domain root (base "/").
+
+# Every response: security headers, and no caching without revalidation. HTML
+# and the unhashed files of public/ are checked against their ETag on each
+# request, so a new deployment is picked up immediately.
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# Build assets carry a content hash in their file name: a changed file gets a
+# new URL, so they can be cached forever. The inherited Cache-Control is
+# detached first, otherwise both values would be joined into one header.
+/_astro/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable

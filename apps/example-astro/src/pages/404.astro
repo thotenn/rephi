@@ -1,0 +1,24 @@
+---
+import BaseLayout from "~/layouts/BaseLayout.astro";
+import { href, ROUTES } from "~/lib/routes";
+---
+
+<BaseLayout title="Page not found" noindex>
+  <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full text-center">
+      <p class="text-sm font-semibold text-indigo-600">404</p>
+      <h1 class="mt-2 text-3xl font-extrabold text-gray-900">Page not found</h1>
+      <p class="mt-2 text-sm text-gray-600">
+        The page you are looking for does not exist or has been moved.
+      </p>
+      <div class="mt-6">
+        <a
+          href={href(ROUTES.root)}
+          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          Back to the start page
+        </a>
+      </div>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,57 @@
+{
+  "name": "rephi-example-astro",
+  "private": true,
+  "type": "module",
+  "rephi": {
+    "copyToPhoenix": false
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "clean": "rm -rf dist .astro",
+    "lint": "eslint . --cache --cache-location ./node_modules/.cache/eslint/",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "pages:dev": "wrangler pages dev --ip 127.0.0.1",
+    "pages:deploy": "wrangler pages deploy"
+  },
+  "dependencies": {
+    "@astrojs/react": "^7.1.9",
+    "@hookform/resolvers": "^7.0.6",
+    "@rephi/shared-components": "workspace:*",
+    "@tailwindcss/vite": "^4.3.5",
+    "@tanstack/react-query": "^5.107.1",
+    "astro": "^7.4.12",
+    "phoenix": "^1.8.16",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-hook-form": "^7.92.0",
+    "react-hot-toast": "^2.6.1",
+    "tailwindcss": "^4.3.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@eslint-react/eslint-plugin": "^5.30.2",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.6",
+    "@types/phoenix": "^1.6.8",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.15.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-astro": "^3.2.1",
+    "eslint-plugin-import-x": "^4.18.1",
+    "eslint-plugin-jsx-a11y-x": "^0.2.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8",
+    "wrangler": "^4.162.0"
+  },
+  "engines": {
+    "node": ">=22.23.4"
+  }
+}

@@ -39,6 +39,8 @@ mix ecto.reset               # Drop and recreate database with seeds
 yarn install                 # Install all workspace dependencies
 yarn shared:build            # Build shared-components (required first!)
 yarn example:dev             # Start example app dev server
+yarn example-astro:dev       # Start the Astro example (port 4321)
+yarn example-astro:build     # Static build -> apps/example-astro/dist (not copied to priv/static)
 yarn build                   # Build all apps (copies to priv/static/apps/)
 yarn lint                    # Lint all apps
 yarn typecheck               # TypeScript check all apps
@@ -48,6 +50,8 @@ mix rephi.gen.frontend NAME  # Generate new frontend app
 > **Important:** Run `yarn shared:build` before `yarn example:dev`, `yarn typecheck` or `yarn lint` - apps resolve the shared-components package from its compiled `dist/`.
 
 Toolchain notes: Node.js 26 LTS (>= 22.22) and Yarn 4.18 via Corepack (on Node 25+ Corepack is no longer bundled: `npm install -g corepack`). `tsc` is TypeScript 7; the `typescript` import is the TS 6 API (npm aliases in each workspace, needed by typescript-eslint). Import router APIs from `react-router`, never `react-router-dom`.
+
+`apps/example-astro` is Astro 7 (static output, React islands): type-check with `astro check`, import the shared library only through `~/lib/rephi` (it applies `configureRephi` with `PUBLIC_API_URL` / `PUBLIC_WS_URL`), and keep `"rephi": { "copyToPhoenix": false }` in its package.json unless you build it with the Phoenix base path. The backend must allow its origin (CORS + `check_origin`).
 
 ## Architecture
 
@@ -71,6 +75,7 @@ lib/rephi_web/               # Web layer
 ```
 apps/                        # Frontend applications (Vite + React)
 ├── example/                 # Template app
+├── example-astro/           # Same app as a static Astro site (Cloudflare Pages), see its README
 └── [generated-apps]/
 
 packages/

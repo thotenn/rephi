@@ -1,0 +1,16 @@
+---
+import Card from "~/components/Card.astro";
+import UserInfoCard from "~/islands/UserInfoCard";
+import AppLayout from "~/layouts/AppLayout.astro";
+---
+
+<AppLayout title="Profile" heading="User Profile">
+  {/* client:only - shows the signed-in user, who is only known in the browser. */}
+  <UserInfoCard client:only="react" showUpdatedAt />
+
+  <Card title="Account Settings" class="mt-8">
+    <p class="text-gray-600">
+      Account settings and preferences will be available here in future updates.
+    </p>
+  </Card>
+</AppLayout>

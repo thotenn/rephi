@@ -17,6 +17,8 @@
     "clean": "yarn workspaces foreach --all --parallel run clean && rm -rf priv/static/apps",
     "example:dev": "yarn workspace rephi-example dev",
     "example:build": "yarn workspace rephi-example build",
+    "example-astro:dev": "yarn workspace rephi-example-astro dev",
+    "example-astro:build": "yarn workspace rephi-example-astro build",
     "shared:build": "yarn workspace @rephi/shared-components build"
   },
   "engines": {

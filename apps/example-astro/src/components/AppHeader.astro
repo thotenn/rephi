@@ -1,0 +1,61 @@
+---
+import AdminMenu from "~/islands/AdminMenu";
+import LogoutButton from "~/islands/LogoutButton";
+import { href, isRoute, ROUTES } from "~/lib/routes";
+
+interface Props {
+  heading?: string;
+}
+
+const { heading = "Welcome to Rephi" } = Astro.props;
+
+// Known at build time: each page is prerendered with its own pathname, so the
+// active link needs no JavaScript.
+const pathname = Astro.url.pathname;
+
+const links = [
+  { route: ROUTES.home, label: "Home" },
+  { route: ROUTES.pages.dashboard, label: "Dashboard" },
+  { route: ROUTES.pages.profile, label: "Profile" },
+];
+---
+
+<header class="bg-white shadow">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center py-6">
+      <div class="flex items-center space-x-8">
+        <h1 class="text-3xl font-bold text-gray-900">{heading}</h1>
+        <nav class="flex space-x-4" aria-label="Main">
+          {
+            links.map((link) => {
+              const active = isRoute(pathname, link.route);
+              return (
+                <a
+                  href={href(link.route)}
+                  aria-current={active ? "page" : undefined}
+                  class:list={[
+                    "px-3 py-2 rounded-md text-sm font-medium",
+                    active
+                      ? "bg-gray-900 text-white"
+                      : "text-gray-700 hover:bg-gray-700 hover:text-white",
+                  ]}
+                >
+                  {link.label}
+                </a>
+              );
+            })
+          }
+
+          {/* client:only - rendered for admins only, which is browser-side knowledge. */}
+          <AdminMenu client:only="react" pathname={pathname} />
+        </nav>
+      </div>
+
+      {/*
+        client:load - the markup never depends on the session, so it is
+        prerendered (no layout shift) and hydrated right away to be clickable.
+      */}
+      <LogoutButton client:load />
+    </div>
+  </div>
+</header>

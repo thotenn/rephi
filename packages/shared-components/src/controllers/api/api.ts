@@ -1,12 +1,17 @@
 import axios from "axios";
 import { useAuthStore } from "../../stores/auth.store";
 import type { ApiError } from "../../types";
-import { env } from "../../env";
+import { getRephiConfig, onRephiConfigChange } from "../../config";
 import { setCsrfHeader } from "./csrf";
 
 const api = axios.create({
-  baseURL: env.API.default,
+  baseURL: getRephiConfig().apiUrl,
   withCredentials: true,
+});
+
+// Follow `configureRephi({ apiUrl })` calls made after this module was loaded.
+onRephiConfigChange(({ apiUrl }) => {
+  api.defaults.baseURL = apiUrl;
 });
 
 api.interceptors.request.use((config) => {

@@ -1,0 +1,9 @@
+---
+import UsersManagement from "~/islands/admin/UsersManagement";
+import AppLayout from "~/layouts/AppLayout.astro";
+---
+
+<AppLayout title="User Management" heading="User Management" access="admin">
+  {/* client:only - everything it shows comes from authenticated API calls. */}
+  <UsersManagement client:only="react" />
+</AppLayout>

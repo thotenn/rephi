@@ -1,0 +1,32 @@
+---
+import LoginForm from "~/islands/LoginForm";
+import BaseLayout from "~/layouts/BaseLayout.astro";
+import { href, ROUTES } from "~/lib/routes";
+---
+
+<BaseLayout title="Sign in" guestOnly>
+  <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+      <div>
+        <h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          Sign in to your account
+        </h1>
+        <p class="mt-2 text-center text-sm text-gray-600">
+          Or{" "}
+          <a
+            href={href(ROUTES.auth.register)}
+            class="font-medium text-indigo-600 hover:text-indigo-500"
+          >
+            create a new account
+          </a>
+        </p>
+      </div>
+
+      {/*
+        client:load - the form is the page: it is prerendered so it is visible
+        before any JavaScript runs, and hydrated immediately.
+      */}
+      <LoginForm client:load />
+    </div>
+  </div>
+</BaseLayout>

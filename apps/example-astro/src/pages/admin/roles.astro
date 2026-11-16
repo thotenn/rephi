@@ -1,0 +1,9 @@
+---
+import RolesManagement from "~/islands/admin/RolesManagement";
+import AppLayout from "~/layouts/AppLayout.astro";
+---
+
+<AppLayout title="Roles Management" heading="Roles Management" access="admin">
+  {/* client:only - everything it shows comes from authenticated API calls. */}
+  <RolesManagement client:only="react" />
+</AppLayout>

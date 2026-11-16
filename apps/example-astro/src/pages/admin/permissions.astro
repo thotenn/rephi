@@ -1,0 +1,9 @@
+---
+import PermissionsManagement from "~/islands/admin/PermissionsManagement";
+import AppLayout from "~/layouts/AppLayout.astro";
+---
+
+<AppLayout title="Permissions Management" heading="Permission Management" access="admin">
+  {/* client:only - everything it shows comes from authenticated API calls. */}
+  <PermissionsManagement client:only="react" />
+</AppLayout>

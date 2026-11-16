@@ -1,0 +1,24 @@
+# Build output and generated types
+dist/
+.astro/
+
+# Wrangler local state
+.wrangler/
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.dev.vars
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store

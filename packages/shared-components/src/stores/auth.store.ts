@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { env } from "../env";
 import type { User } from "../types";
+import { getStorage } from "../utils/storage";
 
 const storeNames = env.STORES.exampleStore;
 
@@ -22,11 +23,11 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (user, token) => {
         set({ user, token, isAuthenticated: true });
         // Also set token in localStorage for socket connection
-        localStorage.setItem(storeNames.authToken, token);
+        getStorage("local")?.setItem(storeNames.authToken, token);
       },
       logout: () => {
         set({ user: null, token: null, isAuthenticated: false });
-        localStorage.removeItem(storeNames.authToken);
+        getStorage("local")?.removeItem(storeNames.authToken);
       },
     }),
     {

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `apps/example-astro`: the example app rebuilt with Astro 7 as a static, multi-page site (React
+  islands, Astro client router, Tailwind CSS 4) with every Phoenix integration of the SPA, ready
+  for Cloudflare Pages (`wrangler.jsonc`, `_headers`, real `404.html`). New root scripts
+  `yarn example-astro:dev` (port 4321) and `yarn example-astro:build`
+- `@rephi/shared-components`: `configureRephi({ apiUrl, wsUrl })` / `getRephiConfig()` to set the
+  API and socket URLs at runtime instead of only when the library is built
+- `scripts/copy-builds.js`: an app can opt out of the copy to `priv/static/apps` with
+  `"rephi": { "copyToPhoenix": false }` in its `package.json`; `--app <name>` copies a single app
+
 ### Changed
 - Backend toolchain upgraded to Elixir 1.20.5 and Erlang/OTP 29.1.2 (`.tool-versions`).
   The project and the `rephi_new` installer now require Elixir `~> 1.19`
@@ -26,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bundles them or the React JSX runtime
 - Imports from `react-router-dom` are now `react-router` (`RouterProvider` comes from
   `react-router/dom`)
+- `@rephi/shared-components` can be imported without a browser (prerendering): `localStorage` and
+  `sessionStorage` are only used when available
+- `User` type: added `inserted_at` (the field the API sends); `created_at` is deprecated
 
 ### Removed
 - `plug_cowboy`: the endpoint has always been served by Bandit, so Cowboy was never started
@@ -43,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `yarn lint` runs again: the legacy `.eslintrc.json` and the `--ignore-path` flag had stopped
   working with ESLint 9
 - Type declarations of `@rephi/shared-components` no longer contain unresolved `@/` path aliases
+- `PhoenixSocket.getSocket()` no longer opens a second socket while the first one is still
+  connecting, and a reconnect sends the current token instead of the one captured at first connect
 
 ## [0.1.0] - 2025-06-23
 
