@@ -2,7 +2,7 @@ import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, envField } from "astro/config";
 import { loadEnv } from "vite";
-import { appConfig } from "./app.config";
+import { appConfig } from "./app.config.ts";
 
 // `astro.config.*` is evaluated before Astro loads `.env`, so the build-time
 // options below are read with Vite's loader (process env wins over `.env` files).

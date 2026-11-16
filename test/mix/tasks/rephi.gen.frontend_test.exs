@@ -364,13 +364,55 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
     end
 
     test "a template whose config does not read app.config.ts", %{tmp_dir: tmp_dir} do
-      vite = Path.join(tmp_dir, "apps/example/vite.config.ts")
-      File.write!(vite, String.replace(File.read!(vite), ~s(from "./app.config"), ~s(from "./x")))
-      before = snapshot(tmp_dir)
+      for {template, config} <- [
+            {"example", "vite.config.ts"},
+            {"example-astro", "astro.config.ts"}
+          ],
+          import <- [~s("./x.ts"), ~s("./app.config.tsx"), ~s("./app.config.ts')] do
+        set_app_config_import(tmp_dir, template, config, import)
+        before = snapshot(tmp_dir)
 
-      assert gen_error(tmp_dir, ["demo"]) =~ "vite.config.ts does not import ./app.config"
-      assert snapshot(tmp_dir) == before
+        assert gen_error(tmp_dir, ["demo", "--template", template]) =~
+                 "#{config} does not import ./app.config"
+
+        assert snapshot(tmp_dir) == before
+      end
     end
+
+    test "the templates import app.config.ts with its extension", %{tmp_dir: tmp_dir} do
+      # Vite's native config loader (Node's type stripping) needs it.
+      assert read(tmp_dir, "apps/example/vite.config.ts") =~ ~s(from "./app.config.ts";)
+      assert read(tmp_dir, "apps/example-astro/astro.config.ts") =~ ~s(from "./app.config.ts";)
+    end
+
+    test "a template that imports app.config without the extension still works",
+         %{tmp_dir: tmp_dir} do
+      for {template, config} <- [
+            {"example", "vite.config.ts"},
+            {"example-astro", "astro.config.ts"}
+          ],
+          {import, n} <- Enum.with_index([~s("./app.config"), ~s('./app.config.js')]) do
+        set_app_config_import(tmp_dir, template, config, import)
+        name = "old-#{template}-#{n}"
+
+        gen(tmp_dir, [name, "--template", template])
+
+        assert read(tmp_dir, "apps/#{name}/#{config}") =~ "from #{import}"
+        assert %{port: _} = app_config(tmp_dir, name)
+      end
+    end
+  end
+
+  # Rewrites the module specifier of a template config's app.config import.
+  defp set_app_config_import(tmp_dir, template, config, import) do
+    path = Path.join(tmp_dir, "apps/#{template}/#{config}")
+    contents = File.read!(path)
+
+    updated =
+      Regex.replace(~r/(import \{ appConfig \} from )["'][^"'\n]*["']/, contents, "\\1#{import}")
+
+    if updated == contents, do: flunk("#{path} has no app.config import to rewrite")
+    File.write!(path, updated)
   end
 
   defp collect_info(acc \\ []) do

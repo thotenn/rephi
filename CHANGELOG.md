@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Vite config import warning** - `apps/example/vite.config.ts` (and `astro.config.ts` of the
+  Astro example) import `./app.config.ts` with its extension, so `yarn build` no longer warns that
+  the config is not ready for Vite's native config loader. `mix rephi.gen.frontend` accepts both
+  forms, so templates of earlier versions still generate
+
 ## [0.2.0] - 2026-11-16
 
 A toolchain upgrade and a full audit of the boilerplate: security, RBAC, the API contract, the
