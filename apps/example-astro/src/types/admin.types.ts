@@ -1,4 +1,4 @@
-import type { Permission as GrantSummary, Role as RoleSummary } from "~/lib/rephi";
+import type { ManagedUser, Role as RoleSummary } from "~/lib/rephi";
 
 /** A role as `/api/roles` returns it. */
 export interface Role {
@@ -48,15 +48,7 @@ export interface RoleDetail extends Role {
 }
 
 /** A user as `/api/users` returns it: assigned roles and direct permissions. */
-export interface UserWithGrants {
-  id: number;
-  email: string;
-  roles: RoleSummary[];
-  /** Granted to the user directly (not through roles). */
-  permissions: GrantSummary[];
-  inserted_at: string;
-  updated_at: string;
-}
+export type UserWithGrants = ManagedUser;
 
 /** A role offered in the user-role picker (`/api/users/:id/roles`). */
 export interface UserRole {

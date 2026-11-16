@@ -7,6 +7,8 @@ import { ErrorAlert, Pagination } from "~/components/commons";
 import { ADMIN_PAGE_SIZE, adminKeys, usersApi } from "~/modules/api/admin";
 import type { UserWithGrants } from "~/types/admin.types";
 import EditUserModal from "./EditUserModal";
+import ResetPasswordModal from "./ResetPasswordModal";
+import UserPermissionsModal from "./UserPermissionsModal";
 import UserRolesModal from "./UserRolesModal";
 import UsersTable from "./UsersTable";
 
@@ -17,6 +19,8 @@ export default function UsersManagement() {
   const [page, setPage] = useState(1);
   const [rolesFor, setRolesFor] = useState<UserWithGrants | null>(null);
   const [editing, setEditing] = useState<UserWithGrants | null>(null);
+  const [permissionsFor, setPermissionsFor] = useState<UserWithGrants | null>(null);
+  const [resettingPasswordOf, setResettingPasswordOf] = useState<UserWithGrants | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const usersQuery = useQuery({
@@ -58,8 +62,11 @@ export default function UsersManagement() {
               canManageRoles={can("roles:assign")}
               canEdit={can("users:edit")}
               canDelete={can("users:delete")}
+              canResetPassword={can("users:reset_password")}
               onManageRoles={setRolesFor}
+              onViewPermissions={setPermissionsFor}
               onEdit={setEditing}
+              onResetPassword={setResettingPasswordOf}
               onDelete={handleDelete}
             />
             <Pagination
@@ -75,6 +82,20 @@ export default function UsersManagement() {
           <UserRolesModal key={rolesFor.id} user={rolesFor} onClose={() => setRolesFor(null)} />
         )}
         {editing && <EditUserModal key={editing.id} user={editing} onClose={() => setEditing(null)} />}
+        {permissionsFor && (
+          <UserPermissionsModal
+            key={permissionsFor.id}
+            user={permissionsFor}
+            onClose={() => setPermissionsFor(null)}
+          />
+        )}
+        {resettingPasswordOf && (
+          <ResetPasswordModal
+            key={resettingPasswordOf.id}
+            user={resettingPasswordOf}
+            onClose={() => setResettingPasswordOf(null)}
+          />
+        )}
       </div>
     </Layout>
   );

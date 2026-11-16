@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
-import { isEmbedded } from "~/lib/navigation";
+import { go, isEmbedded } from "~/lib/navigation";
 import { setRealtimeConnected } from "~/lib/realtime";
+import { isRoute, ROUTES } from "~/lib/routes";
 import {
   fetchMe,
   LOBBY_TOPIC,
@@ -56,8 +57,31 @@ function Notifications({ userId }: { userId: number }) {
 }
 
 /**
+ * Keeps a user whose password an administrator reset (`must_change_password`)
+ * on the profile page, where the password form is, until a new password is
+ * set: the API refuses everything else meanwhile. Checked when the flag
+ * changes and after every navigation (this island survives them).
+ */
+function usePasswordChangeRedirect(mustChangePassword: boolean) {
+  useEffect(() => {
+    if (!mustChangePassword || isEmbedded) return;
+
+    const enforce = () => {
+      if (isRoute(window.location.pathname, ROUTES.pages.profile)) return;
+      toast("Choose a new password to continue.", { id: "must-change-password", icon: "🔑" });
+      go(ROUTES.pages.profile, { replace: true });
+    };
+
+    enforce();
+    document.addEventListener("astro:page-load", enforce);
+    return () => document.removeEventListener("astro:page-load", enforce);
+  }, [mustChangePassword]);
+}
+
+/**
  * App-wide runtime: owns the Phoenix socket, the notification channels, the
- * reaction to a lost session and the toast container.
+ * reaction to a lost session, the forced password change and the toast
+ * container.
  *
  * It is rendered once in the base layout with `transition:persist`, so Astro's
  * client router carries this island (and its open socket) from page to page
@@ -66,12 +90,17 @@ function Notifications({ userId }: { userId: number }) {
 export default function AppRuntime() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const userId = useAuthStore((state) => state.user?.id);
+  const mustChangePassword = useAuthStore(
+    (state) => state.isAuthenticated && !!state.user?.must_change_password
+  );
   // A session restored from storage may be stale or dead: it is checked once
   // per page load before the socket opens, so a revoked token ends the session
   // over HTTP (401) instead of failing a WebSocket handshake.
   const [bootChecked, setBootChecked] = useState(() => !useAuthStore.getState().isAuthenticated);
   // A framed copy of the page must not open a second socket (see `isEmbedded`).
   const online = isAuthenticated && bootChecked && !isEmbedded;
+
+  usePasswordChangeRedirect(mustChangePassword);
 
   useEffect(() => {
     if (bootChecked || isEmbedded) return;

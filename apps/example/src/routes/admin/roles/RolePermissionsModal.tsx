@@ -4,6 +4,7 @@ import { fetchMe, getErrorMessage, usePermissions } from "@rephi/shared-componen
 import { ErrorAlert, Modal } from "~/components/commons";
 import { adminKeys, permissionsApi, rolesApi } from "~/modules/api/admin";
 import type { Role } from "~/types/admin.types";
+import RoleParentsSection from "./RoleParentsSection";
 
 interface RolePermissionsModalProps {
   role: Role;
@@ -11,8 +12,9 @@ interface RolePermissionsModalProps {
 }
 
 /**
- * The permissions of a role: the ones assigned to it (removable) and the ones
- * it inherits from its parent roles (read-only: they are revoked on the parent).
+ * The detail of a role: its place in the hierarchy (`RoleParentsSection`), the
+ * permissions assigned to it (removable) and the ones it inherits from its
+ * parent roles (read-only: they are revoked on the parent).
  * Assigning needs `permissions:assign`, and listing what can be assigned needs
  * `permissions:view`; without them the modal is read-only.
  */
@@ -63,6 +65,8 @@ export default function RolePermissionsModal({ role, onClose }: RolePermissionsM
       title={`Permissions for ${role.name}`}
       className="max-w-4xl max-h-[80vh] overflow-y-auto"
     >
+      <RoleParentsSection role={role} />
+
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {detail.isPending ? (
