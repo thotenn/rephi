@@ -1,24 +1,32 @@
-defmodule RephiWeb.SwaggerContractTest do
+defmodule RephiWeb.ApiContractTest do
   @moduledoc """
-  The Swagger document describes the API that actually runs.
-
-  The document is built the way `mix phx.swagger.generate` builds it (the
-  `swagger_path` functions of the routed controllers plus their
-  `swagger_definitions/0`), then:
+  The OpenAPI document (`RephiWeb.ApiSpec`) describes the API that actually
+  runs.
 
     * every controller route of the router has an operation, and the
-      document is well formed (unique operation ids, every `$ref` resolves,
-      integer path ids, a 401 on every authenticated operation);
+      document is well formed: unique operation ids, every `$ref` resolves,
+      declared tags and security schemes, integer path ids, a 401 on every
+      authenticated operation, examples that match their schemas;
     * every response the document declares is produced by a real request -
-      the status and the whole body, against the declared schema, both ways:
-      a field the endpoint sends and the schema does not list fails, and so
-      does a field the schema lists and the endpoint does not send.
+      the status, the documented headers and the whole body against the
+      declared schema, both ways: a field the endpoint sends and the schema
+      does not declare fails, and so does a field the schema declares and
+      the endpoint does not send.
+
+  The body is checked twice: with `OpenApiSpex.cast_value/3` against the
+  schema made strict (every object `additionalProperties: false`; response
+  objects must list every property in `required`, see "is well formed"),
+  which covers fields, `nullable`, enums, formats and patterns; and against
+  the JSON types (`OpenApiSpex` casting would accept `"1"` for an integer).
 
   Adding an endpoint or a response means adding the request that produces it
-  to `cases/1` (or to the generic ones: 400, 401, 403, 404, 413, 429).
+  to `cases/1` (or relying on the generic ones: 400, 401, 403, 404, 413,
+  429).
   """
   use RephiWeb.ConnCase, async: false
 
+  alias OpenApiSpex.Cast.Error
+  alias OpenApiSpex.Schema
   alias Rephi.Accounts
   alias Rephi.Authorization
   alias RephiWeb.RateLimiter
@@ -35,7 +43,7 @@ defmodule RephiWeb.SwaggerContractTest do
       missing =
         for route <- controller_routes(),
             verb = to_string(route.verb),
-            path = swagger_path(route.path),
+            path = open_api_path(route.path),
             not Map.has_key?(paths[path] || %{}, verb),
             do: "#{String.upcase(verb)} #{route.path}"
 
@@ -46,21 +54,63 @@ defmodule RephiWeb.SwaggerContractTest do
       document = document()
       operations = operations(document)
       ids = Enum.map(operations, fn {_verb, _path, op} -> op["operationId"] end)
+      tags = MapSet.new(document["tags"], & &1["name"])
+      schemes = document["components"]["securitySchemes"]
 
+      assert document["openapi"] =~ ~r/^3\.0\.\d+$/
+      assert document["info"]["version"] == Mix.Project.config()[:version]
       assert ids -- Enum.uniq(ids) == [], "duplicate operationIds"
 
       for ref <- refs(document) do
-        assert Map.has_key?(document["definitions"], ref), "unresolved $ref #{ref}"
+        assert get_in(document, ref_path(ref)), "unresolved $ref #{ref}"
       end
 
       for {verb, path, op} <- operations do
-        assert op["tags"] not in [nil, []], "#{verb} #{path} has no tag"
+        where = "#{String.upcase(verb)} #{path}"
+        assert op["tags"] not in [nil, []], "#{where} has no tag"
+        assert Enum.all?(op["tags"], &(&1 in tags)), "#{where}: undeclared tag"
 
-        for %{"in" => "path"} = param <- op["parameters"] || [] do
-          assert param["type"] == "integer", "#{verb} #{path}: #{param["name"]} is not an integer"
+        path_params = for %{"in" => "path"} = param <- op["parameters"] || [], do: param
+
+        for param <- path_params do
+          assert param["schema"]["type"] == "integer",
+                 "#{where}: #{param["name"]} is not an integer"
         end
 
-        if op["security"], do: assert(Map.has_key?(op["responses"], "401"))
+        assert Enum.sort(for(p <- path_params, do: p["name"])) ==
+                 Enum.sort(for([_, name] <- Regex.scan(~r/\{(\w+)\}/, path), do: name)),
+               "#{where}: path parameters"
+
+        for requirement <- op["security"] || [], name <- Map.keys(requirement) do
+          assert Map.has_key?(schemes, name), "#{where}: unknown security scheme #{name}"
+        end
+
+        if op["security"], do: assert(Map.has_key?(op["responses"], "401"), where)
+      end
+
+      # A response object declares exactly what the views send: every
+      # property is required (a field that can be empty is nullable).
+      for {name, schema} <- response_schemas(document),
+          {where, object} <- objects(schema, name) do
+        properties = Map.keys(object["properties"])
+
+        assert Enum.sort(object["required"] || []) == Enum.sort(properties),
+               "#{where}: required must list every property"
+      end
+    end
+
+    test "every example matches its schema" do
+      spec = RephiWeb.ApiSpec.spec()
+
+      examples =
+        for {name, %Schema{example: example}} <- spec.components.schemas,
+            example != nil,
+            do: {name, example}
+
+      assert length(examples) > 10
+
+      for {name, example} <- examples do
+        OpenApiSpex.TestAssertions.assert_schema(example, name, strict(spec))
       end
     end
   end
@@ -70,6 +120,7 @@ defmodule RephiWeb.SwaggerContractTest do
 
     test "is what the endpoint answers", ctx do
       document = document()
+      spec = strict(RephiWeb.ApiSpec.spec())
 
       exercised =
         for {verb, path, status, request} <- cases(ctx) ++ generic_cases(ctx, document),
@@ -85,7 +136,13 @@ defmodule RephiWeb.SwaggerContractTest do
 
           response = op["responses"][to_string(status)]
           assert response, "#{where} does not document #{status}"
-          assert_body(conn, response, document["definitions"], where)
+
+          for {header, _header} <- response["headers"] || %{} do
+            assert get_resp_header(conn, header) != [], "#{where}: no #{header} header"
+          end
+
+          operation = Map.fetch!(spec.paths[path], String.to_existing_atom(verb))
+          assert_body(conn, operation.responses[status], response, spec, document, where)
 
           {verb, path, status}
         end
@@ -116,15 +173,7 @@ defmodule RephiWeb.SwaggerContractTest do
     inherited = create_permission()
     {:ok, _} = Authorization.assign_permission_to_role(parent, inherited)
 
-    file = Path.join(System.tmp_dir!(), "swagger-contract-#{System.unique_integer()}.json")
-    File.write!(file, Jason.encode!(document()))
-    previous = Application.get_env(:rephi, :swagger_file)
-
-    on_exit(fn ->
-      File.rm(file)
-      restore_env(:rephi, :swagger_file, previous)
-      RateLimiter.reset()
-    end)
+    on_exit(fn -> RateLimiter.reset() end)
 
     %{
       admin: admin,
@@ -132,8 +181,7 @@ defmodule RephiWeb.SwaggerContractTest do
       nobody_token: nobody_token,
       parent: parent,
       child: child,
-      inherited: inherited,
-      swagger_file: file
+      inherited: inherited
     }
   end
 
@@ -145,15 +193,16 @@ defmodule RephiWeb.SwaggerContractTest do
       {"get", "/", 200, fn -> call(:get, "/") end},
       {"get", "/api/health", 200, fn -> call(:get, "/api/health") end},
       {"get", "/api/health/ready", 200, fn -> call(:get, "/api/health/ready") end},
-      {"get", "/api/swagger/swagger.json", 200,
+      {"get", "/api/openapi", 200, fn -> call(:get, "/api/openapi") end},
+      {"get", "/api/openapi", 404,
        fn ->
-         Application.put_env(:rephi, :swagger_file, ctx.swagger_file)
-         call(:get, "/api/swagger/swagger.json")
-       end},
-      {"get", "/api/swagger/swagger.json", 404,
-       fn ->
-         Application.put_env(:rephi, :swagger_file, ctx.swagger_file <> ".missing")
-         call(:get, "/api/swagger/swagger.json")
+         Application.put_env(:rephi, :swagger_enabled, false)
+
+         try do
+           call(:get, "/api/openapi")
+         after
+           Application.put_env(:rephi, :swagger_enabled, true)
+         end
        end},
 
       # Auth
@@ -411,35 +460,10 @@ defmodule RephiWeb.SwaggerContractTest do
 
   defp fill(path, id), do: Regex.replace(~r/\{[a-z_]+\}/, path, to_string(id))
 
-  defp restore_env(app, key, nil), do: Application.delete_env(app, key)
-  defp restore_env(app, key, value), do: Application.put_env(app, key, value)
-
   # -- the document -----------------------------------------------------------
 
-  # What `mix phx.swagger.generate` builds, as decoded JSON.
-  defp document do
-    routes = controller_routes()
-
-    paths =
-      for route <- routes,
-          fun = :"swagger_path_#{route.plug_opts}",
-          function_exported?(route.plug, fun, 1),
-          reduce: %{} do
-        paths ->
-          operation =
-            apply(route.plug, fun, [%{verb: route.verb, path: swagger_path(route.path)}])
-
-          Map.merge(paths, operation, fn _path, a, b -> Map.merge(a, b) end)
-      end
-
-    definitions =
-      for controller <- routes |> Enum.map(& &1.plug) |> Enum.uniq(),
-          function_exported?(controller, :swagger_definitions, 0),
-          reduce: %{},
-          do: (definitions -> Map.merge(definitions, controller.swagger_definitions()))
-
-    %{paths: paths, definitions: definitions} |> Jason.encode!() |> Jason.decode!()
-  end
+  # What GET /api/openapi serves, as decoded JSON.
+  defp document, do: RephiWeb.ApiSpec.spec() |> Jason.encode!() |> Jason.decode!()
 
   defp controller_routes do
     for route <- RephiWeb.Router.__routes__(),
@@ -449,70 +473,141 @@ defmodule RephiWeb.SwaggerContractTest do
         do: route
   end
 
-  defp swagger_path(path), do: Regex.replace(~r/:([^\/]+)/, path, "{\\1}")
+  defp open_api_path(path), do: Regex.replace(~r/:([^\/]+)/, path, "{\\1}")
 
   defp operations(document) do
     for {path, verbs} <- document["paths"], {verb, op} <- verbs, do: {verb, path, op}
   end
 
-  defp refs(%{"$ref" => "#/definitions/" <> name}), do: [name]
+  defp refs(%{"$ref" => ref}), do: [ref]
   defp refs(map) when is_map(map), do: Enum.flat_map(Map.values(map), &refs/1)
   defp refs(list) when is_list(list), do: Enum.flat_map(list, &refs/1)
   defp refs(_other), do: []
 
-  # -- the response against the schema ----------------------------------------
+  defp ref_path("#/" <> pointer), do: String.split(pointer, "/")
 
-  defp assert_body(conn, %{"schema" => schema}, definitions, where) do
-    assert ["application/json" <> _] = get_resp_header(conn, "content-type")
-    assert_schema(Jason.decode!(conn.resp_body), schema, definitions, where)
+  # The schemas of the response bodies: the inline ones and every component
+  # they reach, with where they are.
+  defp response_schemas(document) do
+    roots =
+      for {verb, path, op} <- operations(document),
+          {status, response} <- op["responses"],
+          %{"schema" => schema} <- Map.values(response["content"] || %{}),
+          do: {"#{String.upcase(verb)} #{path} #{status}", schema}
+
+    schemas = document["components"]["schemas"]
+    refs = roots |> Enum.flat_map(fn {_where, schema} -> refs(schema) end)
+
+    components =
+      for name <- reachable(refs, schemas, MapSet.new()), do: {name, schemas[name]}
+
+    roots ++ components
   end
 
-  defp assert_body(conn, _response, _definitions, where) do
-    assert conn.resp_body == "", "#{where}: documented without a body, got #{conn.resp_body}"
-  end
+  defp reachable([], _schemas, seen), do: seen
 
-  defp assert_schema(value, %{"$ref" => "#/definitions/" <> name}, definitions, where) do
-    assert_schema(value, Map.fetch!(definitions, name), definitions, "#{where} (#{name})")
-  end
-
-  defp assert_schema(nil, %{"x-nullable" => true}, _definitions, _where), do: :ok
-
-  defp assert_schema(value, %{"type" => "object"} = schema, definitions, where) do
-    assert is_map(value), "#{where}: expected an object, got #{inspect(value)}"
-
-    case schema do
-      %{"properties" => properties} ->
-        keys = Map.keys(value)
-        listed = Map.keys(properties)
-
-        assert keys -- listed == [], "#{where}: undocumented fields #{inspect(keys -- listed)}"
-        assert listed -- keys == [], "#{where}: phantom fields #{inspect(listed -- keys)}"
-
-        for {key, property} <- properties,
-            do: assert_schema(value[key], property, definitions, "#{where}.#{key}")
-
-      %{"additionalProperties" => property} ->
-        for {key, item} <- value,
-            do: assert_schema(item, property, definitions, "#{where}.#{key}")
-
-      _free_form ->
-        :ok
+  defp reachable(["#/components/schemas/" <> name | rest], schemas, seen) do
+    if name in seen do
+      reachable(rest, schemas, seen)
+    else
+      reachable(refs(schemas[name]) ++ rest, schemas, MapSet.put(seen, name))
     end
   end
 
-  defp assert_schema(value, %{"type" => "array", "items" => items}, definitions, where) do
-    assert is_list(value), "#{where}: expected an array, got #{inspect(value)}"
-    for item <- value, do: assert_schema(item, items, definitions, "#{where}[]")
+  # Every object with properties inside a schema, with where it is.
+  defp objects(%{"properties" => properties} = schema, where) do
+    nested = for {key, property} <- properties, do: objects(property, "#{where}.#{key}")
+    [{where, schema} | List.flatten(nested)]
   end
 
-  defp assert_schema(value, %{"type" => type} = schema, _definitions, where) do
+  defp objects(%{"items" => items}, where), do: objects(items, "#{where}[]")
+  defp objects(_schema, _where), do: []
+
+  # The spec with every object that lists its properties closed to any other
+  # (`additionalProperties: false`), so casting a body with an undeclared
+  # field fails.
+  defp strict(%OpenApiSpex.OpenApi{} = spec) do
+    schemas = Map.new(spec.components.schemas, fn {name, schema} -> {name, strict(schema)} end)
+    put_in(spec.components.schemas, schemas)
+  end
+
+  defp strict(%Schema{} = schema) do
+    schema = %{
+      schema
+      | properties: schema.properties && Map.new(schema.properties, &strict_property/1),
+        items: strict(schema.items)
+    }
+
+    if schema.type == :object and schema.properties != nil and
+         schema.additionalProperties == nil,
+       do: %{schema | additionalProperties: false},
+       else: schema
+  end
+
+  defp strict(other), do: other
+
+  defp strict_property({key, schema}), do: {key, strict(schema)}
+
+  # -- the response against the schema ----------------------------------------
+
+  defp assert_body(conn, %{content: nil}, _response, _spec, _document, where) do
+    assert conn.resp_body == "", "#{where}: documented without a body, got #{conn.resp_body}"
+  end
+
+  defp assert_body(conn, %{content: content}, response, spec, document, where) do
+    assert ["application/json" <> _] = get_resp_header(conn, "content-type")
+    body = Jason.decode!(conn.resp_body)
+
+    case OpenApiSpex.cast_value(body, content["application/json"].schema, spec) do
+      {:ok, _cast} ->
+        :ok
+
+      {:error, errors} ->
+        messages =
+          Enum.map_join(errors, "; ", &"#{Error.message(&1)} at #{Error.path_to_string(&1)}")
+
+        flunk("#{where}: #{messages}\n#{conn.resp_body}")
+    end
+
+    assert_types(body, response["content"]["application/json"]["schema"], document, where)
+  end
+
+  # The JSON types, which casting does not check (it accepts "1" for an
+  # integer or "true" for a boolean), and UTC date-times.
+  defp assert_types(value, %{"$ref" => ref}, document, where) do
+    assert_types(value, get_in(document, ref_path(ref)), document, "#{where} (#{ref})")
+  end
+
+  defp assert_types(nil, %{"nullable" => true}, _document, _where), do: :ok
+
+  defp assert_types(value, %{"type" => "object"} = schema, document, where) do
+    assert is_map(value), "#{where}: expected an object, got #{inspect(value)}"
+
+    for {key, item} <- value do
+      case schema do
+        %{"properties" => %{^key => property}} ->
+          assert_types(item, property, document, "#{where}.#{key}")
+
+        %{"additionalProperties" => %{} = property} ->
+          assert_types(item, property, document, "#{where}.#{key}")
+
+        _free_form ->
+          :ok
+      end
+    end
+  end
+
+  defp assert_types(value, %{"type" => "array", "items" => items}, document, where) do
+    assert is_list(value), "#{where}: expected an array, got #{inspect(value)}"
+    for item <- value, do: assert_types(item, items, document, "#{where}[]")
+  end
+
+  defp assert_types(value, %{"type" => type} = schema, _document, where) do
     assert scalar?(type, value), "#{where}: expected #{type}, got #{inspect(value)}"
 
     if schema["format"] == "date-time" do
       assert {:ok, _datetime, 0} = DateTime.from_iso8601(value), "#{where}: not a UTC date-time"
     end
-
-    if enum = schema["enum"], do: assert(value in enum, "#{where}: #{inspect(value)} not in enum")
   end
 
   defp scalar?("integer", value), do: is_integer(value)

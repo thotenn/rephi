@@ -6,7 +6,7 @@
 #      .tool-versions are the minimums), Node.js (`engines` in package.json),
 #      Yarn 4 through Corepack, and that PostgreSQL answers;
 #   2. writes the development secrets into .env (scripts/dev_env.exs);
-#   3. `mix setup`: dependencies, database, migrations, seeds, swagger.json;
+#   3. `mix setup`: dependencies, database, migrations, seeds;
 #   4. installs the frontend dependencies and builds shared-components and
 #      every app into priv/static/apps.
 #
@@ -120,7 +120,7 @@ elixir scripts/dev_env.exs
 
 # --- 3. Phoenix ----------------------------------------------------------------
 
-step "Setting up Phoenix: dependencies, database, seeds, swagger.json (mix setup)"
+step "Setting up Phoenix: dependencies, database, seeds (mix setup)"
 mix setup
 
 # --- 4. Frontends --------------------------------------------------------------

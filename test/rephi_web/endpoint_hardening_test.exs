@@ -1,7 +1,7 @@
 defmodule RephiWeb.EndpointHardeningTest do
   @moduledoc """
   CORS (SEC-14, API-17), HTTPS redirect (SEC-15), secure headers on the API
-  (SEC-15), the Swagger switch (SEC-20) and the "every API route needs a
+  (SEC-15), the API documentation switch (SEC-20) and the "every API route needs a
   token" invariant.
   """
   use RephiWeb.ConnCase, async: false
@@ -190,15 +190,16 @@ defmodule RephiWeb.EndpointHardeningTest do
     end
   end
 
-  describe "Swagger switch" do
-    test "on, the UI is served" do
-      assert get(build_conn(), "/api/swagger/index.html").status == 200
+  describe "API documentation switch" do
+    test "on, the document and the UI are served" do
+      assert get(build_conn(), "/api/openapi").status == 200
+      assert get(build_conn(), "/api/swagger").status == 200
     end
 
-    test "off, the UI and the document are a 404" do
+    test "off, the document and the UI are a 404" do
       put_app_env(:swagger_enabled, false)
 
-      for path <- ["/api/swagger", "/api/swagger/index.html", "/api/swagger/swagger.json"] do
+      for path <- ["/api/openapi", "/api/swagger"] do
         assert error_detail(get(build_conn(), path), 404) == "Not Found"
       end
     end
@@ -210,7 +211,8 @@ defmodule RephiWeb.EndpointHardeningTest do
       {"POST", "/api/users/login"},
       {"GET", "/api/health"},
       {"GET", "/api/health/ready"},
-      {"GET", "/api/swagger/swagger.json"}
+      {"GET", "/api/openapi"},
+      {"GET", "/api/swagger"}
     ]
 
     test "but the public ones answers 401 without a token" do

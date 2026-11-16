@@ -1,5 +1,5 @@
 # Production image: the Phoenix release plus the frontends it serves
-# (priv/static/apps) and the API documentation (priv/static/swagger.json).
+# (priv/static/apps). The API documentation is built from the code at runtime.
 #
 #     docker build -t rephi .
 #     docker run --rm -p 4000:4000 \
@@ -78,7 +78,6 @@ RUN mix compile
 
 # Build-time artifacts the release serves.
 COPY --from=frontends /app/priv/static/apps priv/static/apps
-RUN mix phx.swagger.generate
 
 # Changes to config/runtime.exs don't require recompiling the code
 COPY config/runtime.exs config/

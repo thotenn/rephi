@@ -44,16 +44,19 @@ defmodule RephiWeb.RoleController do
 
   """
   use RephiWeb, :controller
-  use PhoenixSwagger
+  use OpenApiSpex.ControllerSpecs
 
-  import RephiWeb.Swagger
+  import RephiWeb.ApiSpec.Operations
 
-  alias PhoenixSwagger.Schema
   alias Rephi.Accounts
   alias Rephi.Authorization
   alias Rephi.Authorization.Role
+  alias RephiWeb.Schemas
 
   action_fallback RephiWeb.FallbackController
+
+  tags ["Roles"]
+  security bearer_auth()
 
   plug AuthorizationPlug,
        {:permission, "roles:view"} when action in [:index, :show, :get_role_permissions]
@@ -65,17 +68,17 @@ defmodule RephiWeb.RoleController do
   plug AuthorizationPlug,
        {:permission, "roles:assign"} when action in [:assign_to_user, :remove_from_user]
 
-  swagger_path :index do
-    get("/api/roles")
-    summary("List roles")
-    description("One page of roles, ordered by slug. Requires roles:view.")
-    tag("Roles")
-    produces("application/json")
-    bearer_auth()
-    page_params()
-    response(200, "One page of roles", Schema.ref(:RolesResponse))
-    error_response(403, "Forbidden - requires roles:view")
-  end
+  operation :index,
+    summary: "List roles",
+    description: "One page of roles, ordered by slug. Requires roles:view.",
+    parameters: page_params(),
+    responses:
+      responses([
+        :unauthorized,
+        :invalid_page,
+        ok: {"One page of roles", Schemas.RolesResponse},
+        forbidden: "Forbidden - requires roles:view"
+      ])
 
   def index(conn, params) do
     with {:ok, page} <- Authorization.paginate_roles(params) do
@@ -83,22 +86,18 @@ defmodule RephiWeb.RoleController do
     end
   end
 
-  swagger_path :show do
-    get("/api/roles/{id}")
-    summary("Get a role")
-
-    description(
-      "A role with the permissions assigned to it (permissions) and the ones it only inherits from its parent roles (inherited_permissions). Requires roles:view."
-    )
-
-    tag("Roles")
-    produces("application/json")
-    bearer_auth()
-    id_param(:id, "Role ID")
-    response(200, "The role", Schema.ref(:RoleDetailResponse))
-    error_response(403, "Forbidden - requires roles:view")
-    error_response(404, "Role not found")
-  end
+  operation :show,
+    summary: "Get a role",
+    description:
+      "A role with the permissions assigned to it (permissions) and the ones it only inherits from its parent roles (inherited_permissions). Requires roles:view.",
+    parameters: [id_param(:id, "Role ID")],
+    responses:
+      responses([
+        :unauthorized,
+        ok: {"The role", Schemas.RoleDetailResponse},
+        forbidden: "Forbidden - requires roles:view",
+        not_found: "Role not found"
+      ])
 
   def show(conn, %{"id" => id}) do
     with {:ok, role} <- Authorization.fetch_role(id) do
@@ -106,28 +105,19 @@ defmodule RephiWeb.RoleController do
     end
   end
 
-  swagger_path :create do
-    post("/api/roles")
-    summary("Create a role")
-
-    description(
-      "The attributes may also be wrapped under \"role\". Requires roles:create. The location header points to the new role."
-    )
-
-    tag("Roles")
-    consumes("application/json")
-    produces("application/json")
-    bearer_auth()
-
-    parameters do
-      body(:body, Schema.ref(:RoleInput), "The role", required: true)
-    end
-
-    response(201, "Role created", Schema.ref(:RoleDetailResponse))
-    body_errors()
-    error_response(403, "Forbidden - requires roles:create")
-    validation_response("Invalid or taken name or slug")
-  end
+  operation :create,
+    summary: "Create a role",
+    description:
+      "The attributes may also be wrapped under \"role\". Requires roles:create. The location header points to the new role.",
+    request_body: body("The role", Schemas.RoleInput),
+    responses:
+      responses([
+        :unauthorized,
+        :body_errors,
+        created: {"Role created", Schemas.RoleDetailResponse},
+        forbidden: "Forbidden - requires roles:create",
+        unprocessable_entity: "Invalid or taken name or slug"
+      ])
 
   def create(conn, _params) do
     with {:ok, %Role{} = role} <- Authorization.create_role(resource_params(conn, "role")) do
@@ -138,32 +128,21 @@ defmodule RephiWeb.RoleController do
     end
   end
 
-  swagger_path :update do
-    summary("Update a role")
-
-    description(
-      "Changes the attributes sent; the others keep their value. The attributes may also be wrapped under \"role\". The slug of a system role cannot change (422). PUT and PATCH behave the same. Requires roles:edit."
-    )
-
-    tag("Roles")
-    consumes("application/json")
-    produces("application/json")
-    bearer_auth()
-    id_param(:id, "Role ID")
-
-    parameters do
-      body(:body, Schema.ref(:RoleUpdate), "The attributes to change", required: true)
-    end
-
-    response(200, "Role updated", Schema.ref(:RoleDetailResponse))
-    body_errors()
-    error_response(403, "Forbidden - requires roles:edit")
-    error_response(404, "Role not found")
-    validation_response("Invalid or taken name or slug, or the slug of a system role")
-  end
-
-  defoverridable swagger_path_update: 1
-  def swagger_path_update(route), do: route |> super() |> operation_per_verb()
+  operation :update,
+    summary: "Update a role",
+    description:
+      "Changes the attributes sent; the others keep their value. The attributes may also be wrapped under \"role\". The slug of a system role cannot change (422). PUT and PATCH behave the same. Requires roles:edit.",
+    parameters: [id_param(:id, "Role ID")],
+    request_body: body("The attributes to change", Schemas.RoleUpdate),
+    responses:
+      responses([
+        :unauthorized,
+        :body_errors,
+        ok: {"Role updated", Schemas.RoleDetailResponse},
+        forbidden: "Forbidden - requires roles:edit",
+        not_found: "Role not found",
+        unprocessable_entity: "Invalid or taken name or slug, or the slug of a system role"
+      ])
 
   def update(conn, %{"id" => id}) do
     with {:ok, role} <- Authorization.fetch_role(id),
@@ -172,23 +151,18 @@ defmodule RephiWeb.RoleController do
     end
   end
 
-  swagger_path :delete do
-    PhoenixSwagger.Path.delete("/api/roles/{id}")
-    summary("Delete a role")
-    description("Requires roles:delete.")
-    tag("Roles")
-    produces("application/json")
-    bearer_auth()
-    id_param(:id, "Role ID")
-    response(204, "Role deleted")
-    error_response(403, "Forbidden - requires roles:delete")
-    error_response(404, "Role not found")
-
-    error_response(
-      409,
-      "A system role, or deleting it would leave nobody with the admin role"
-    )
-  end
+  operation :delete,
+    summary: "Delete a role",
+    description: "Requires roles:delete.",
+    parameters: [id_param(:id, "Role ID")],
+    responses:
+      responses([
+        :unauthorized,
+        no_content: "Role deleted",
+        forbidden: "Forbidden - requires roles:delete",
+        not_found: "Role not found",
+        conflict: "A system role, or deleting it would leave nobody with the admin role"
+      ])
 
   def delete(conn, %{"id" => id}) do
     with {:ok, role} <- Authorization.fetch_role(id),
@@ -197,37 +171,22 @@ defmodule RephiWeb.RoleController do
     end
   end
 
-  swagger_path :assign_to_user do
-    post("/api/users/{user_id}/roles/{role_id}")
-    summary("Assign a role to a user")
-
-    description(
-      "Requires roles:assign, and holding the role (assigned or inherited) or being an admin. The body is optional. assigned_by is the caller."
-    )
-
-    tag("Roles")
-    consumes("application/json")
-    produces("application/json")
-    bearer_auth()
-    id_param(:user_id, "User ID")
-    id_param(:role_id, "Role ID")
-
-    parameters do
-      body(:body, Schema.ref(:AssignmentNotes), "Optional notes", required: false)
-    end
-
-    response(201, "Role assigned", Schema.ref(:UserRoleAssignmentResponse))
-    body_errors()
-
-    error_response(
-      403,
-      "Forbidden - requires roles:assign, and holding the role or being an admin"
-    )
-
-    error_response(404, "User or role not found")
-    error_response(409, "Role already assigned to user")
-    validation_response("notes is not a string or is too long")
-  end
+  operation :assign_to_user,
+    summary: "Assign a role to a user",
+    description:
+      "Requires roles:assign, and holding the role (assigned or inherited) or being an admin. The body is optional. assigned_by is the caller.",
+    parameters: [id_param(:user_id, "User ID"), id_param(:role_id, "Role ID")],
+    request_body: body("Optional notes", Schemas.AssignmentNotes, required: false),
+    responses:
+      responses([
+        :unauthorized,
+        :body_errors,
+        created: {"Role assigned", Schemas.UserRoleAssignmentResponse},
+        forbidden: "Forbidden - requires roles:assign, and holding the role or being an admin",
+        not_found: "User or role not found",
+        conflict: "Role already assigned to user",
+        unprocessable_entity: "notes is not a string or is too long"
+      ])
 
   def assign_to_user(conn, %{"user_id" => user_id, "role_id" => role_id} = params) do
     opts = [actor: current_access(conn), notes: params["notes"]]
@@ -244,29 +203,19 @@ defmodule RephiWeb.RoleController do
     end
   end
 
-  swagger_path :remove_from_user do
-    PhoenixSwagger.Path.delete("/api/users/{user_id}/roles/{role_id}")
-    summary("Remove a role from a user")
-
-    description(
-      "Requires roles:assign, and holding the role (assigned or inherited) or being an admin."
-    )
-
-    tag("Roles")
-    produces("application/json")
-    bearer_auth()
-    id_param(:user_id, "User ID")
-    id_param(:role_id, "Role ID")
-    response(204, "Role removed")
-
-    error_response(
-      403,
-      "Forbidden - requires roles:assign, and holding the role or being an admin"
-    )
-
-    error_response(404, "User or role not found, or the role is not assigned to the user")
-    error_response(409, "It would leave nobody with the admin role")
-  end
+  operation :remove_from_user,
+    summary: "Remove a role from a user",
+    description:
+      "Requires roles:assign, and holding the role (assigned or inherited) or being an admin.",
+    parameters: [id_param(:user_id, "User ID"), id_param(:role_id, "Role ID")],
+    responses:
+      responses([
+        :unauthorized,
+        no_content: "Role removed",
+        forbidden: "Forbidden - requires roles:assign, and holding the role or being an admin",
+        not_found: "User or role not found, or the role is not assigned to the user",
+        conflict: "It would leave nobody with the admin role"
+      ])
 
   def remove_from_user(conn, %{"user_id" => user_id, "role_id" => role_id}) do
     with {:ok, user} <- Accounts.fetch_user(user_id),
@@ -276,254 +225,22 @@ defmodule RephiWeb.RoleController do
     end
   end
 
-  swagger_path :get_role_permissions do
-    get("/api/roles/{id}/permissions")
-    summary("List the permissions of a role")
-
-    description(
-      "Every permission the role grants, by slug: assigned to it (inherited: false) or inherited from its parent roles (inherited: true, inherited_from lists them). Not paginated. Requires roles:view."
-    )
-
-    tag("Roles")
-    produces("application/json")
-    bearer_auth()
-    id_param(:id, "Role ID")
-    response(200, "The permissions of the role", Schema.ref(:RolePermissionsResponse))
-    error_response(403, "Forbidden - requires roles:view")
-    error_response(404, "Role not found")
-  end
+  operation :get_role_permissions,
+    summary: "List the permissions of a role",
+    description:
+      "Every permission the role grants, by slug: assigned to it (inherited: false) or inherited from its parent roles (inherited: true, inherited_from lists them). Not paginated. Requires roles:view.",
+    parameters: [id_param(:id, "Role ID")],
+    responses:
+      responses([
+        :unauthorized,
+        ok: {"The permissions of the role", Schemas.RolePermissionsResponse},
+        forbidden: "Forbidden - requires roles:view",
+        not_found: "Role not found"
+      ])
 
   def get_role_permissions(conn, %{"id" => id}) do
     with {:ok, role} <- Authorization.fetch_role(id) do
       render(conn, :permissions, sources: Authorization.get_role_permission_sources(role))
     end
-  end
-
-  # Swagger schema definitions
-  def swagger_definitions do
-    RephiWeb.Swagger.definitions(%{
-      Role: %{
-        type: :object,
-        title: "Role",
-        properties: %{
-          id: %{type: :integer},
-          name: %{type: :string},
-          slug: %{type: :string, description: "Unique identifier"},
-          description: %{type: :string, "x-nullable": true},
-          is_system: %{
-            type: :boolean,
-            description: "Part of the application (seeded): cannot be deleted, slug cannot change"
-          },
-          inserted_at: %{type: :string, format: :"date-time"},
-          updated_at: %{type: :string, format: :"date-time"}
-        },
-        required: [:id, :name, :slug, :description, :is_system, :inserted_at, :updated_at],
-        example: %{
-          id: 2,
-          name: "Manager",
-          slug: "manager",
-          description: "Can manage users and view reports",
-          is_system: true,
-          inserted_at: "2026-01-03T10:00:00Z",
-          updated_at: "2026-01-03T10:00:00Z"
-        }
-      },
-      RoleInput: %{
-        type: :object,
-        title: "Role Input",
-        description: "A new role",
-        properties: %{
-          name: %{type: :string, maxLength: 255},
-          slug: %{
-            type: :string,
-            maxLength: 100,
-            pattern: "^[a-z0-9]+([_-][a-z0-9]+)*$",
-            description: "Unique identifier"
-          },
-          description: %{type: :string, maxLength: 2000}
-        },
-        required: [:name, :slug],
-        example: %{
-          name: "Content Editor",
-          slug: "content_editor",
-          description: "Can create and edit content"
-        }
-      },
-      RoleUpdate: %{
-        type: :object,
-        title: "Role Update",
-        description: "The attributes of a role to change; all optional",
-        properties: %{
-          name: %{type: :string, maxLength: 255},
-          slug: %{
-            type: :string,
-            maxLength: 100,
-            pattern: "^[a-z0-9]+([_-][a-z0-9]+)*$",
-            description: "Cannot change on a system role"
-          },
-          description: %{type: :string, maxLength: 2000}
-        },
-        example: %{name: "Senior Editor"}
-      },
-      RolesResponse: %{
-        type: :object,
-        title: "Roles Response",
-        description: "One page of roles",
-        properties: %{
-          data: %{type: :array, items: Schema.ref(:Role)},
-          meta: Schema.ref(:PageMeta)
-        },
-        required: [:data, :meta]
-      },
-      InheritedPermission: %{
-        type: :object,
-        title: "Inherited Permission",
-        description: "A permission a role inherits from its parent roles",
-        properties: %{
-          id: %{type: :integer},
-          name: %{type: :string},
-          slug: %{type: :string},
-          description: %{type: :string, "x-nullable": true},
-          inherited_from: %{
-            type: :array,
-            description: "The ancestor roles that grant it",
-            items: Schema.ref(:Grant)
-          }
-        },
-        required: [:id, :name, :slug, :description, :inherited_from]
-      },
-      RoleDetailResponse: %{
-        type: :object,
-        title: "Role Detail Response",
-        description:
-          "A role with the permissions assigned to it and the ones it only inherits (not assigned to it)",
-        properties: %{
-          data: %{
-            type: :object,
-            properties: %{
-              id: %{type: :integer},
-              name: %{type: :string},
-              slug: %{type: :string},
-              description: %{type: :string, "x-nullable": true},
-              is_system: %{type: :boolean},
-              inserted_at: %{type: :string, format: :"date-time"},
-              updated_at: %{type: :string, format: :"date-time"},
-              permissions: %{
-                type: :array,
-                description: "Assigned to the role itself (removable), by slug",
-                items: Schema.ref(:GrantWithDescription)
-              },
-              inherited_permissions: %{
-                type: :array,
-                description: "Inherited from parent roles only (read-only here), by slug",
-                items: Schema.ref(:InheritedPermission)
-              }
-            },
-            required: [
-              :id,
-              :name,
-              :slug,
-              :description,
-              :is_system,
-              :inserted_at,
-              :updated_at,
-              :permissions,
-              :inherited_permissions
-            ]
-          }
-        },
-        required: [:data],
-        example: %{
-          data: %{
-            id: 1,
-            name: "Administrator",
-            slug: "admin",
-            description: "Full system access",
-            is_system: true,
-            inserted_at: "2026-01-03T10:00:00Z",
-            updated_at: "2026-01-03T10:00:00Z",
-            permissions: [
-              %{
-                id: 12,
-                name: "Broadcast Notifications",
-                slug: "notifications:broadcast",
-                description: nil
-              }
-            ],
-            inherited_permissions: [
-              %{
-                id: 5,
-                name: "View Roles",
-                slug: "roles:view",
-                description: nil,
-                inherited_from: [%{id: 2, name: "Manager", slug: "manager"}]
-              }
-            ]
-          }
-        }
-      },
-      AssignmentNotes: %{
-        type: :object,
-        title: "Assignment Notes",
-        description: "Optional notes kept with an assignment",
-        properties: %{
-          notes: %{type: :string, maxLength: 2000}
-        },
-        example: %{notes: "Covers for the team lead in March"}
-      },
-      UserRoleAssignmentResponse: %{
-        type: :object,
-        title: "User Role Assignment Response",
-        description: "The assignment created by giving a role to a user",
-        properties: %{
-          data: %{
-            type: :object,
-            properties: %{
-              user_id: %{type: :integer},
-              role_id: %{type: :integer},
-              assigned_by: %{
-                type: :integer,
-                "x-nullable": true,
-                description: "The user who assigned it (null once that user is deleted)"
-              },
-              notes: %{type: :string, "x-nullable": true},
-              inserted_at: %{type: :string, format: :"date-time"}
-            },
-            required: [:user_id, :role_id, :assigned_by, :notes, :inserted_at]
-          }
-        },
-        required: [:data]
-      },
-      RolePermissionsResponse: %{
-        type: :object,
-        title: "Role Permissions Response",
-        description: "Every permission the role grants, assigned or inherited, by slug",
-        properties: %{
-          data: %{
-            type: :array,
-            items: %{
-              type: :object,
-              properties: %{
-                id: %{type: :integer},
-                name: %{type: :string},
-                slug: %{type: :string},
-                description: %{type: :string, "x-nullable": true},
-                inherited: %{
-                  type: :boolean,
-                  description: "Not assigned to the role, only inherited"
-                },
-                inherited_from: %{
-                  type: :array,
-                  description: "The ancestor roles that grant it ([] when assigned)",
-                  items: Schema.ref(:Grant)
-                }
-              },
-              required: [:id, :name, :slug, :description, :inherited, :inherited_from]
-            }
-          }
-        },
-        required: [:data]
-      }
-    })
   end
 end

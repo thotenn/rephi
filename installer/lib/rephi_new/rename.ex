@@ -79,7 +79,7 @@ defmodule RephiNew.Rename do
     elixir eex ex_unit iex logger mix kernel stdlib crypto ssl public_key
     runtime_tools inets compiler
     bandit bcrypt_elixir cors_plug dns_cluster ecto ecto_sql ex_doc finch gettext
-    guardian jason phoenix phoenix_ecto phoenix_live_dashboard phoenix_swagger plug
+    guardian jason open_api_spex phoenix phoenix_ecto phoenix_live_dashboard plug
     postgrex swoosh telemetry_metrics telemetry_poller rephi_new
   )
 

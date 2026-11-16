@@ -51,10 +51,10 @@ defmodule Rephi.MixProject do
       {:gettext, "~> 1.0.2"},
       {:guardian, "~> 2.5.0"},
       {:jason, "~> 1.4.5"},
+      {:open_api_spex, "~> 3.22.4"},
       {:phoenix, "~> 1.8.16"},
       {:phoenix_ecto, "~> 4.7.0"},
       {:phoenix_live_dashboard, "~> 0.9.1"},
-      {:phoenix_swagger, "~> 0.8.5"},
       {:plug, "~> 1.20.3"},
       {:postgrex, "~> 0.22.4"},
       {:swoosh, "~> 1.29.3"},
@@ -65,7 +65,7 @@ defmodule Rephi.MixProject do
 
   # Aliases are shortcuts or tasks specific to the current project.
   #
-  #     $ mix setup       # dependencies, database, seeds and swagger.json
+  #     $ mix setup       # dependencies, database and seeds
   #     $ mix precommit   # the checks CI runs, before you push
   #
   # `mix setup` prepares the Phoenix side only. The frontends (Node.js and
@@ -75,7 +75,7 @@ defmodule Rephi.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup", "phx.swagger.generate"],
+      setup: ["deps.get", "ecto.setup"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
@@ -89,8 +89,8 @@ defmodule Rephi.MixProject do
   end
 
   # `mix test --cover`. The modules left out are generated code (the
-  # `Guardian.Plug` helpers) or only run by a Mix task (`mix phx.swagger.generate`,
-  # the generators), which the coverage of the suite cannot see.
+  # `Guardian.Plug` helpers) or test support, which the coverage of the suite
+  # does not measure.
   defp test_coverage do
     [
       summary: [threshold: 90],

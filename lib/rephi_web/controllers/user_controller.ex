@@ -27,15 +27,18 @@ defmodule RephiWeb.UserController do
   """
 
   use RephiWeb, :controller
-  use PhoenixSwagger
+  use OpenApiSpex.ControllerSpecs
 
-  import RephiWeb.Swagger
+  import RephiWeb.ApiSpec.Operations
 
-  alias PhoenixSwagger.Schema
   alias Rephi.Accounts
   alias Rephi.Authorization
+  alias RephiWeb.Schemas
 
   action_fallback RephiWeb.FallbackController
+
+  tags ["Users"]
+  security bearer_auth()
 
   plug AuthorizationPlug,
        {:permission, "users:view"} when action in [:index, :show, :get_user_roles]
@@ -43,21 +46,18 @@ defmodule RephiWeb.UserController do
   plug AuthorizationPlug, {:permission, "users:edit"} when action in [:update]
   plug AuthorizationPlug, {:permission, "users:delete"} when action in [:delete]
 
-  swagger_path :index do
-    get("/api/users")
-    summary("List users")
-
-    description(
-      "One page of users, ordered by id, with the roles assigned to them and the permissions granted to them directly. Requires users:view."
-    )
-
-    tag("Users")
-    produces("application/json")
-    bearer_auth()
-    page_params()
-    response(200, "One page of users", Schema.ref(:UsersResponse))
-    error_response(403, "Forbidden - requires users:view")
-  end
+  operation :index,
+    summary: "List users",
+    description:
+      "One page of users, ordered by id, with the roles assigned to them and the permissions granted to them directly. Requires users:view.",
+    parameters: page_params(),
+    responses:
+      responses([
+        :unauthorized,
+        :invalid_page,
+        ok: {"One page of users", Schemas.UsersResponse},
+        forbidden: "Forbidden - requires users:view"
+      ])
 
   def index(conn, params) do
     with {:ok, page} <- Accounts.paginate_users(params) do
@@ -65,18 +65,17 @@ defmodule RephiWeb.UserController do
     end
   end
 
-  swagger_path :show do
-    get("/api/users/{id}")
-    summary("Get a user")
-    description("A user with its assigned roles and direct permissions. Requires users:view.")
-    tag("Users")
-    produces("application/json")
-    bearer_auth()
-    id_param(:id, "User ID")
-    response(200, "The user", Schema.ref(:UserResponse))
-    error_response(403, "Forbidden - requires users:view")
-    error_response(404, "User not found")
-  end
+  operation :show,
+    summary: "Get a user",
+    description: "A user with its assigned roles and direct permissions. Requires users:view.",
+    parameters: [id_param(:id, "User ID")],
+    responses:
+      responses([
+        :unauthorized,
+        ok: {"The user", Schemas.UserResponse},
+        forbidden: "Forbidden - requires users:view",
+        not_found: "User not found"
+      ])
 
   def show(conn, %{"id" => id}) do
     with {:ok, user} <- Accounts.fetch_user(id) do
@@ -84,37 +83,21 @@ defmodule RephiWeb.UserController do
     end
   end
 
-  swagger_path :update do
-    summary("Change the email of a user")
-
-    description(
-      "Only the email can change; other attributes are ignored and a password is refused (422): users change their own with PUT /api/me/password. The attributes may also be wrapped under \"user\". PUT and PATCH behave the same. Requires users:edit, and holding every role of the user or being an admin."
-    )
-
-    tag("Users")
-    consumes("application/json")
-    produces("application/json")
-    bearer_auth()
-    id_param(:id, "User ID")
-
-    parameters do
-      body(:body, Schema.ref(:UpdateUserRequest), "The new email", required: true)
-    end
-
-    response(200, "User updated", Schema.ref(:UserResponse))
-    body_errors()
-
-    error_response(
-      403,
-      "Forbidden - requires users:edit, or the user holds roles the caller does not"
-    )
-
-    error_response(404, "User not found")
-    validation_response("Invalid or taken email, or a password in the body")
-  end
-
-  defoverridable swagger_path_update: 1
-  def swagger_path_update(route), do: route |> super() |> operation_per_verb()
+  operation :update,
+    summary: "Change the email of a user",
+    description:
+      "Only the email can change; other attributes are ignored and a password is refused (422): users change their own with PUT /api/me/password. The attributes may also be wrapped under \"user\". PUT and PATCH behave the same. Requires users:edit, and holding every role of the user or being an admin.",
+    parameters: [id_param(:id, "User ID")],
+    request_body: body("The new email", Schemas.UpdateUserRequest),
+    responses:
+      responses([
+        :unauthorized,
+        :body_errors,
+        ok: {"User updated", Schemas.UserResponse},
+        forbidden: "Forbidden - requires users:edit, or the user holds roles the caller does not",
+        not_found: "User not found",
+        unprocessable_entity: "Invalid or taken email, or a password in the body"
+      ])
 
   def update(conn, %{"id" => id}) do
     params = resource_params(conn, "user")
@@ -127,28 +110,20 @@ defmodule RephiWeb.UserController do
     end
   end
 
-  swagger_path :delete do
-    PhoenixSwagger.Path.delete("/api/users/{id}")
-    summary("Delete a user")
-
-    description(
-      "Revokes the user's tokens and closes its WebSocket connections. Requires users:delete, and holding every role of the user or being an admin."
-    )
-
-    tag("Users")
-    produces("application/json")
-    bearer_auth()
-    id_param(:id, "User ID")
-    response(204, "User deleted")
-
-    error_response(
-      403,
-      "Forbidden - requires users:delete, or the user holds roles the caller does not"
-    )
-
-    error_response(404, "User not found")
-    error_response(409, "The caller's own account, or the last user holding the admin role")
-  end
+  operation :delete,
+    summary: "Delete a user",
+    description:
+      "Revokes the user's tokens and closes its WebSocket connections. Requires users:delete, and holding every role of the user or being an admin.",
+    parameters: [id_param(:id, "User ID")],
+    responses:
+      responses([
+        :unauthorized,
+        no_content: "User deleted",
+        forbidden:
+          "Forbidden - requires users:delete, or the user holds roles the caller does not",
+        not_found: "User not found",
+        conflict: "The caller's own account, or the last user holding the admin role"
+      ])
 
   def delete(conn, %{"id" => id}) do
     with {:ok, user} <- Accounts.fetch_user(id),
@@ -159,22 +134,18 @@ defmodule RephiWeb.UserController do
     end
   end
 
-  swagger_path :get_user_roles do
-    get("/api/users/{id}/roles")
-    summary("List the roles of a user")
-
-    description(
-      "The roles assigned to the user (not the inherited ones), by slug. Not paginated. Requires users:view."
-    )
-
-    tag("Users")
-    produces("application/json")
-    bearer_auth()
-    id_param(:id, "User ID")
-    response(200, "The roles of the user", Schema.ref(:UserRolesResponse))
-    error_response(403, "Forbidden - requires users:view")
-    error_response(404, "User not found")
-  end
+  operation :get_user_roles,
+    summary: "List the roles of a user",
+    description:
+      "The roles assigned to the user (not the inherited ones), by slug. Not paginated. Requires users:view.",
+    parameters: [id_param(:id, "User ID")],
+    responses:
+      responses([
+        :unauthorized,
+        ok: {"The roles of the user", Schemas.UserRolesResponse},
+        forbidden: "Forbidden - requires users:view",
+        not_found: "User not found"
+      ])
 
   def get_user_roles(conn, %{"id" => id}) do
     with {:ok, user} <- Accounts.fetch_user(id) do
@@ -204,82 +175,5 @@ defmodule RephiWeb.UserController do
     if Authorization.can_manage_user?(current_access(conn), user),
       do: :ok,
       else: {:error, :outranked}
-  end
-
-  # Swagger definitions
-  def swagger_definitions do
-    RephiWeb.Swagger.definitions(%{
-      User: %{
-        type: :object,
-        title: "User",
-        properties: %{
-          id: %{type: :integer},
-          email: %{type: :string},
-          roles: %{
-            type: :array,
-            description: "Roles assigned to the user (not the inherited ones), by slug",
-            items: Schema.ref(:Grant)
-          },
-          permissions: %{
-            type: :array,
-            description: "Permissions granted to the user directly (not through roles), by slug",
-            items: Schema.ref(:Grant)
-          },
-          inserted_at: %{type: :string, format: :"date-time"},
-          updated_at: %{type: :string, format: :"date-time"}
-        },
-        required: [:id, :email, :roles, :permissions, :inserted_at, :updated_at]
-      },
-      UsersResponse: %{
-        type: :object,
-        title: "Users Response",
-        description: "One page of users",
-        properties: %{
-          data: %{type: :array, items: Schema.ref(:User)},
-          meta: Schema.ref(:PageMeta)
-        },
-        required: [:data, :meta],
-        example: %{
-          data: [
-            %{
-              id: 1,
-              email: "admin@example.com",
-              roles: [%{id: 1, name: "Administrator", slug: "admin"}],
-              permissions: [],
-              inserted_at: "2026-01-03T10:00:00Z",
-              updated_at: "2026-01-03T10:00:00Z"
-            }
-          ],
-          meta: %{page: 1, page_size: 50, total: 1, total_pages: 1}
-        }
-      },
-      UserResponse: %{
-        type: :object,
-        title: "User Response",
-        description: "A single user",
-        properties: %{
-          data: Schema.ref(:User)
-        },
-        required: [:data]
-      },
-      UpdateUserRequest: %{
-        type: :object,
-        title: "Update User Request",
-        description: "Only the email can change; without it nothing changes",
-        properties: %{
-          email: %{type: :string, format: :email, maxLength: 160}
-        },
-        example: %{email: "someone@example.com"}
-      },
-      UserRolesResponse: %{
-        type: :object,
-        title: "User Roles Response",
-        description: "The roles assigned to a user",
-        properties: %{
-          data: %{type: :array, items: Schema.ref(:GrantWithDescription)}
-        },
-        required: [:data]
-      }
-    })
   end
 end

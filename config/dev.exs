@@ -70,8 +70,12 @@ config :rephi, :cors_origins, [
   "http://localhost:8788"
 ]
 
-# Serve Swagger UI at /api/swagger
+# Serve the API documentation (/api/openapi, Swagger UI at /api/swagger)
 config :rephi, :swagger_enabled, true
+
+# Build the OpenAPI document on every request, so a changed `operation` or
+# schema shows up after the code reloads (it is cached everywhere else).
+config :open_api_spex, :cache_adapter, OpenApiSpex.Plug.NoneCache
 
 # Lets `mix run priv/repo/seeds.exs` create the well-known development admin
 # when ADMIN_EMAIL / ADMIN_PASSWORD are not set. See `Rephi.Seeds`.

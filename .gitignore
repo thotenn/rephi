@@ -28,8 +28,9 @@ erl_crash.dump
 
 # --- Generated at build time ---------------------------------------------------
 
-# `mix phx.swagger.generate` (run by `mix setup` and by the release build).
-/priv/static/swagger.json
+# `mix openapi.spec.json --spec RephiWeb.ApiSpec ...` (an export of the API
+# document for a client generator; the server builds it from the code).
+/openapi.json
 
 # Frontend builds copied by scripts/copy-builds.js (`yarn build`).
 /priv/static/apps/

@@ -1,6 +1,5 @@
 defmodule RephiWeb.Router do
   use RephiWeb, :router
-  use PhoenixSwagger
 
   # JSON never needs to load anything nor be framed, hence the strictest CSP.
   pipeline :api do
@@ -18,9 +17,11 @@ defmodule RephiWeb.Router do
   end
 
   # The API documentation is only served where it is enabled
-  # (`config :rephi, :swagger_enabled`, SWAGGER_ENABLED at runtime).
-  pipeline :swagger do
-    plug :ensure_swagger_enabled
+  # (`config :rephi, :swagger_enabled`, SWAGGER_ENABLED at runtime), and puts
+  # the OpenAPI document (`RephiWeb.ApiSpec`) in the connection.
+  pipeline :api_docs do
+    plug :ensure_api_docs_enabled
+    plug OpenApiSpex.Plug.PutApiSpec, module: RephiWeb.ApiSpec
   end
 
   pipeline :frontend do
@@ -72,21 +73,19 @@ defmodule RephiWeb.Router do
     get "/users/:id/roles", UserController, :get_user_roles
   end
 
-  # API documentation. The JSON document has its own route, declared before
-  # the Swagger UI forward so it is served with a content type and answers a
-  # clean 404 while it has not been generated (`mix phx.swagger.generate`).
-  scope "/api/swagger" do
-    pipe_through [:api, :swagger]
+  # API documentation: the OpenAPI 3.0 document and the Swagger UI on top of
+  # it (an HTML page that loads its assets from a CDN, hence not the strict
+  # CSP of :api). See `RephiWeb.ApiSpec`.
+  scope "/api" do
+    pipe_through [:api, :api_docs]
 
-    get "/swagger.json", RephiWeb.SwaggerController, :show
+    get "/openapi", RephiWeb.OpenApiController, :show
   end
 
-  scope "/api/swagger" do
-    pipe_through :swagger
+  scope "/api" do
+    pipe_through [:frontend, :api_docs]
 
-    forward "/", PhoenixSwagger.Plug.SwaggerUI,
-      otp_app: :rephi,
-      swagger_file: "swagger.json"
+    get "/swagger", OpenApiSpex.Plug.SwaggerUI, path: "/api/openapi", title: "Rephi API"
   end
 
   # Frontend apps: every directory in priv/static/apps/<name> is served at
@@ -97,10 +96,10 @@ defmodule RephiWeb.Router do
     forward "/", RephiWeb.Plugs.FrontendAppPlug
   end
 
-  # Answers 404, as if the routes did not exist, unless Swagger is enabled.
-  # Read on every request so a release can switch it with an environment
-  # variable.
-  defp ensure_swagger_enabled(conn, _opts) do
+  # Answers 404, as if the routes did not exist, unless the documentation is
+  # enabled. Read on every request so a release can switch it with an
+  # environment variable.
+  defp ensure_api_docs_enabled(conn, _opts) do
     if Application.get_env(:rephi, :swagger_enabled, false) do
       conn
     else
@@ -108,62 +107,6 @@ defmodule RephiWeb.Router do
       |> RephiWeb.FallbackController.call({:error, :not_found})
       |> halt()
     end
-  end
-
-  @api_version Mix.Project.config()[:version]
-
-  @api_description """
-  Phoenix JSON API with JWT authentication, role-based access control and \
-  real-time notifications over WebSockets (`/socket`, channel `user:lobby`).
-
-  **Envelopes.** A successful response with a body is `{"data": ...}`; a \
-  paginated list adds `"meta": {"page", "page_size", "total", "total_pages"}` \
-  (`page` from 1, `page_size` 50 by default, at most 100). An error is \
-  `{"errors": {"detail": "message"}}`, or `{"errors": {"field": ["message"]}}` \
-  for a validation error (422).
-
-  **Status codes.** 400 malformed JSON or missing credentials; 401 missing, \
-  invalid, expired or revoked token; 403 missing permission, or granting what \
-  the caller does not hold; 404 unknown record or route (also for an id that \
-  is not a positive integer); 409 the change conflicts with the data (system \
-  records, last admin, duplicates); 413 body over 1 MB; 422 invalid fields; \
-  429 rate limited (see `retry-after`).
-
-  **Write bodies** may be sent flat or wrapped under the singular resource \
-  name (`{"role": {...}}`).
-  """
-
-  def swagger_info do
-    %{
-      info: %{
-        version: @api_version,
-        title: "Rephi API",
-        description: @api_description
-      },
-      securityDefinitions: %{
-        Bearer: %{
-          type: "apiKey",
-          name: "Authorization",
-          in: "header",
-          description:
-            "The access token returned by login, register or a password change: \"Authorization: Bearer <token>\""
-        }
-      },
-      consumes: ["application/json"],
-      produces: ["application/json"],
-      tags: [
-        %{name: "Auth", description: "Sessions and the signed-in user"},
-        %{name: "Users", description: "User management (users:*)"},
-        %{name: "Roles", description: "Roles and their assignment to users (roles:*)"},
-        %{
-          name: "Permissions",
-          description: "Permissions and their assignment to roles (permissions:*)"
-        },
-        %{name: "Notifications", description: "Real-time notifications"},
-        %{name: "Health", description: "Liveness and readiness checks"},
-        %{name: "Service", description: "The service and this document"}
-      ]
-    }
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

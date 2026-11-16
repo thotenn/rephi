@@ -89,25 +89,10 @@ config :rephi, Rephi.Authorization, admin_role: "admin"
 # `Rephi.Accounts.register_user/1`.
 config :rephi, Rephi.Accounts, default_role: "user"
 
-# Swagger UI and swagger.json are served only where this is true (dev and
-# test). SWAGGER_ENABLED overrides it at runtime.
+# The API documentation (the OpenAPI document at /api/openapi and the Swagger
+# UI at /api/swagger) is served only where this is true (dev and test).
+# SWAGGER_ENABLED overrides it at runtime.
 config :rephi, :swagger_enabled, false
-
-# Phoenix Swagger configuration
-#
-# No `endpoint:` on purpose: with it the generator bakes the endpoint host and
-# port into swagger.json, and "Try it out" would call that host instead of the
-# one the documentation is being served from.
-config :rephi, :phoenix_swagger,
-  swagger_files: %{
-    "priv/static/swagger.json" => [
-      router: RephiWeb.Router
-    ]
-  }
-
-# Use Jason for JSON encoding in Phoenix Swagger (it defaults to Poison,
-# which is not a dependency of this project)
-config :phoenix_swagger, json_library: Jason
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
