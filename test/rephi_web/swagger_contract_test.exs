@@ -104,7 +104,7 @@ defmodule RephiWeb.SwaggerContractTest do
   # -- the requests -----------------------------------------------------------
 
   defp seed(_ctx) do
-    {:ok, _result} = Rephi.Seeds.run()
+    {:ok, _result} = Rephi.Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
 
     {admin, admin_token} = create_user_with_token_and(roles: ["admin"])
     {_nobody, nobody_token} = create_user_with_token()
