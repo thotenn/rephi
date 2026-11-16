@@ -92,11 +92,13 @@ defmodule RephiWeb.Plugs.RateLimit do
   defp too_many_requests(conn, retry_after) do
     conn
     |> put_resp_header("retry-after", Integer.to_string(retry_after))
-    |> FallbackController.call(
-      {:error, :too_many_requests, "Too many attempts. Try again in #{retry_after} seconds."}
-    )
+    |> FallbackController.call({:error, :too_many_requests, retry_message(retry_after)})
     |> halt()
   end
+
+  @doc false
+  def retry_message(1), do: "Too many attempts. Try again in 1 second."
+  def retry_message(seconds), do: "Too many attempts. Try again in #{seconds} seconds."
 
   @doc """
   The address a request is counted under.

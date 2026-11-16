@@ -42,9 +42,17 @@ defmodule RephiWeb.Plugs.RateLimitTest do
     for _ <- 1..3, do: assert(login().status == 401)
 
     conn = login()
-    assert error_detail(conn, 429) =~ "Too many attempts"
     assert [retry_after] = get_resp_header(conn, "retry-after")
     assert String.to_integer(retry_after) in 1..60
+
+    assert error_detail(conn, 429) ==
+             RateLimit.retry_message(String.to_integer(retry_after))
+  end
+
+  test "the message says how long to wait, in correct English" do
+    assert RateLimit.retry_message(1) == "Too many attempts. Try again in 1 second."
+    assert RateLimit.retry_message(2) == "Too many attempts. Try again in 2 seconds."
+    assert RateLimit.retry_message(60) == "Too many attempts. Try again in 60 seconds."
   end
 
   test "register: past the limit the answer is a 429 and no user is created" do

@@ -475,8 +475,8 @@ docker run -p 4000:4000 -e DATABASE_URL -e SECRET_KEY_BASE -e GUARDIAN_SECRET_KE
 Without Docker, build the same release by hand:
 
 ```bash
-# shared-components inlines the API and socket URLs when it is built
-export VITE_SERVER_API_URL=/api VITE_WS_URL=/socket
+# A built app calls /api and /socket on its own origin; set VITE_API_URL / VITE_WS_URL
+# (apps/example/.env.example) only when the API lives somewhere else.
 yarn install --immutable && yarn shared:build && yarn build
 MIX_ENV=prod mix deps.get --only prod
 MIX_ENV=prod mix compile

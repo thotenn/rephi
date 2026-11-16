@@ -45,9 +45,9 @@ COPY packages packages
 COPY scripts scripts
 RUN yarn install --immutable
 
-# The apps call the API on the origin that serves them.
-ENV VITE_SERVER_API_URL=/api \
-  VITE_WS_URL=/socket
+# A build of a Vite app calls the API on the origin that serves it (`/api`,
+# `/socket`) unless VITE_API_URL / VITE_WS_URL say otherwise, so no variable is
+# needed here.
 RUN yarn shared:build && yarn build
 
 # --- Release ------------------------------------------------------------------
