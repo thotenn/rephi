@@ -16,6 +16,7 @@ interface Summary {
 export interface SessionUser {
   id: number;
   email: string;
+  must_change_password: boolean;
   roles: Summary[];
   permissions: Summary[];
 }
@@ -28,6 +29,12 @@ export interface Session {
 export interface Role extends Summary {
   description: string | null;
   is_system: boolean;
+}
+
+export interface DashboardStats {
+  users: { total: number | null };
+  notifications: { sent_total: number | null; sent_by_me: number };
+  sessions: { online_users: number; connections: number };
 }
 
 export class ApiError extends Error {
@@ -85,9 +92,20 @@ export const api = {
     return role;
   },
 
+  assignRole: (token: string, userId: number, roleId: number) =>
+    call<void>("POST", `/users/${userId}/roles/${roleId}`, { token }),
+
   deleteRole: (token: string, id: number) => call<void>("DELETE", `/roles/${id}`, { token }),
 
   deleteUser: (token: string, id: number) => call<void>("DELETE", `/users/${id}`, { token }),
+
+  dashboard: (token: string) => call<DashboardStats>("GET", "/dashboard", { token }),
+
+  broadcast: (token: string, message: string) =>
+    call<unknown>("POST", "/notifications/broadcast", { token, body: { message } }),
+
+  sendTestNotification: (token: string, message: string) =>
+    call<unknown>("POST", "/notifications/me", { token, body: { message } }),
 };
 
 export async function cleanup(fn: () => Promise<unknown>): Promise<void> {

@@ -62,6 +62,10 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
+  projects: [
+    { name: "app", testIgnore: /presence\.spec\.ts/ },
+    { name: "presence", testMatch: /presence\.spec\.ts/, dependencies: ["app"] },
+  ],
   metadata: { apiURL },
   webServer: process.env.E2E_START_STACK ? stack() : undefined,
 });

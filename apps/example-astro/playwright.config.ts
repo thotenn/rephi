@@ -27,5 +27,9 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
+  projects: [
+    { name: "app", testIgnore: /presence\.spec\.ts/ },
+    { name: "presence", testMatch: /presence\.spec\.ts/, dependencies: ["app"] },
+  ],
   metadata: { apiURL },
 });
