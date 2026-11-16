@@ -1,54 +1,50 @@
 defmodule RephiWeb.UserSocket do
+  @moduledoc """
+  The WebSocket of authenticated users, mounted at `/socket`.
+
+  ## Authentication
+
+  A connection needs the same access token the HTTP API uses. It can be sent
+  in two ways:
+
+    * **`authToken`** (preferred) - the option of the Phoenix JS client,
+      `new Socket("/socket", {authToken: token})`. The token travels in the
+      `Sec-WebSocket-Protocol` header and reaches `connect/3` as the
+      `:auth_token` connect info, so it never appears in a URL (and therefore
+      not in access logs or browser history).
+    * **`token` param** (legacy) - `new Socket("/socket", {params: {token}})`,
+      which puts the token in the query string. Still accepted so existing
+      clients keep working.
+
+  When both are present the `authToken` wins. A missing, malformed, expired or
+  revoked token, or a token of a user that no longer exists, refuses the
+  connection.
+
+  ## Disconnecting a user
+
+  Every socket of a user shares the id `Rephi.Accounts.socket_id/1`. The
+  accounts context broadcasts `"disconnect"` on it when the user logs out,
+  changes password or is deleted, which closes all of them.
+  """
   use Phoenix.Socket
 
-  # A Socket handler
-  #
-  # It's possible to control the websocket connection and
-  # assign values that can be accessed by your channel topics.
+  alias Rephi.Accounts
+  alias RephiWeb.Auth.Guardian
 
   ## Channels
 
   channel "user:*", RephiWeb.UserChannel
 
-  # Socket params are passed from the client and can
-  # be used to verify and authenticate a user. After
-  # verification, you can put default assigns into
-  # the socket that will be set for all channels, ie
-  #
-  #     {:ok, assign(socket, :user_id, verified_user_id)}
-  #
-  # To deny connection, return `:error` or `{:error, term}`. To control the
-  # response the client receives in that case, [define an error handler in the
-  # websocket
-  # configuration](https://hexdocs.pm/phoenix/Phoenix.Endpoint.html#socket/3-websocket-configuration).
-  #
-  # See `Phoenix.Token` documentation for examples in
-  # performing token verification on connect.
   @impl true
-  def connect(%{"token" => token}, socket, _connect_info) do
-    case RephiWeb.Auth.Guardian.resource_from_token(token) do
-      {:ok, user, _claims} ->
-        {:ok, assign(socket, :user_id, user.id)}
-
-      {:error, _reason} ->
-        :error
+  def connect(params, socket, connect_info) do
+    with token when is_binary(token) <- connect_info[:auth_token] || params["token"],
+         {:ok, user, _claims} <- Guardian.resource_from_token(token, %{"typ" => "access"}) do
+      {:ok, assign(socket, :user_id, user.id)}
+    else
+      _ -> :error
     end
   end
 
-  def connect(_params, _socket, _connect_info) do
-    :error
-  end
-
-  # Socket IDs are topics that allow you to identify all sockets for a given user:
-  #
-  #     def id(socket), do: "user_socket:#{socket.assigns.user_id}"
-  #
-  # Would allow you to broadcast a "disconnect" event and terminate
-  # all active sockets and channels for a given user:
-  #
-  #     Elixir.RephiWeb.Endpoint.broadcast("user_socket:#{user.id}", "disconnect", %{})
-  #
-  # Returning `nil` makes this socket anonymous.
   @impl true
-  def id(socket), do: "user_socket:#{socket.assigns.user_id}"
+  def id(socket), do: Accounts.socket_id(socket.assigns.user_id)
 end

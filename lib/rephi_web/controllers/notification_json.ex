@@ -7,6 +7,6 @@ defmodule RephiWeb.NotificationJSON do
   Renders a single notification.
   """
   def show(%{notification: notification}) do
-    %{data: Map.take(notification, [:message, :timestamp, :type])}
+    %{data: Map.take(notification, [:message, :timestamp, :type, :from])}
   end
 end

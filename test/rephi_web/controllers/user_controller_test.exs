@@ -167,7 +167,7 @@ defmodule RephiWeb.UserControllerTest do
       assert json_response(conn, 422) == %{
                "errors" => %{
                  "email" => ["must have the @ sign and no spaces"],
-                 "password" => ["should be at least 6 character(s)"]
+                 "password" => ["should be at least 8 character(s)"]
                }
              }
     end

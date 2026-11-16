@@ -45,10 +45,12 @@ defmodule RephiWeb.ErrorEnvelopeTest do
       assert get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
     end
 
-    test "malformed JSON body", %{conn: conn} do
-      body = rendered_error(400, fn -> json_post(conn, "/api/users/login", ~s({"email": )) end)
+    test "malformed JSON body (answered by RephiWeb.Plugs.BodyParser, not raised)", %{
+      conn: conn
+    } do
+      conn = json_post(conn, "/api/users/login", ~s({"email": ))
 
-      assert body == %{"errors" => %{"detail" => "Bad Request"}}
+      assert json_response(conn, 400) == %{"errors" => %{"detail" => "Bad Request"}}
     end
 
     test "response format the API does not produce", %{conn: conn} do

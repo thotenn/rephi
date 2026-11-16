@@ -111,6 +111,63 @@ defmodule Rephi.AuthTestHelpers do
   end
 
   @doc """
+  Signs `claims` as an HS512 JWT, bypassing Guardian entirely, so tests can
+  build tokens Guardian itself would never issue (no `exp`, another `typ`, a
+  foreign issuer, a different key).
+
+  `claims` are merged over the claims of a regular access token for `user`
+  (or for no one when `user` is `nil`); a `nil` value removes the claim.
+
+  ## Options
+
+    * `:secret` - the signing key; defaults to the configured one
+  """
+  def forge_token(user, claims \\ %{}, opts \\ []) do
+    now = System.system_time(:second)
+
+    base = %{
+      "sub" => user && to_string(user.id),
+      "ver" => user && user.token_version,
+      "typ" => "access",
+      "iss" => "rephi",
+      "aud" => "rephi",
+      "iat" => now,
+      "exp" => now + 3600
+    }
+
+    secret =
+      Keyword.get_lazy(opts, :secret, fn ->
+        Application.fetch_env!(:rephi, Guardian)[:secret_key]
+      end)
+
+    claims = base |> Map.merge(claims) |> Map.reject(fn {_key, value} -> is_nil(value) end)
+
+    {_jws, token} =
+      secret
+      |> JOSE.JWK.from_oct()
+      |> JOSE.JWT.sign(%{"alg" => "HS512", "typ" => "JWT"}, claims)
+      |> JOSE.JWS.compact()
+
+    token
+  end
+
+  @doc """
+  Sets an application environment value for the rest of the test and puts the
+  previous value back when it finishes. Only for `async: false` tests.
+  """
+  def put_app_env(app \\ :rephi, key, value) do
+    previous = Application.fetch_env(app, key)
+    Application.put_env(app, key, value)
+
+    ExUnit.Callbacks.on_exit(fn ->
+      case previous do
+        {:ok, old} -> Application.put_env(app, key, old)
+        :error -> Application.delete_env(app, key)
+      end
+    end)
+  end
+
+  @doc """
   Ids that can never identify an existing record. Every resource route must
   answer them with a 404, never with a 400 or a 500.
   """

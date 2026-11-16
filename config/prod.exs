@@ -6,6 +6,9 @@ config :swoosh, api_client: Swoosh.ApiClient.Finch, finch_name: Rephi.Finch
 # Disable Swoosh Local Memory Storage
 config :swoosh, local: false
 
+# Only send the session cookie over HTTPS
+config :rephi, :secure_session_cookie, true
+
 # Do not print debug messages in production
 config :logger, level: :info
 

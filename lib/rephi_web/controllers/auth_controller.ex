@@ -1,26 +1,31 @@
 defmodule RephiWeb.AuthController do
   @moduledoc """
-  Registration, login and the "who am I" endpoint.
+  Registration, login, logout and the "who am I" endpoint.
 
   ## Endpoints
 
     * `POST /api/users/register` - Create an account and get a token
     * `POST /api/users/login` - Exchange credentials for a token
+    * `POST /api/users/logout` - Revoke every token of the signed-in user
     * `GET /api/me` - The signed-in user with roles and permissions
 
   Register and login accept their attributes flat (`{"email": ..., "password": ...}`)
-  or wrapped under `"user"`.
+  or wrapped under `"user"`. Both are throttled per client IP
+  (`RephiWeb.Plugs.RateLimit`): past the limit they answer `429` with a
+  `retry-after` header.
   """
   use RephiWeb, :controller
   use PhoenixSwagger
 
   alias PhoenixSwagger.Schema
   alias Rephi.Accounts
-  alias Rephi.Accounts.User
   alias Rephi.Authorization
   alias RephiWeb.Auth.Guardian
 
   action_fallback RephiWeb.FallbackController
+
+  plug RephiWeb.Plugs.RateLimit, [bucket: :register] when action == :register
+  plug RephiWeb.Plugs.RateLimit, [bucket: :login] when action == :login
 
   swagger_path :register do
     post("/api/users/register")
@@ -36,6 +41,7 @@ defmodule RephiWeb.AuthController do
     response(201, "User created successfully", Schema.ref(:AuthResponse))
 
     response(422, "Validation errors", Schema.ref(:ValidationErrors))
+    response(429, "Too many attempts, see the retry-after header", Schema.ref(:ErrorResponse))
   end
 
   def register(conn, _params) do
@@ -61,12 +67,33 @@ defmodule RephiWeb.AuthController do
 
     response(400, "Email or password missing", Schema.ref(:ErrorResponse))
     response(401, "Invalid credentials", Schema.ref(:ErrorResponse))
+    response(429, "Too many attempts, see the retry-after header", Schema.ref(:ErrorResponse))
   end
 
   def login(conn, _params) do
     with {:ok, email, password} <- credentials(resource_params(conn, "user")),
          {:ok, user} <- authenticate(email, password) do
       render_session(conn, user)
+    end
+  end
+
+  swagger_path :logout do
+    post("/api/users/logout")
+    summary("Log out")
+
+    description(
+      "Revokes every token issued to the signed-in user (on all devices) and closes its WebSocket connections"
+    )
+
+    security([%{Bearer: []}])
+
+    response(204, "Logged out")
+    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
+  end
+
+  def logout(conn, _params) do
+    with {:ok, _user} <- Accounts.revoke_tokens(conn.assigns.current_user) do
+      send_resp(conn, :no_content, "")
     end
   end
 
@@ -83,10 +110,7 @@ defmodule RephiWeb.AuthController do
   end
 
   def me(conn, _params) do
-    case Guardian.Plug.current_resource(conn) do
-      %User{} = user -> render(conn, :me, session_assigns(user))
-      _ -> {:error, :unauthorized, "Invalid or expired token"}
-    end
+    render(conn, :me, session_assigns(conn.assigns.current_user))
   end
 
   defp credentials(%{"email" => email, "password" => password})
@@ -124,12 +148,16 @@ defmodule RephiWeb.AuthController do
         description: "New user registration data",
         properties: %{
           email: %{type: :string, description: "User's email address", format: :email},
-          password: %{type: :string, description: "User's password", minLength: 8}
+          password: %{
+            type: :string,
+            description: "User's password (8 characters minimum, 72 bytes maximum)",
+            minLength: 8
+          }
         },
         required: [:email, :password],
         example: %{
-          email: "admin@admin.com",
-          password: "password123!!"
+          email: "user@example.com",
+          password: "a-long-passphrase"
         }
       },
       LoginCredentials: %{
@@ -142,8 +170,8 @@ defmodule RephiWeb.AuthController do
         },
         required: [:email, :password],
         example: %{
-          email: "admin@admin.com",
-          password: "password123!!"
+          email: "user@example.com",
+          password: "a-long-passphrase"
         }
       },
       SessionUser: %{
@@ -243,7 +271,7 @@ defmodule RephiWeb.AuthController do
         example: %{
           errors: %{
             email: ["can't be blank"],
-            password: ["should be at least 6 character(s)"]
+            password: ["should be at least 8 character(s)"]
           }
         }
       }

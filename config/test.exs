@@ -20,6 +20,21 @@ config :rephi, RephiWeb.Endpoint,
   secret_key_base: "qkoV3JNLtzN1upIwO90qs2cLee5JA+jp6RXgE5VODv8vpL4q7xQpgzhbcW9kJr/O",
   server: false
 
+# Test-only signing key for JWTs
+config :rephi, RephiWeb.Auth.Guardian,
+  secret_key: "5Y6ykfiz6iuoovGagSwFAvp3+takQI4NwUr7Ro98nDub3cVtZ/pdd9z/BCnjCZEz"
+
+config :rephi, :cors_origins, ["http://localhost:3000", "https://*.preview.example.com"]
+
+config :rephi, :swagger_enabled, true
+
+# Seeding without ADMIN_EMAIL / ADMIN_PASSWORD creates no administrator
+config :rephi, Rephi.Seeds, admin: :optional
+
+# Throttling is off so the suite can log in as often as it needs. The tests of
+# the limiter turn it on for themselves (see RephiWeb.Plugs.RateLimitTest).
+config :rephi, RephiWeb.Plugs.RateLimit, enabled: false
+
 # Hashing passwords with the production cost makes every test that creates a
 # user or logs in take close to a second. Only do this in tests!
 config :bcrypt_elixir, log_rounds: 1

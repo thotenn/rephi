@@ -1,50 +1,40 @@
-# Script for populating the database. You can run it as:
+# Seeds the default roles, permissions and the first administrator:
 #
 #     mix run priv/repo/seeds.exs
 #
-# Inside the script, you can read and write to any of your
-# repositories directly:
-#
-#     Rephi.Repo.insert!(%Rephi.SomeSchema{})
-#
-# We recommend using the bang functions (`insert!`, `update!`
-# and so on) as they will fail if something goes wrong.
+# Safe to run again: nothing is duplicated and nothing that exists is
+# changed. The administrator comes from ADMIN_EMAIL / ADMIN_PASSWORD, which
+# are required outside development. See `Rephi.Seeds` for the details.
 
-alias Rephi.Repo
-alias Rephi.Accounts.User
-alias Rephi.Authorization
+case Rephi.Seeds.run() do
+  {:ok, %{admin: admin}} ->
+    IO.puts("Seeded the default roles and permissions.")
 
-# Run authorization seeds first (creates roles and permissions)
-Code.eval_file("priv/repo/authorization_seeds.exs")
+    case admin do
+      {:created, email} ->
+        IO.puts("Administrator created: #{email}")
 
-# Create first user
-admin_attrs = %{
-  email: "admin@admin.com",
-  password: "password123!!"
-}
+      {:existing, email} ->
+        IO.puts("Administrator already exists: #{email} (password unchanged)")
 
-admin_user =
-  case Repo.get_by(User, email: admin_attrs.email) do
-    nil ->
-      user =
-        %User{}
-        |> User.changeset(admin_attrs)
-        |> Repo.insert!()
+      {default, email} when default in [:default_created, :default_existing] ->
+        IO.puts(
+          :stderr,
+          IO.ANSI.format([
+            :yellow,
+            """
 
-      IO.puts("User created: #{admin_attrs.email}")
-      user
+            WARNING: #{email} is the well-known development administrator \
+            (password "password123!!"), seeded because ADMIN_EMAIL and \
+            ADMIN_PASSWORD are not set. Never expose this database.
+            """
+          ])
+        )
 
-    user ->
-      IO.puts("User already exists: #{admin_attrs.email}")
-      user
-  end
+      :skipped ->
+        IO.puts("No administrator seeded (ADMIN_EMAIL / ADMIN_PASSWORD are not set).")
+    end
 
-# Assign admin role to the admin user
-admin_role = Authorization.get_role_by_slug("admin")
-
-if admin_role do
-  case Authorization.assign_role_to_user(admin_user, admin_role) do
-    {:ok, _} -> IO.puts("Assigned admin role to #{admin_user.email}")
-    {:error, _} -> IO.puts("Admin role already assigned to #{admin_user.email}")
-  end
+  {:error, message} ->
+    Mix.raise("Seeding failed, nothing was changed: " <> message)
 end

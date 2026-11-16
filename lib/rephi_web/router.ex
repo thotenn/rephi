@@ -2,13 +2,25 @@ defmodule RephiWeb.Router do
   use RephiWeb, :router
   use PhoenixSwagger
 
+  # JSON never needs to load anything nor be framed, hence the strictest CSP.
   pipeline :api do
     plug :accepts, ["json"]
+
+    plug :put_secure_browser_headers, %{
+      "content-security-policy" => "default-src 'none'; frame-ancestors 'none'"
+    }
   end
 
+  # A valid access token of an existing user, or a 401. See
+  # `RephiWeb.Auth.Pipeline`.
   pipeline :authenticated do
     plug RephiWeb.Auth.Pipeline
-    plug Guardian.Plug.EnsureAuthenticated
+  end
+
+  # The API documentation is only served where it is enabled
+  # (`config :rephi, :swagger_enabled`, SWAGGER_ENABLED at runtime).
+  pipeline :swagger do
+    plug :ensure_swagger_enabled
   end
 
   pipeline :frontend do
@@ -40,6 +52,7 @@ defmodule RephiWeb.Router do
     pipe_through :authenticated
 
     get "/me", AuthController, :me
+    post "/users/logout", AuthController, :logout
     post "/notifications/broadcast", NotificationController, :broadcast
 
     # Role management endpoints
@@ -62,12 +75,14 @@ defmodule RephiWeb.Router do
   # the Swagger UI forward so it is served with a content type and answers a
   # clean 404 while it has not been generated (`mix phx.swagger.generate`).
   scope "/api/swagger" do
-    pipe_through :api
+    pipe_through [:api, :swagger]
 
     get "/swagger.json", RephiWeb.SwaggerController, :show
   end
 
   scope "/api/swagger" do
+    pipe_through :swagger
+
     forward "/", PhoenixSwagger.Plug.SwaggerUI,
       otp_app: :rephi,
       swagger_file: "swagger.json"
@@ -79,6 +94,19 @@ defmodule RephiWeb.Router do
     pipe_through :frontend
 
     forward "/", RephiWeb.Plugs.FrontendAppPlug
+  end
+
+  # Answers 404, as if the routes did not exist, unless Swagger is enabled.
+  # Read on every request so a release can switch it with an environment
+  # variable.
+  defp ensure_swagger_enabled(conn, _opts) do
+    if Application.get_env(:rephi, :swagger_enabled, false) do
+      conn
+    else
+      conn
+      |> RephiWeb.FallbackController.call({:error, :not_found})
+      |> halt()
+    end
   end
 
   def swagger_info do
