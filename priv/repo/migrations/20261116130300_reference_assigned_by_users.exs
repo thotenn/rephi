@@ -1,15 +1,7 @@
 defmodule Rephi.Repo.Migrations.ReferenceAssignedByUsers do
   @moduledoc """
-  `assigned_by` (who granted a role or a permission) becomes a real reference
-  to `users`:
-
-    * same type as `users.id` (`bigint`; it was an `integer`, so ids above
-      2^31 could not be stored);
-    * a foreign key, so it can only name an existing user, and deleting that
-      user keeps the assignment and clears `assigned_by`;
-    * an index, which the `ON DELETE SET NULL` needs to stay cheap.
-
-  Existing values that point to no user are cleared first.
+  Makes `assigned_by` a `bigint` foreign key to `users` (`ON DELETE SET NULL`,
+  indexed). Values that point to no user are cleared first.
   """
   use Ecto.Migration
 
@@ -31,8 +23,7 @@ defmodule Rephi.Repo.Migrations.ReferenceAssignedByUsers do
     end
   end
 
-  # Values above the range of `integer` would not fit back: they make the
-  # rollback fail instead of being truncated.
+  # Ids beyond the `integer` range make the rollback fail instead of being truncated.
   def down do
     for table <- @tables do
       drop index(table, [:assigned_by])

@@ -1,7 +1,5 @@
 defmodule Rephi.Repo.Migrations.CreateNotifications do
-  @moduledoc """
-  Every notification sent (`Rephi.Notifications`), counted by the dashboard.
-  """
+  @moduledoc "Every notification sent, counted by the dashboard."
   use Ecto.Migration
 
   def change do

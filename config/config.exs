@@ -7,10 +7,7 @@
 # General application configuration
 import Config
 
-# Development only: export the variables of `.env` (if the file exists) before
-# anything below reads the environment. Variables that are already set win,
-# tests never read the file, and a release only sees the real environment.
-# See `Rephi.DotEnv` in config/dotenv.exs.
+# Must run before anything below reads the environment (dev only).
 Code.require_file("dotenv.exs", __DIR__)
 
 if config_env() == :dev do
@@ -49,27 +46,14 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-# JWT authentication.
-#
-# There is no `secret_key` here on purpose: config/dev.exs and config/test.exs
-# carry their own throwaway keys, and production must provide
-# GUARDIAN_SECRET_KEY (config/runtime.exs refuses to boot without it).
-#
-# Tokens are access tokens with no refresh flow, so `ttl` is the longest a
-# session lasts (TOKEN_TTL_SECONDS overrides it at runtime).
+# No secret_key here on purpose: dev/test set their own, prod requires GUARDIAN_SECRET_KEY.
 config :rephi, RephiWeb.Auth.Guardian,
   issuer: "rephi",
   verify_issuer: true,
   ttl: {24, :hours}
 
-# Origins allowed to call the API from a browser (CORS) and, in production, to
-# open the WebSocket. Exact origins ("https://app.example.com") or a wildcard
-# for the leftmost labels of the host ("https://*.example.pages.dev").
-# CORS_ORIGINS overrides it at runtime. See `RephiWeb.CORS`.
 config :rephi, :cors_origins, []
 
-# Request throttling: login and register per client IP, the notification a user
-# sends to itself per user. See `RephiWeb.Plugs.RateLimit` for every option.
 config :rephi, RephiWeb.Plugs.RateLimit,
   enabled: true,
   trusted_proxies: 0,
@@ -77,21 +61,12 @@ config :rephi, RephiWeb.Plugs.RateLimit,
   register: [limit: 5, window_seconds: 60],
   self_notification: [limit: 5, window_seconds: 60]
 
-# Seeding an administrator requires ADMIN_EMAIL / ADMIN_PASSWORD unless an
-# environment says otherwise (config/dev.exs, config/test.exs). See `Rephi.Seeds`.
 config :rephi, Rephi.Seeds, admin: :required
 
-# Authorization. `admin_role` names the administrator role: at least one user
-# always keeps it, and its holders can grant any role or permission. See
-# `Rephi.Authorization`.
 config :rephi, Rephi.Authorization, admin_role: "admin"
 
-# The role every new account gets on registration (`nil`: none). See
-# `Rephi.Accounts.register_user/1`.
 config :rephi, Rephi.Accounts, default_role: "user"
 
-# /api/openapi and /api/swagger are served only where this is true (dev and
-# test). SWAGGER_ENABLED overrides it at runtime.
 config :rephi, :swagger_enabled, false
 
 # Import environment specific config. This must remain at the bottom

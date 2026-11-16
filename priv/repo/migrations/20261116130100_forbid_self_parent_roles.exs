@@ -1,12 +1,7 @@
 defmodule Rephi.Repo.Migrations.ForbidSelfParentRoles do
   @moduledoc """
-  A role can never be its own parent.
-
-  `Rephi.Authorization.assign_parent_role/2` also rejects longer cycles; this
-  constraint is the part the database can enforce on its own, even for rows
-  inserted without going through the application. A self-link has no effect
-  on what a role grants, so existing ones are deleted before the constraint
-  is added.
+  A role can never be its own parent; existing self-links grant nothing and are
+  deleted. Longer cycles are rejected by `Rephi.Authorization`.
   """
   use Ecto.Migration
 

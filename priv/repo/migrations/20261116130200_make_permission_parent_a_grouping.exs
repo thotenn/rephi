@@ -1,12 +1,7 @@
 defmodule Rephi.Repo.Migrations.MakePermissionParentAGrouping do
   @moduledoc """
-  `permissions.parent_id` only groups permissions for display: holding a
-  parent permission grants nothing else.
-
-    * deleting a parent no longer fails: its children lose the parent
-      (`ON DELETE SET NULL` instead of `RESTRICT`);
-    * a permission cannot be its own parent. Existing self references carry
-      no meaning and are cleared.
+  `permissions.parent_id` only groups for display: deleting a parent clears its
+  children's link, and existing self references are cleared.
   """
   use Ecto.Migration
 

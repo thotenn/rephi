@@ -1,7 +1,5 @@
 defmodule Rephi.Repo.Migrations.AddMustChangePasswordToUsers do
-  @moduledoc """
-  Flags accounts whose password an administrator reset (`Rephi.Accounts.reset_password/1`).
-  """
+  @moduledoc "Flags accounts whose password an administrator reset."
   use Ecto.Migration
 
   def change do

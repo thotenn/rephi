@@ -17,7 +17,6 @@ defmodule Rephi.MixProject do
     ]
   end
 
-  # `mix precommit` runs in the test environment, like `mix test`.
   def cli do
     [preferred_envs: [precommit: :test]]
   end
@@ -64,14 +63,6 @@ defmodule Rephi.MixProject do
   end
 
   # Aliases are shortcuts or tasks specific to the current project.
-  #
-  #     $ mix setup       # dependencies, database and seeds
-  #     $ mix precommit   # the checks CI runs, before you push
-  #
-  # `mix setup` prepares the Phoenix side only. The frontends (Node.js and
-  # Yarn) are installed and built by ./setup.sh, which also checks the
-  # toolchain, writes a development `.env` and then calls `mix setup`.
-  #
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
@@ -88,9 +79,6 @@ defmodule Rephi.MixProject do
     ]
   end
 
-  # `mix test --cover`. The modules left out are generated code (the
-  # `Guardian.Plug` helpers) or test support, which the coverage of the suite
-  # does not measure.
   defp test_coverage do
     [
       summary: [threshold: 90],

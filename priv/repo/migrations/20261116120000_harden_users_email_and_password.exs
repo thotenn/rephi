@@ -1,13 +1,8 @@
 defmodule Rephi.Repo.Migrations.HardenUsersEmailAndPassword do
   @moduledoc """
-  Makes the `users` table enforce what the application already assumes:
-
-    * emails are stored trimmed and lowercased, and are unique regardless of
-      case (`Admin@example.com` and `admin@example.com` are the same account);
-    * `email` and `hashed_password` can never be `NULL`.
-
-  The migration refuses to run, without changing anything, when the existing
-  data cannot satisfy those rules. Resolve the rows it lists and run it again.
+  Stores emails trimmed and lowercased, unique regardless of case, and makes
+  `email` and `hashed_password` NOT NULL. Refuses to run, changing nothing,
+  while existing rows violate that; it lists them.
   """
   use Ecto.Migration
 
@@ -18,8 +13,7 @@ defmodule Rephi.Repo.Migrations.HardenUsersEmailAndPassword do
     execute "UPDATE users SET email = lower(btrim(email)) WHERE email <> lower(btrim(email))"
 
     drop unique_index(:users, [:email])
-    # Same name as the index it replaces, so `unique_constraint(:email)` in
-    # the changeset keeps working.
+    # Same name as the replaced index, so `unique_constraint(:email)` keeps working.
     create unique_index(:users, ["lower(email)"], name: :users_email_index)
 
     alter table(:users) do

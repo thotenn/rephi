@@ -1,10 +1,7 @@
 defmodule Rephi.Repo.Migrations.AddTokenVersionToUsers do
   @moduledoc """
-  Adds the counter that lets a user's tokens be revoked.
-
-  Every JWT carries the `token_version` its user had when it was issued and is
-  only accepted while the two still match. Incrementing the column (password
-  change, logout) invalidates every token issued before.
+  Adds `users.token_version`: a JWT is accepted only while its version matches,
+  so incrementing it revokes every earlier token.
   """
   use Ecto.Migration
 

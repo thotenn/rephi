@@ -1,15 +1,7 @@
 defmodule Rephi.Repo.Migrations.DropRedundantJoinIndexes do
   @moduledoc """
-  Drops four single-column indexes that are the leading column of the unique
-  composite index of the same table, which already serves those lookups:
-
-    * `user_roles(user_id)` - `user_roles(user_id, role_id)`
-    * `user_permissions(user_id)` - `user_permissions(user_id, permission_id)`
-    * `role_permissions(role_id)` - `role_permissions(role_id, permission_id)`
-    * `role_roles(parent_role_id)` - `role_roles(parent_role_id, child_role_id)`
-
-  The indexes on the second column (`role_id`, `permission_id`,
-  `child_role_id`) are still needed and stay.
+  Drops the single-column indexes already served by the leading column of each
+  join table's unique composite index.
   """
   use Ecto.Migration
 

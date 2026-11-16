@@ -1,41 +1,10 @@
 defmodule Rephi.DotEnv do
   @moduledoc """
-  Minimal `.env` loader for development.
-
-  It lives next to the configuration files, and not under `lib/`, because it
-  has to run before the project is compiled: `config/config.exs` requires this
-  file and calls `load/1` on its very first lines, so every later
-  `System.get_env/1` (in `config/dev.exs` and `config/runtime.exs`) already
-  sees the values.
-
-  Rules:
-
-    * variables that are already set in the real environment always win, so
-      `PORT=4040 mix phx.server` works whatever `.env` says;
-    * it only runs in the `:dev` environment. Tests never read `.env`, and a
-      release reads the real environment only;
-    * a missing file is not an error.
-
-  Supported syntax, one assignment per line:
-
-      # a comment
-      PORT=4000
-      export DB_NAME=rephi_dev        # "export" is accepted and ignored
-      DB_PASSWORD="p@ss word # 1"     # double quotes: \\n, \\" and \\\\ escapes
-      PLAIN='kept $as is'             # single quotes: taken literally
-      CORS_ORIGINS=http://localhost:3000   # trailing comment after whitespace
-      SECRET_KEY_BASE=                # empty: the variable is left unset
-
-  There is no variable interpolation and no multi-line values. Lines that are
-  not an assignment are ignored.
+  Minimal `.env` loader for development. Lives in `config/` because it runs
+  before the project compiles; variables already set in the environment win.
   """
 
-  @doc """
-  Loads the file at `path` into the system environment.
-
-  Returns the names of the variables it set. Variables that already exist and
-  assignments with an empty value are skipped.
-  """
+  @doc "Loads the file at `path` into the environment; returns the names it set."
   @spec load(Path.t()) :: [String.t()]
   def load(path) do
     case File.read(path) do
@@ -50,16 +19,7 @@ defmodule Rephi.DotEnv do
     end
   end
 
-  @doc """
-  Parses the contents of a `.env` file into a list of `{name, value}` pairs,
-  in file order.
-
-  ## Examples
-
-      iex> Rephi.DotEnv.parse(~s(export PORT=4000 # dev\\nNAME="a b"\\n))
-      [{"PORT", "4000"}, {"NAME", "a b"}]
-
-  """
+  @doc "Parses `.env` contents into `{name, value}` pairs, in file order."
   @spec parse(String.t()) :: [{String.t(), String.t()}]
   def parse(contents) when is_binary(contents) do
     contents
@@ -89,7 +49,6 @@ defmodule Rephi.DotEnv do
   defp parse_value("'" <> rest) do
     case String.split(rest, "'", parts: 2) do
       [value, _comment] -> value
-      # No closing quote: keep the text as written.
       [value] -> value
     end
   end
@@ -110,6 +69,5 @@ defmodule Rephi.DotEnv do
   defp double_quoted(<<char::utf8, rest::binary>>, acc),
     do: double_quoted(rest, acc <> <<char::utf8>>)
 
-  # No closing quote: keep the text as written.
   defp double_quoted("", acc), do: acc
 end

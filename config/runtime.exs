@@ -5,14 +5,8 @@ import Config
 # system starts, so it is typically used to load production configuration
 # and secrets from environment variables or elsewhere. Do not define
 # any compile-time configuration in here, as it won't be applied.
-#
-# Every variable read here is listed and explained in `.env.example`.
 
-# ## Reading the environment
-#
-# An empty variable counts as unset: container tooling passes `VAR=` for
-# values that were never filled in, and that must not replace a default (or
-# satisfy a required secret) with an empty string.
+# An empty variable counts as unset: container tooling passes `VAR=` for unfilled values.
 env = fn name ->
   case System.get_env(name) do
     nil -> nil
@@ -47,7 +41,6 @@ env_list = fn name ->
   end
 end
 
-# `true`, `false`, or a comma separated list of origins.
 env_check_origin = fn default ->
   case env.("CHECK_ORIGIN") do
     nil -> default
@@ -69,10 +62,7 @@ if System.get_env("PHX_SERVER") do
   config :rephi, RephiWeb.Endpoint, server: true
 end
 
-# ## Optional settings (development and production)
-#
-# The test environment is configured only by config/test.exs, so the suite
-# does not depend on the shell it runs in.
+# The test suite is configured only by config/test.exs, independent of the shell.
 if config_env() != :test do
   if ttl = env_integer.("TOKEN_TTL_SECONDS", 1) do
     config :rephi, RephiWeb.Auth.Guardian, ttl: {ttl, :seconds}
@@ -104,15 +94,12 @@ if config_env() != :test do
       register: [window_seconds: window]
   end
 
-  # Number of reverse proxies in front of the app whose X-Forwarded-For entry
-  # can be trusted. 0 (the default) never reads the header.
   if proxies = env_integer.("RATE_LIMIT_TRUSTED_PROXIES", 0) do
     config :rephi, RephiWeb.Plugs.RateLimit, trusted_proxies: proxies
   end
 end
 
 if config_env() == :dev do
-  # Development has working defaults for all of these in config/dev.exs.
   if secret = env.("GUARDIAN_SECRET_KEY") do
     config :rephi, RephiWeb.Auth.Guardian, secret_key: secret
   end
@@ -154,8 +141,6 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  # The key that signs every JWT. Whoever knows it can forge a token for any
-  # user, so there is no default: each deployment needs its own.
   guardian_secret =
     env.("GUARDIAN_SECRET_KEY") ||
       raise """
@@ -172,8 +157,7 @@ if config_env() == :prod do
 
   config :rephi, RephiWeb.Auth.Guardian, secret_key: guardian_secret
 
-  # The public host name of the API. It is what the WebSocket origin check
-  # compares against, so a wrong value shows up as "the socket never connects".
+  # The WebSocket origin check compares against it: if wrong, the socket never connects.
   host =
     env.("PHX_HOST") ||
       raise """
@@ -185,9 +169,6 @@ if config_env() == :prod do
 
   config :rephi, :dns_cluster_query, env.("DNS_CLUSTER_QUERY")
 
-  # Browsers on other origins: CORS_ORIGINS feeds both CORS (above) and, unless
-  # CHECK_ORIGIN says otherwise, the WebSocket origin check, which accepts the
-  # host of this service plus those origins.
   cors_origins = env_list.("CORS_ORIGINS") || []
 
   config :rephi, RephiWeb.Endpoint,
@@ -203,17 +184,6 @@ if config_env() == :prod do
     check_origin: env_check_origin.(["//#{host}" | cors_origins]),
     secret_key_base: secret_key_base
 
-  # ## HTTPS
-  #
-  # Plain HTTP requests are redirected to HTTPS and HTTPS responses carry
-  # HSTS. The scheme is taken from X-Forwarded-Proto, so this works behind a
-  # reverse proxy or load balancer that terminates TLS (the usual setup).
-  # Health checks and requests to localhost are never redirected.
-  #
-  # Set FORCE_SSL=false only if something else already guarantees HTTPS and
-  # the redirect gets in the way.
-  #
-  # The options are the ones of `Plug.SSL`. See `RephiWeb.Plugs.ForceSSL`.
   if env_flag.("FORCE_SSL", true) do
     config :rephi, :force_ssl,
       rewrite_on: [:x_forwarded_proto],
@@ -226,9 +196,7 @@ if config_env() == :prod do
     config :rephi, :force_ssl, false
   end
 
-  # To terminate TLS in the application itself instead of in a proxy, add an
-  # `https:` entry to the endpoint configuration. See
-  # https://hexdocs.pm/plug/Plug.SSL.html#configure/1
+  # To terminate TLS in the app instead of a proxy, add an `https:` entry:
   #
   #     config :rephi, RephiWeb.Endpoint,
   #       https: [

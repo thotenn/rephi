@@ -20,7 +20,6 @@ config :rephi, Rephi.Repo,
 config :rephi, RephiWeb.Endpoint,
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT", "4000"))],
-  # CHECK_ORIGIN can turn the WebSocket origin check on (config/runtime.exs).
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -54,13 +53,10 @@ config :rephi, RephiWeb.Endpoint,
 # configured to run both http and https servers on
 # different ports.
 
-# Development-only signing key for JWTs. Never use it anywhere else:
-# production reads GUARDIAN_SECRET_KEY and refuses to boot without it.
+# Development-only JWT key; production requires GUARDIAN_SECRET_KEY.
 config :rephi, RephiWeb.Auth.Guardian,
   secret_key: "AkB8AWcPADxQZYaVTwUqDzhbUIuaq5pgOJ1LHoRcoQw+D16iRPHWacHc84hI5WF/"
 
-# Frontend dev servers allowed to call the API: the React apps (3000, 5173,
-# 5001, 5010), Astro dev (4321) and `wrangler pages dev` (8788).
 config :rephi, :cors_origins, [
   "http://localhost:3000",
   "http://localhost:5173",
@@ -70,14 +66,11 @@ config :rephi, :cors_origins, [
   "http://localhost:8788"
 ]
 
-# Serve the API documentation (/api/openapi, Swagger UI at /api/swagger)
 config :rephi, :swagger_enabled, true
 
-# Otherwise the OpenAPI document is cached and code reloads do not show up.
+# Otherwise the cached OpenAPI document hides code reloads.
 config :open_api_spex, :cache_adapter, OpenApiSpex.Plug.NoneCache
 
-# Lets `mix run priv/repo/seeds.exs` create the well-known development admin
-# when ADMIN_EMAIL / ADMIN_PASSWORD are not set. See `Rephi.Seeds`.
 config :rephi, Rephi.Seeds, admin: :default
 
 # Enable dev routes for dashboard and mailbox
