@@ -30,7 +30,6 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 rephi-*.tar
 
-mix.lock
 package-lock.json
 
 .claude/
@@ -42,7 +41,6 @@ CLAUDE.md
 .env.local
 .env.*.local
 .yarn/
-yarn.lock
 
 # Frontend builds
 /priv/static/dashboard/
@@ -56,6 +54,7 @@ yarn.lock
 /apps/*/.vite/
 
 # Editor directories and files
+.elixir_ls/
 .vscode/
 .idea/
 *.swp
