@@ -1,22 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { isAdmin } from "~/lib/auth";
-import { useAuthStore } from "~/lib/rephi";
-import { href, isRoute, isUnderRoute, ROUTES } from "~/lib/routes";
+import { usePermissions } from "~/lib/rephi";
+import { ADMIN_PERMISSIONS, href, isRoute, isUnderRoute, ROUTES } from "~/lib/routes";
 
 interface AdminMenuProps {
   /** Pathname of the page being rendered, provided by Astro at build time. */
   pathname: string;
 }
 
+// Each entry shows for users with the permission of its screen, so a manager
+// with `users:view` gets "User Management" without the rest.
 const links = [
-  { route: ROUTES.admin.users, label: "User Management" },
-  { route: ROUTES.admin.roles, label: "Roles Management" },
-  { route: ROUTES.admin.permissions, label: "Permissions Management" },
+  { route: ROUTES.admin.users, label: "User Management", permission: ADMIN_PERMISSIONS.users },
+  { route: ROUTES.admin.roles, label: "Roles Management", permission: ADMIN_PERMISSIONS.roles },
+  {
+    route: ROUTES.admin.permissions,
+    label: "Permissions Management",
+    permission: ADMIN_PERMISSIONS.permissions,
+  },
 ];
 
-/** Admin dropdown of the header. Renders nothing for non-admin users. */
+/** Admin dropdown of the header. Renders nothing for users without any admin screen. */
 export default function AdminMenu({ pathname }: AdminMenuProps) {
-  const user = useAuthStore((state) => state.user);
+  const { can } = usePermissions();
+  const visibleLinks = links.filter((link) => can(link.permission));
   const [showAdminDropdown, setShowAdminDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +40,7 @@ export default function AdminMenu({ pathname }: AdminMenuProps) {
     };
   }, []);
 
-  if (!isAdmin(user)) return null;
+  if (visibleLinks.length === 0) return null;
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -69,7 +75,7 @@ export default function AdminMenu({ pathname }: AdminMenuProps) {
       {showAdminDropdown && (
         <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
           <div className="py-1">
-            {links.map((link) => (
+            {visibleLinks.map((link) => (
               <a
                 key={link.route}
                 href={href(link.route)}

@@ -1,159 +1,132 @@
-import { useState, useEffect, type SubmitEventHandler } from "react";
+import { useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
+import { describeError, getErrorMessage, usePermissions } from "~/lib/rephi";
 import IslandProviders from "~/components/react/IslandProviders";
-import { describeError } from "~/lib/errors";
-import { permissionsApi } from "~/lib/api/admin";
+import { ErrorAlert, Pagination } from "~/components/react";
+import { ADMIN_PAGE_SIZE, adminKeys, permissionsApi } from "~/lib/api/admin";
 import type { Permission } from "~/types/admin.types";
+import SlugRecordModal, { type SlugRecordValues } from "./shared/SlugRecordModal";
+import { permissionSlugFromName, validatePermissionSlug } from "./shared/slugs";
 import PermissionsTable from "./PermissionsTable";
-import CreateEditPermissionModal from "./CreateEditPermissionModal";
+
+type Editing = { mode: "create" } | { mode: "edit"; permission: Permission } | null;
 
 function PermissionsManagementScreen() {
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingPermission, setEditingPermission] = useState<Permission | null>(
-    null
-  );
+  const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState<Editing>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    slug: "",
-    description: "",
+  const permissionsQuery = useQuery({
+    queryKey: adminKeys.permissionsPage(page),
+    queryFn: () => permissionsApi.list({ page, page_size: ADMIN_PAGE_SIZE }),
+    placeholderData: keepPreviousData,
   });
 
-  const loadPermissions = async () => {
-    try {
-      const response = await permissionsApi.getAll();
-      setPermissions(response.data);
-    } catch (err) {
-      setError(describeError("Error loading permissions", err));
-    } finally {
-      setLoading(false);
-    }
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: adminKeys.permissions });
+
+  const save = useMutation({
+    mutationFn: (values: SlugRecordValues) =>
+      editing?.mode === "edit"
+        ? permissionsApi.update(editing.permission.id, values)
+        : permissionsApi.create(values),
+    onSuccess: (permission) => {
+      toast.success(editing?.mode === "edit" ? `Permission "${permission.name}" updated` : `Permission "${permission.name}" created`);
+      setEditing(null);
+      invalidate();
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (permission: Permission) => permissionsApi.delete(permission.id),
+    onSuccess: (_, permission) => {
+      toast.success(`Permission "${permission.name}" deleted`);
+      // Deleting the last row of a page: go back one page.
+      if (permissionsQuery.data?.data.length === 1 && page > 1) setPage(page - 1);
+      invalidate();
+    },
+    onError: (error) => setActionError(getErrorMessage(error, "Error deleting permission")),
+  });
+
+  const openForm = (next: Editing) => {
+    save.reset();
+    setEditing(next);
   };
 
-  useEffect(() => {
-    // The loader only sets state after its request settles, which the rule cannot
-    // see through the async call. Moving these fetches to react-query removes this.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadPermissions();
-  }, []);
-
-  const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingPermission) {
-        await permissionsApi.update(editingPermission.id, formData);
-      } else {
-        await permissionsApi.create(formData);
-      }
-      resetForm();
-      loadPermissions();
-    } catch (err) {
-      setError(describeError(editingPermission ? "Error updating permission" : "Error creating permission", err));
-    }
+  const handleDelete = (permission: Permission) => {
+    if (!confirm(`Delete the permission "${permission.name}"?`)) return;
+    setActionError(null);
+    remove.mutate(permission);
   };
 
-  const handleEdit = (permission: Permission) => {
-    setEditingPermission(permission);
-    setFormData({
-      name: permission.name,
-      slug: permission.slug,
-      description: permission.description || "",
-    });
-    setShowCreateForm(true);
-  };
-
-  const handleDelete = async (permissionId: number) => {
-    if (!confirm("Are you sure you want to delete this permission?")) return;
-
-    try {
-      await permissionsApi.delete(permissionId);
-      loadPermissions();
-    } catch (err) {
-      setError(describeError("Error deleting permission", err));
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({ name: "", slug: "", description: "" });
-    setEditingPermission(null);
-    setShowCreateForm(false);
-  };
-
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_:]/g, "");
-  };
-
-  const handleNameChange = (name: string) => {
-    setFormData({
-      ...formData,
-      name,
-      slug: generateSlug(name),
-    });
-  };
-
-  const handleFormDataChange = (field: string, value: string) => {
-    setFormData({
-      ...formData,
-      [field]: value,
-    });
-  };
-
-  const getPermissionCategory = (slug: string) => {
-    const [category] = slug.split(":");
-    return category;
-  };
-
-
-  if (loading) {
-    return <div className="flex justify-center p-8">Loading...</div>;
-  }
+  const saveError = save.error ? describeError(save.error) : null;
 
   return (
     <div className="max-w-6xl mx-auto p-6 text-gray-500">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Permissions Management</h1>
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Create Permission
-        </button>
+        {can("permissions:create") && (
+          <button
+            type="button"
+            onClick={() => openForm({ mode: "create" })}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Create Permission
+          </button>
+        )}
       </div>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
+      <ErrorAlert message={actionError} onDismiss={() => setActionError(null)} />
+
+      {permissionsQuery.isPending ? (
+        <div className="flex justify-center p-8">Loading...</div>
+      ) : permissionsQuery.isError ? (
+        <ErrorAlert message={getErrorMessage(permissionsQuery.error, "Error loading permissions")} />
+      ) : (
+        <>
+          <PermissionsTable
+            permissions={permissionsQuery.data.data}
+            canEdit={can("permissions:edit")}
+            canDelete={can("permissions:delete")}
+            onEdit={(permission) => openForm({ mode: "edit", permission })}
+            onDelete={handleDelete}
+          />
+          <Pagination
+            meta={permissionsQuery.data.meta}
+            onPageChange={setPage}
+            busy={permissionsQuery.isPlaceholderData}
+            label="Permissions pages"
+          />
+        </>
       )}
 
-      <CreateEditPermissionModal
-        isOpen={showCreateForm}
-        editingPermission={editingPermission}
-        formData={formData}
-        onClose={resetForm}
-        onSubmit={handleSubmit}
-        onNameChange={handleNameChange}
-        onFormDataChange={handleFormDataChange}
-      />
-
-      <PermissionsTable
-        permissions={permissions}
-        loading={loading}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onCreateFirst={() => setShowCreateForm(true)}
-        getPermissionCategory={getPermissionCategory}
-      />
+      {editing && (
+        <SlugRecordModal
+          key={editing.mode === "edit" ? editing.permission.id : "new"}
+          noun="Permission"
+          editing={
+            editing.mode === "edit"
+              ? { ...editing.permission, description: editing.permission.description ?? "" }
+              : null
+          }
+          onClose={() => setEditing(null)}
+          onSubmit={(values) => save.mutate(values)}
+          submitting={save.isPending}
+          serverFieldErrors={saveError?.fieldErrors ?? {}}
+          serverError={saveError && Object.keys(saveError.fieldErrors).length === 0 ? saveError.message : null}
+          validateSlug={validatePermissionSlug}
+          slugFromName={permissionSlugFromName}
+          slugPlaceholder="e.g., users:edit"
+          slugHint="Use format: category:action (e.g., users:edit, roles:create)"
+        />
+      )}
     </div>
   );
 }
 
-/** Permissions CRUD, grouped by category. */
+/** Permissions list (paginated, grouped by category) with create / edit / delete. */
 export default function PermissionsManagement() {
   return (
     <IslandProviders>

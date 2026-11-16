@@ -25,6 +25,13 @@ export const ROUTES = {
   },
 } as const;
 
+/** Permission that opens each admin screen (and its entry in the Admin menu). */
+export const ADMIN_PERMISSIONS = {
+  users: "users:view",
+  roles: "roles:view",
+  permissions: "permissions:view",
+} as const;
+
 /** The configured `base` without a trailing slash: "" for "/", "/app/x" for "/app/x/". */
 const BASE = import.meta.env.BASE_URL.replace(/\/+$/, "");
 

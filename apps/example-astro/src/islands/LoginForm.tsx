@@ -1,16 +1,24 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import IslandProviders from "~/components/react/IslandProviders";
 import { useLogin } from "~/hooks/useAuth";
-import { getRedirectPath } from "~/lib/rephi";
+import { applyServerErrors } from "~/lib/forms";
+import { getRedirectPath, useAuthStore } from "~/lib/rephi";
 import type { LoginCredentials } from "~/lib/rephi";
 
+// No minimum length here: accounts created under older, shorter password
+// rules can still sign in. The rules apply when a password is set.
 const loginSchema = z.object({
   email: z.email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(1, "Password is required"),
 });
+
+const sessionNotices = {
+  logout: "You have been signed out.",
+  unauthorized: "Your session has ended. Please sign in again.",
+} as const;
 
 // The "redirect back" target lives in sessionStorage, which only exists in the
 // browser. Reading it through an external store with a server snapshot keeps
@@ -21,40 +29,47 @@ const noRedirectTarget = () => false;
 
 function LoginFormFields() {
   const loginMutation = useLogin();
+  const [serverError, setServerError] = useState<string | null>(null);
   const redirected = useSyncExternalStore(
     subscribeToNothing,
     hasRedirectTarget,
     noRedirectTarget
   );
+  // Set when the session ended on a page of this tab (kept by the client router).
+  const sessionEndReason = useAuthStore((state) => state.sessionEndReason);
+  const notice = sessionEndReason
+    ? sessionNotices[sessionEndReason]
+    : redirected
+      ? "You need to login to access that page."
+      : null;
 
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<LoginCredentials>({
     resolver: zodResolver(loginSchema),
   });
 
   const onSubmit = (data: LoginCredentials) => {
-    loginMutation.mutate(data);
+    setServerError(null);
+    loginMutation.mutate(data, {
+      onError: (error) => setServerError(applyServerErrors(error, setError, ["email", "password"])),
+    });
   };
 
   return (
     <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
-      {redirected && (
+      {notice && !serverError && (
         <div className="rounded-md bg-blue-50 p-4">
-          <div className="text-sm text-blue-800">
-            You need to login to access that page.
-          </div>
+          <div className="text-sm text-blue-800">{notice}</div>
         </div>
       )}
 
-      {loginMutation.isError && (
+      {serverError && (
         <div className="rounded-md bg-red-50 p-4" role="alert">
-          <div className="text-sm text-red-800">
-            {loginMutation.error?.message ||
-              "An error occurred during login"}
-          </div>
+          <div className="text-sm text-red-800">{serverError}</div>
         </div>
       )}
 

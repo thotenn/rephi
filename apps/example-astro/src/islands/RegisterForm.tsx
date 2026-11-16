@@ -1,51 +1,45 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import IslandProviders from "~/components/react/IslandProviders";
 import { useRegister } from "~/hooks/useAuth";
+import { applyServerErrors } from "~/lib/forms";
+import { registrationSchema } from "~/lib/passwords";
 import type { RegisterCredentials } from "~/lib/rephi";
 
 type RegisterFormData = RegisterCredentials;
-
-const registerSchema = z
-  .object({
-    email: z.email("Invalid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    password_confirmation: z
-      .string()
-      .min(6, "Password must be at least 6 characters"),
-  })
-  .refine((data) => data.password === data.password_confirmation, {
-    error: "Passwords don't match",
-    path: ["password_confirmation"],
-  });
 
 const inputClassName =
   "mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm";
 
 function RegisterFormFields() {
   const registerMutation = useRegister();
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(registrationSchema),
   });
 
   const onSubmit = (data: RegisterFormData) => {
-    registerMutation.mutate(data);
+    setServerError(null);
+    registerMutation.mutate(data, {
+      onError: (error) =>
+        setServerError(
+          applyServerErrors(error, setError, ["email", "password", "password_confirmation"])
+        ),
+    });
   };
 
   return (
     <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
-      {registerMutation.isError && (
+      {serverError && (
         <div className="rounded-md bg-red-50 p-4" role="alert">
-          <div className="text-sm text-red-800">
-            {registerMutation.error?.message ||
-              "An error occurred during registration"}
-          </div>
+          <div className="text-sm text-red-800">{serverError}</div>
         </div>
       )}
 

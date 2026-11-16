@@ -1,16 +1,13 @@
 ---
-import Card from "~/components/Card.astro";
+import ChangePasswordForm from "~/islands/ChangePasswordForm";
 import UserInfoCard from "~/islands/UserInfoCard";
 import AppLayout from "~/layouts/AppLayout.astro";
 ---
 
 <AppLayout title="Profile" heading="User Profile">
   {/* client:only - shows the signed-in user, who is only known in the browser. */}
-  <UserInfoCard client:only="react" showUpdatedAt />
+  <UserInfoCard client:only="react" showPermissions />
 
-  <Card title="Account Settings" class="mt-8">
-    <p class="text-gray-600">
-      Account settings and preferences will be available here in future updates.
-    </p>
-  </Card>
+  {/* client:only - only makes sense with a session, which exists in the browser only. */}
+  <ChangePasswordForm client:only="react" />
 </AppLayout>

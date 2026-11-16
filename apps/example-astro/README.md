@@ -5,9 +5,10 @@ with [Astro](https://astro.build) as a **static, multi-page site** that can be h
 [Cloudflare Pages](https://pages.cloudflare.com) or any other static host, while the Phoenix
 backend runs somewhere else.
 
-It keeps every Phoenix integration of the SPA: JWT login and registration, the persisted auth
-store, the axios API client, role-based guards, the admin screens (users, roles, permissions) and
-live notifications over a Phoenix channel. All of them come from
+It keeps every Phoenix integration of the SPA: JWT login, registration and server-side logout,
+the persisted auth store, the axios API client with its error and 401 handling, permission-based
+guards, the admin screens (users, roles, permissions, paginated), the password change and live
+notifications over Phoenix channels. All of them come from
 [`@rephi/shared-components`](../../packages/shared-components), exactly as in the SPA.
 
 ## How it differs from the SPA
@@ -19,7 +20,7 @@ live notifications over a Phoenix channel. All of them come from
 | Rendering | Everything rendered by React at runtime | Static shell rendered at build time, React only inside islands |
 | Navigation | Client-side router | Astro client router (`<ClientRouter />`) between prerendered pages |
 | Hosting | Served by Phoenix under `/app/example` | Any static host; Phoenix only provides the API and the socket |
-| API / socket URL | Inlined into the shared library when it is built | `PUBLIC_API_URL` / `PUBLIC_WS_URL` of this app, applied at runtime |
+| API / socket URL | `VITE_API_URL` / `VITE_WS_URL` of the app (same origin `/api`, `/socket` in a build) | `PUBLIC_API_URL` / `PUBLIC_WS_URL` of this app |
 | Requests | Same origin as the API | Cross-origin: the backend must allow the site's origin |
 
 ## Architecture
@@ -49,9 +50,11 @@ islands, and each one states how it is loaded:
 | `GuestRedirect` (welcome, login, register) | `client:only` | No markup; it only redirects visitors who are already signed in. |
 | `LoginForm`, `RegisterForm` | `client:load` | Prerendered so the form is visible before any JavaScript runs, hydrated immediately. Their markup does not depend on the session. |
 | `LogoutButton` | `client:load` | Same markup for everyone: prerendered (no layout shift), hydrated at once. |
-| `AdminMenu` | `client:only` | Rendered for admins only, which is known in the browser only. |
-| `UserInfoCard` | `client:only` | Shows the signed-in user. |
-| `NotificationSender` | `client:only` | Shows the live state of the socket. |
+| `AdminMenu` | `client:only` | Lists the admin screens the user has the permissions for, which is known in the browser only. |
+| `UserInfoCard` | `client:only` | Shows the signed-in user (roles, permissions). |
+| `NotificationSender` | `client:only` | Only for users with `notifications:broadcast`; shows the live state of the socket. |
+| `RealtimeHint` | `client:only` | One line with the state of the live notifications. |
+| `ChangePasswordForm` | `client:only` | Profile page; only makes sense with a session. |
 | `UsersManagement`, `RolesManagement`, `PermissionsManagement` | `client:only` | Everything they display comes from authenticated API calls. |
 
 `client:only` is used wherever the output depends on the session: the store is persisted in
@@ -80,19 +83,35 @@ the API authorizes every request on its own.
 
 - **Signed-in pages** use `AppLayout`, which wraps the page in `RouteGuard`. A signed-out visitor
   is sent to `/login/` and the requested URL is remembered, so the login returns there.
-- **Admin pages** pass `access="admin"`; other users get the access-denied screen.
+- **Admin pages** pass the `permission` they need (`users:view`, `roles:view`,
+  `permissions:view`, see `ADMIN_PERMISSIONS` in `src/lib/routes.ts`); users without it get the
+  access-denied screen. Authorize by permission, never by role slug: the session's
+  `permissions` include inherited ones, its `roles` only the assigned ones. Inside the screens,
+  every action follows its own permission (a manager with `users:view` + `users:edit` sees the
+  users list with "Edit" only, and the roles list read-only).
 - **Public-only pages** (`/`, `/login/`, `/register/`) pass `guestOnly` to `BaseLayout`:
   a signed-in visitor is sent to `/home/`. Because these pages are painted before any island
   loads, a small inline script in `<head>` does the same check before the first paint, so the
   public page does not flash.
-- **Logout** only clears the store. `RouteGuard` reacts by navigating to the login page and
-  `AppRuntime` closes the socket.
+- **Logout** calls `POST /api/users/logout` (the server revokes the token on every device of the
+  user and closes their sockets), then clears the store. `RouteGuard` reacts by navigating to the
+  login page and `AppRuntime` closes the socket.
+- **A session the server ended** (token expired after 24 h, logout or password change on another
+  device, user deleted) ends here too: the first request answered with 401, or the socket being
+  closed by the server, clears the session through the shared library; `AppRuntime` shows a
+  toast and `RouteGuard` sends the visitor to the login page, which says the session ended. A
+  session restored from storage is checked once per page load (`GET /api/me`) before the socket
+  opens.
+- **Password change** (profile page) stores the new session the server returns and reconnects the
+  socket with the new token; the user stays signed in here and every other device is signed out.
 
 ### Realtime
 
-`AppRuntime` is the only place that opens the socket and joins `user:lobby`, so a notification is
-shown exactly once whatever the page. Islands that need the connection state (the badge on the
-home page) read it from `src/lib/realtime.ts`.
+`AppRuntime` is the only place that opens the socket and joins `user:lobby` (broadcasts) and
+`user:<id>` (notifications for the signed-in user), so a notification is shown exactly once
+whatever the page, with its sender. Islands that need the connection state (the badge on the home
+page) read it from `src/lib/realtime.ts`. The token reaches the socket as Phoenix's `authToken`,
+never in the URL.
 
 ### Configuration flow
 
@@ -133,7 +152,8 @@ yarn example-astro:dev --port 5173
 
 The backend answers browsers only from the origins on its CORS allow-list (see
 [Backend requirements](#backend-requirements)), so the origin of the dev server, port included,
-has to be on that list.
+has to be on that list. In development the backend already allows `http://localhost:4321` and
+`http://localhost:8788` (`wrangler pages dev`).
 
 Other scripts (run them with `yarn workspace rephi-example-astro <script>`):
 
@@ -274,40 +294,32 @@ Wrangler configuration changes accordingly. See Astro's
 
 ## Backend requirements
 
-The site and the API are on different origins, so the Phoenix backend has to accept the site:
+The site and the API are on different origins, so the Phoenix backend has to accept the site.
+Everything is runtime configuration of the backend (environment variables of the release), no
+code change:
 
-1. **CORS**: the site's origin (scheme + host + port, no path) must be on the allow-list of
-   `CORSPlug` in `lib/rephi_web/endpoint.ex`, with credentials enabled. A wildcard `*` does not
-   work, because the API client sends credentialed requests.
+1. **CORS**: put the site's origins (scheme + host + port, no path) in `CORS_ORIGINS`,
+   comma-separated. A subdomain wildcard covers the preview deployments; `*` is refused at boot.
 
-   ```elixir
-   plug CORSPlug,
-     origin: [
-       "http://localhost:4321",
-       "https://<your-project>.pages.dev",
-       "https://app.example.com"
-     ],
-     credentials: true
+   ```bash
+   CORS_ORIGINS=https://<your-project>.pages.dev,https://*.<your-project>.pages.dev,https://app.example.com
    ```
 
-   Preview deployments get their own host name (`https://<hash>.<your-project>.pages.dev`).
-   `CORSPlug` accepts regular expressions if you want to allow them.
+   In development the defaults already include `http://localhost:4321` and
+   `http://localhost:8788`.
 
-2. **WebSocket origin check**: in production Phoenix compares the `Origin` header of a socket
-   connection with the endpoint's own host and rejects anything else. List the site's origins
-   in the endpoint configuration (`config/runtime.exs`):
+2. **WebSocket origin check**: in production the socket accepts `PHX_HOST` plus every origin of
+   `CORS_ORIGINS`, so the step above covers it. `CHECK_ORIGIN` overrides it
+   (`true`, `false` or a comma-separated list).
 
-   ```elixir
-   config :rephi, RephiWeb.Endpoint,
-     check_origin: [
-       "https://<your-project>.pages.dev",
-       "https://app.example.com"
-     ]
-   ```
+3. **`PHX_HOST`**: the public host of the API (no scheme), e.g. `api.example.com`. It is required
+   in production.
 
-   `"//*.<your-project>.pages.dev"` matches every preview deployment.
+4. **HTTPS**: a site served over HTTPS can only call an `https://` API and a `wss://` socket. Behind
+   a TLS-terminating proxy, the proxy has to send `X-Forwarded-Proto`.
 
-3. **HTTPS**: a site served over HTTPS can only call an `https://` API and a `wss://` socket.
+The API client sends the token in the `Authorization` header (no cookies), and the socket sends
+it as Phoenix's `authToken` (in the `Sec-WebSocket-Protocol` header).
 
 ## Base path
 
@@ -324,17 +336,17 @@ need the same prefix.
 
 ### Serving it from Phoenix
 
-`yarn build` at the repository root copies every `apps/*/dist` into `priv/static/apps/`, where
-`RephiWeb.Plugs.FrontendAppPlug` serves them as single-page apps: any unknown path gets the root
-`index.html`. That is wrong for a multi-page site (`/app/x/login/` must be answered with
-`login/index.html`), so this app opts out of the copy:
+`yarn build` at the repository root copies every `apps/*/dist` into `priv/static/apps/`, served at
+`/app/<name>/` by `RephiWeb.Plugs.FrontendAppPlug`. This app opts out of that copy because it is
+meant for a static host:
 
 ```json
 "rephi": { "copyToPhoenix": false }
 ```
 
-To serve it from Phoenix anyway, the plug first has to resolve directory indexes and serve
-`404.html` for unknown paths. Then build with the Phoenix path and copy it explicitly:
+The plug handles multi-page sites too (`/app/x/login/` serves `login/index.html`, `/app/x/login`
+redirects there, and an app that ships a root `404.html` gets it for unknown paths, with status
+404), so it can be served from Phoenix anyway. Build it for that path and copy it explicitly:
 
 ```bash
 ASTRO_BASE=/app/example-astro PUBLIC_API_URL=/api PUBLIC_WS_URL=/socket yarn example-astro:build

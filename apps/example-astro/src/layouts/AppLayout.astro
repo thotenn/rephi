@@ -8,11 +8,11 @@ interface Props {
   title: string;
   /** Heading shown in the header bar. */
   heading?: string;
-  /** Who may see the page: any signed-in user, or admins only. */
-  access?: "auth" | "admin";
+  /** Permission the page requires (e.g. "users:view"); any signed-in user when omitted. */
+  permission?: string;
 }
 
-const { title, heading, access = "auth" } = Astro.props;
+const { title, heading, permission } = Astro.props;
 ---
 
 <BaseLayout title={title} noindex>
@@ -22,7 +22,7 @@ const { title, heading, access = "auth" } = Astro.props;
     shipped as inert HTML inside the island and inserted once the guard allows
     it; until then the "fallback" slot is displayed.
   */}
-  <RouteGuard client:only="react" access={access}>
+  <RouteGuard client:only="react" permission={permission}>
     <div class="min-h-screen bg-gray-50">
       <AppHeader heading={heading} />
       <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">

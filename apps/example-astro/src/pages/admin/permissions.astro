@@ -1,9 +1,10 @@
 ---
 import PermissionsManagement from "~/islands/admin/PermissionsManagement";
 import AppLayout from "~/layouts/AppLayout.astro";
+import { ADMIN_PERMISSIONS } from "~/lib/routes";
 ---
 
-<AppLayout title="Permissions Management" heading="Permission Management" access="admin">
+<AppLayout title="Permissions Management" heading="Permission Management" permission={ADMIN_PERMISSIONS.permissions}>
   {/* client:only - everything it shows comes from authenticated API calls. */}
   <PermissionsManagement client:only="react" />
 </AppLayout>

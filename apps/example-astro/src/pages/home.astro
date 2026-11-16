@@ -1,6 +1,7 @@
 ---
 import Card from "~/components/Card.astro";
 import NotificationSender from "~/islands/NotificationSender";
+import RealtimeHint from "~/islands/RealtimeHint";
 import UserInfoCard from "~/islands/UserInfoCard";
 import AppLayout from "~/layouts/AppLayout.astro";
 ---
@@ -9,7 +10,10 @@ import AppLayout from "~/layouts/AppLayout.astro";
   {/* client:only - shows the signed-in user, who is only known in the browser. */}
   <UserInfoCard client:only="react" />
 
-  {/* client:only - displays the live socket state, which has no build-time value. */}
+  {/*
+    client:only - rendered only for users with `notifications:broadcast`, and
+    it displays the live socket state; neither is known at build time.
+  */}
   <NotificationSender client:only="react" />
 
   <Card title="Welcome!" class="mt-8">
@@ -18,5 +22,7 @@ import AppLayout from "~/layouts/AppLayout.astro";
       home dashboard where you can manage your account and access all the
       features of the application.
     </p>
+    {/* client:only - the live socket state has no build-time value. */}
+    <RealtimeHint client:only="react" />
   </Card>
 </AppLayout>

@@ -1,19 +1,5 @@
 import { useSyncExternalStore } from "react";
 
-/** Phoenix channel topics and events used by the app. */
-export const channelsProps = {
-  topics: {
-    user: {
-      lobby: "user:lobby",
-    },
-  },
-  events: {
-    user: {
-      notification: "new_notification",
-    },
-  },
-} as const;
-
 /**
  * Connection state of the lobby channel.
  *

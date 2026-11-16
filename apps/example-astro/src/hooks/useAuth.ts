@@ -1,88 +1,69 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { go, goToPath } from "~/lib/navigation";
 import {
-  api,
+  changePassword,
   clearRedirectPath,
-  env,
   getRedirectPath,
-  useAuthStore,
+  login,
+  logout,
+  register,
 } from "~/lib/rephi";
 import type {
-  AuthResponse,
+  AuthSession,
+  ChangePasswordParams,
   LoginCredentials,
   RegisterCredentials,
 } from "~/lib/rephi";
 import { isInternalPath, ROUTES } from "~/lib/routes";
 
-/**
- * Stores the session returned by login / register, then completes it with the
- * roles and permissions from `/me` (the auth endpoints only return id + email).
- */
-async function startSession({ user, token }: AuthResponse): Promise<void> {
-  const { setAuth } = useAuthStore.getState();
-
-  // Set auth first: the axios interceptor reads the token from the store.
-  setAuth(user, token);
-
-  try {
-    const profile = await api.get(env.API.auth.me);
-    if (profile.data?.user) {
-      setAuth(profile.data.user, token);
-    }
-  } catch (error) {
-    console.warn("Failed to fetch user profile:", error);
+/** After signing in: back to the protected page that sent the visitor here, or home. */
+function leaveGuestPage(): void {
+  const redirectPath = getRedirectPath();
+  clearRedirectPath();
+  if (isInternalPath(redirectPath)) {
+    goToPath(redirectPath, { replace: true });
+  } else {
+    go(ROUTES.home, { replace: true });
   }
 }
 
+/**
+ * Signs in. The response carries the roles and permissions, so the session is
+ * complete at once; the form then navigates exactly once.
+ */
 export function useLogin() {
   const queryClient = useQueryClient();
 
-  return useMutation<AuthResponse, Error, LoginCredentials>({
-    mutationFn: async (credentials) => {
-      const { data } = await api.post(env.API.auth.login, credentials);
-      return data;
-    },
-    onSuccess: async (data) => {
-      await startSession(data);
-
-      // Drop anything cached for a previous session.
-      queryClient.clear();
-
-      // Go back to the protected page that sent the visitor here, if any.
-      const redirectPath = getRedirectPath();
-      clearRedirectPath();
-
-      if (isInternalPath(redirectPath)) {
-        goToPath(redirectPath, { replace: true });
-      } else {
-        go(ROUTES.home, { replace: true });
-      }
-    },
+  return useMutation<AuthSession, Error, LoginCredentials>({
+    // Drop anything cached for a previous session before the new one starts.
+    onMutate: () => queryClient.clear(),
+    mutationFn: login,
+    onSuccess: leaveGuestPage,
   });
 }
 
+/** Creates the account (with the server's default role) and signs it in. */
 export function useRegister() {
   const queryClient = useQueryClient();
 
-  return useMutation<AuthResponse, Error, RegisterCredentials>({
-    mutationFn: async (credentials) => {
-      const { data } = await api.post(env.API.auth.register, credentials);
-      return data;
-    },
-    onSuccess: async (data) => {
-      await startSession(data);
-      queryClient.clear();
-      clearRedirectPath();
-      go(ROUTES.home, { replace: true });
-    },
+  return useMutation<AuthSession, Error, RegisterCredentials>({
+    onMutate: () => queryClient.clear(),
+    mutationFn: register,
+    onSuccess: leaveGuestPage,
   });
 }
 
+/** Changes the password; the new session replaces the stored one. */
+export function useChangePassword() {
+  return useMutation<AuthSession, Error, ChangePasswordParams>({ mutationFn: changePassword });
+}
+
 /**
- * Ends the session. Navigation is not done here: `RouteGuard` reacts to the
- * store and sends the visitor to the login page, and `AppRuntime` closes the
- * socket, so every consequence of losing the session lives in one place.
+ * Ends the session on the server (revokes the token on every device), then
+ * locally. Navigation is not done here: `RouteGuard` reacts to the store and
+ * sends the visitor to the login page, and `AppRuntime` follows the session
+ * for the socket, so every consequence of losing the session lives in one place.
  */
-export function logout(): void {
-  useAuthStore.getState().logout();
+export function signOut(): Promise<void> {
+  return logout();
 }
