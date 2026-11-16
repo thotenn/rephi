@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
-import { queryClient } from "~/components/react/IslandProviders";
 import { isEmbedded } from "~/lib/navigation";
 import { setRealtimeConnected } from "~/lib/realtime";
 import {
@@ -89,12 +88,13 @@ export default function AppRuntime() {
     };
   }, [online]);
 
-  // Whatever ended the session, cached data belonged to it. `RouteGuard`
-  // follows the store and takes the user to the login page.
+  // `RouteGuard` follows the store and takes the user to the login page; this
+  // only tells the user why. Cached data is dropped when the next session
+  // starts (`useLogin` / `useRegister`): clearing it here would make the
+  // queries of the page being left refetch without a token.
   useEffect(() => {
     if (isEmbedded) return;
     return onSessionEnd((reason) => {
-      queryClient.clear();
       if (reason === "unauthorized") {
         toast.error("Your session has ended. Please sign in again.", { id: "session-ended" });
       }
