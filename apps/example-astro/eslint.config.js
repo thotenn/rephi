@@ -29,7 +29,9 @@ export default defineConfig([
     },
     settings: {
       // Resolves the `~/*` alias and workspace packages through tsconfig.json.
-      "import-x/resolver-next": [createTypeScriptImportResolver()],
+      "import-x/resolver-next": [
+        createTypeScriptImportResolver({ project: `${import.meta.dirname}/tsconfig.json` }),
+      ],
     },
     rules: {
       // eslint-plugin-react-hooks (maintained by the React team) owns the hooks
@@ -82,6 +84,19 @@ export default defineConfig([
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    files: ["e2e/**/*.ts"],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
+    languageOptions: {
+      parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
   },
 ]);
