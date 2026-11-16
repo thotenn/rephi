@@ -2,8 +2,9 @@
 export { configureRephi, getRephiConfig } from './config';
 export type { RephiConfig } from './config';
 
-// HTTP client, auth calls and pagination
+// HTTP client, auth calls, administration calls and pagination
 export {
+  addRoleParent,
   api,
   AUTH_ENDPOINTS,
   changePassword,
@@ -11,13 +12,20 @@ export {
   fetchAllPages,
   fetchMe,
   fetchPage,
+  fetchRoleChildren,
+  fetchRoleParents,
+  fetchUserPermissions,
+  grantUserPermission,
   hasNextPage,
   hasPreviousPage,
   login,
   logout,
   MAX_PAGE_SIZE,
   PhoenixSocket,
-  register
+  register,
+  removeRoleParent,
+  resetUserPassword,
+  revokeUserPermission
 } from './controllers';
 export type { SocketStatus } from './controllers';
 
@@ -67,15 +75,23 @@ export type {
   ApiResponse,
   AuthSession,
   ChangePasswordParams,
+  DirectUserPermission,
+  EffectiveUserPermission,
   FieldErrors,
   LoginCredentials,
+  ManagedUser,
   PageMeta,
   PageParams,
   PaginatedResponse,
+  PasswordReset,
   Permission,
   RegisterCredentials,
   RephiNotification,
   Role,
+  RoleLink,
+  RoleParentAssignment,
   SessionEndReason,
-  User
+  User,
+  UserPermissionAssignment,
+  UserPermissions
 } from './types';

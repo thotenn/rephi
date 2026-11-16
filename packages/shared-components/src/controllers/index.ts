@@ -3,6 +3,16 @@ export { default as PhoenixSocket } from "./api/socket";
 export type { SocketStatus } from "./api/socket";
 export { AUTH_ENDPOINTS, changePassword, fetchMe, login, logout, register } from "./api/auth";
 export {
+  addRoleParent,
+  fetchRoleChildren,
+  fetchRoleParents,
+  fetchUserPermissions,
+  grantUserPermission,
+  removeRoleParent,
+  resetUserPassword,
+  revokeUserPermission,
+} from "./api/admin";
+export {
   describePage,
   fetchAllPages,
   fetchPage,

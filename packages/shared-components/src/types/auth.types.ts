@@ -20,6 +20,12 @@ export interface User {
   id: number;
   /** Normalized by the server: trimmed and lower-cased. */
   email: string;
+  /**
+   * An administrator reset the password: until the user sets a new one
+   * (`changePassword`), the API refuses everything but `/me`, the password
+   * change and logout (403). Send the user to the password form.
+   */
+  must_change_password: boolean;
   /** Roles assigned to the user (not the ones it only inherits). */
   roles: Role[];
   /** Effective permissions: direct, through roles and inherited. Authorize the UI with these. */
