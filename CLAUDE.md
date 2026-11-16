@@ -39,15 +39,15 @@ aliases, needed by typescript-eslint). Import router APIs from `react-router`, n
 
 ```
 lib/rephi/
-  accounts/accounts.ex, user.ex    Accounts: register_user (default role), change_password, revoke_tokens
+  accounts/accounts.ex, user.ex    Accounts: register_user (default role), change_password, reset_password, revoke_tokens
   authorization.ex                 RBAC context: load_access, can?, has_role?, assign_*/remove_*, preserving_admins
   authorization/                   Role, Permission, UserRole, UserPermission, RolePermission, RoleRole, Access
   seeds.ex                         default roles/permissions/admin as data (@roles, @permissions); run/1
   release.ex                       migrate/0, seed/0 for bin/migrate, bin/seed
   pagination.ex, health.ex, repo.ex (fetch/2, cast_id/1)
 lib/rephi_web/
-  router.ex                        /api (pipelines :api, :authenticated), /api/swagger, /app forward
-  auth/                            Guardian, Pipeline, AuthorizationPlug, AuthorizationHelpers, ErrorHandler
+  router.ex                        /api (pipelines :api, :authenticated, :password_settled), /api/swagger, /app forward
+  auth/                            Guardian, Pipeline, PasswordChangeGate, AuthorizationPlug, AuthorizationHelpers, ErrorHandler
   controllers/                     *_controller.ex + *_json.ex views, FallbackController, ControllerHelpers
   swagger.ex                       shared swagger definitions and swagger_path helpers
   plugs/                           FrontendAppPlug, RateLimit, ForceSSL, BodyParser
@@ -88,14 +88,19 @@ permissions). Read access, never `user.roles` / `user.permissions`.
   (`{:any_permission, [...]}`, `{:all_permissions, [...]}`, `{:role, slug}` follow the hierarchy);
 - inside an action: `can?(conn, slug)`, `has_role?/2`, `can_any?/2`, `can_all?/2`,
   `current_access(conn)` (imported by `use RephiWeb, :controller`);
-- assignments always get `actor: current_access(conn)` (escalation checks, `assigned_by`);
+- assignments always get `actor: current_access(conn)` (escalation checks, `assigned_by`),
+  hierarchy links included (`assign_parent_role/3`, `remove_parent_role/3`: both roles held);
 - anything that can remove the admin role from someone goes through
   `Authorization.preserving_admins/1`;
 - anything that must end sessions calls `Accounts.revoke_tokens/1` (bumps `token_version`,
-  broadcasts `"disconnect"` on `Accounts.socket_id/1`).
+  broadcasts `"disconnect"` on `Accounts.socket_id/1`);
+- a new authenticated route goes after `pipe_through :password_settled` in the router (a user
+  whose password an admin reset gets `403` there until it sets a new one); only routes such a user
+  needs to recover (`/me`, `/me/password`, logout) go before it.
 
 **Seeds.** Data in `Rephi.Seeds` (`@roles`, `@permissions`, `@role_hierarchy`): a new default
-permission is one line; seeding is idempotent, insert-only, and marks seeded rows `is_system`.
+permission is one line; seeding is idempotent, insert-only, and marks seeded rows `is_system`
+(roles, permissions and the hierarchy links).
 It never revokes; grants it stopped making show up in `stale_grants`.
 
 **Migrations.** Never edit an existing migration: existing projects must be able to apply new
@@ -132,8 +137,8 @@ ones. Make them reversible.
 - Seeds in a test: `Rephi.Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)`
   (do not depend on the shell's `ADMIN_*`).
 - Query budgets: `import Rephi.QueryCounter`; `count_queries(fn -> ... end)` returns
-  `{result, count}`. Login 2, `/api/me` 2, `/api/roles/:id` 4: if a number grows, something
-  queries per check again.
+  `{result, count}`. Login 2, `/api/me` 2, `/api/roles/:id` 4, `/api/roles/:id/parents` 4,
+  `/api/users/:id/permissions` 5: if a number grows, something queries per check again.
 - Channels: `connect(UserSocket, %{}, connect_info: %{auth_token: token})`.
 - Rate limiting is off in test; turn it on per test with `put_app_env(RephiWeb.Plugs.RateLimit,
   ...)` + `RephiWeb.RateLimiter.reset/0`.
@@ -156,6 +161,8 @@ ones. Make them reversible.
   `priv/static/apps` (the Astro app: it targets a static host).
 - Authorize the UI by `permissions` (effective); `roles` in the session are only the assigned
   ones. Any 401 on the current token ends the session.
+- A session user with `must_change_password` is kept on the profile page (password form) until it
+  changes the password: `ProtectedRoute` in the SPA, `AppRuntime` in the Astro app.
 
 ## Traps
 
