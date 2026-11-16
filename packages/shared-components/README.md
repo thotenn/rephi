@@ -128,7 +128,7 @@ useEffect(() => {
 }, [isAuthenticated]);
 
 // Anywhere below:
-const lobby = useChannel(LOBBY_TOPIC);                       // { channel, connected, error }
+const lobby = useChannel(LOBBY_TOPIC);                       // { channel, connected, error, presences }
 const mine = useChannel(user ? userTopic(user.id) : null);   // notifications for this user only
 useChannelEvent<RephiNotification>(lobby.channel, NOTIFICATION_EVENT, (n) => {
   toast(`${n.message} — ${n.from?.email ?? "system"}`);      // render as text, never HTML
@@ -158,8 +158,21 @@ useChannelEvent<RephiNotification>(lobby.channel, NOTIFICATION_EVENT, (n) => {
 - Topics: `LOBBY_TOPIC` (`"user:lobby"`, broadcasts), `userTopic(id)` (`"user:<id>"`, only that
   user may join). Event: `NOTIFICATION_EVENT` (`"new_notification"`), payload
   `RephiNotification` = `{message, timestamp, type, from: {id, email} | null}`. Clients cannot
-  broadcast over the socket; `POST /api/notifications/broadcast` needs the
-  `notifications:broadcast` permission.
+  broadcast over the socket: `broadcastNotification(message)` (`POST /api/notifications/broadcast`)
+  needs the `notifications:broadcast` permission; `sendTestNotification(message)`
+  (`POST /api/notifications/me`) is open to every signed-in user and reaches only the caller's
+  `user:<id>` topic (a 429 past 5 a minute by default). Both resolve to the notification sent.
+- **Presence.** The server tracks every lobby socket with Phoenix Presence. `useChannel` keeps
+  `presences` (`[{key, metas}]`, one entry per user; `null` until the first `presence_state`)
+  current from `presence_state` / `presence_diff`, bound before the join so the first state is
+  never missed. `presenceCounts(lobby.presences)` → `{online_users, connections}` or `null`.
+
+## Dashboard
+
+`fetchDashboard()` → `DashboardStats` (`GET /api/dashboard`):
+`{users: {total}, notifications: {sent_total, sent_by_me}, sessions: {online_users, connections}}`.
+`users.total` is `null` without `users:view`, `notifications.sent_total` without
+`notifications:broadcast`: hide those counters rather than showing them as 0.
 
 ## Permissions (UI only — the server authorizes every request)
 
@@ -203,7 +216,8 @@ path in session storage (the Astro app uses them; the SPA carries it in the rout
 
 `User`, `Role`, `Permission`, `AuthSession`, `LoginCredentials`, `RegisterCredentials`,
 `ChangePasswordParams`, `SessionEndReason`, `ApiResponse<T>`, `ApiErrorBody`, `FieldErrors`,
-`PaginatedResponse<T>`, `PageMeta`, `PageParams`, `RephiNotification`.
+`PaginatedResponse<T>`, `PageMeta`, `PageParams`, `RephiNotification`, `DashboardStats`,
+`OnlineCounts`, `PresenceEntry`.
 
 ## Development
 

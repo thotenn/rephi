@@ -7,9 +7,11 @@ export {
   addRoleParent,
   api,
   AUTH_ENDPOINTS,
+  broadcastNotification,
   changePassword,
   describePage,
   fetchAllPages,
+  fetchDashboard,
   fetchMe,
   fetchPage,
   fetchRoleChildren,
@@ -25,7 +27,8 @@ export {
   register,
   removeRoleParent,
   resetUserPassword,
-  revokeUserPermission
+  revokeUserPermission,
+  sendTestNotification
 } from './controllers';
 export type { SocketStatus } from './controllers';
 
@@ -50,6 +53,7 @@ export { userCan, userCanAll, userCanAny, userHasRole } from './permissions';
 
 // Realtime
 export { LOBBY_TOPIC, NOTIFICATION_EVENT, userTopic } from './realtime';
+export { presenceCounts } from './utils/presence';
 
 // Components
 export { AuthGuard } from './components/AuthGuard';
@@ -57,7 +61,7 @@ export { PermissionGuard } from './components/PermissionGuard';
 
 // Hooks
 export { useChannel, useChannelEvent, usePermissions, usePhoenixSocket } from './hooks';
-export type { UseChannelOptions, UseChannelResult } from './hooks';
+export type { PresenceEntry, UseChannelOptions, UseChannelResult } from './hooks';
 
 // Utils
 export {
@@ -75,11 +79,13 @@ export type {
   ApiResponse,
   AuthSession,
   ChangePasswordParams,
+  DashboardStats,
   DirectUserPermission,
   EffectiveUserPermission,
   FieldErrors,
   LoginCredentials,
   ManagedUser,
+  OnlineCounts,
   PageMeta,
   PageParams,
   PaginatedResponse,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { Channel } from "phoenix";
+import { Presence, type Channel } from "phoenix";
 import { debugLog } from "../config";
 import PhoenixSocket from "../controllers/api/socket";
 
@@ -17,6 +17,16 @@ export interface UseChannelResult {
   connected: boolean;
   /** The `reason` of a refused join (e.g. `"unauthorized"`), which is not retried. */
   error: string | null;
+  /**
+   * Who is present, for a topic the server tracks with Phoenix Presence (the lobby):
+   * one entry per key with its metas. `null` until the first `presence_state`.
+   */
+  presences: PresenceEntry[] | null;
+}
+
+export interface PresenceEntry {
+  key: string;
+  metas: Record<string, unknown>[];
 }
 
 interface ChannelState extends UseChannelResult {
@@ -34,6 +44,7 @@ const initialState: ChannelState = {
   channel: null,
   connected: false,
   error: null,
+  presences: null,
 };
 
 /**
@@ -70,6 +81,12 @@ export function useChannel(topic: string | null | undefined, options: UseChannel
       });
     };
 
+    // Bound before the join: the server pushes presence_state right after it.
+    const presence = new Presence(channel);
+    presence.onSync(() =>
+      update({ presences: presence.list((key, { metas }: { metas: PresenceEntry["metas"] }) => ({ key, metas })) })
+    );
+
     channel.onError(() => update({ connected: false }));
     channel.onClose(() => update({ connected: false }));
 
@@ -103,8 +120,8 @@ export function useChannel(topic: string | null | undefined, options: UseChannel
     enabled && state.socket === socket && state.topic === topic && state.paramsKey === paramsKey;
 
   return current
-    ? { channel: state.channel, connected: state.connected, error: state.error }
-    : { channel: null, connected: false, error: null };
+    ? { channel: state.channel, connected: state.connected, error: state.error, presences: state.presences }
+    : { channel: null, connected: false, error: null, presences: null };
 }
 
 /**

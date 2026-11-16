@@ -12,6 +12,7 @@ export {
   resetUserPassword,
   revokeUserPermission,
 } from "./api/admin";
+export { broadcastNotification, fetchDashboard, sendTestNotification } from "./api/notifications";
 export {
   describePage,
   fetchAllPages,

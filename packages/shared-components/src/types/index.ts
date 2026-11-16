@@ -20,6 +20,8 @@ export type {
 
 export type { RephiNotification } from "./realtime.types";
 
+export type { DashboardStats, OnlineCounts } from "./dashboard.types";
+
 export type {
   DirectUserPermission,
   EffectiveUserPermission,
