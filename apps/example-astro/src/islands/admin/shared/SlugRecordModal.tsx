@@ -69,7 +69,7 @@ export default function SlugRecordModal({
       slug: values.slug.trim(),
       description: values.description.trim(),
     };
-    // A system record keeps its slug: do not even send it.
+    // A system record keeps its slug (the server refuses a change): send it as it is.
     onSubmit(slugLocked ? { ...payload, slug: editing!.slug } : payload);
   };
 
