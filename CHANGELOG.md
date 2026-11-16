@@ -187,7 +187,7 @@ an existing project can notice; [Upgrading from 0.1.0](#upgrading-from-010) says
 - Tokens without `exp`, refresh tokens and tokens of another issuer were accepted; a token without
   `sub` or of a deleted user caused 500s
 - Login: timing difference between unknown and known emails, 500 on non-string credentials
-- `Admin@x.com` and `admin@x.com` could be two accounts; emails with a trailing newline were
+- `Admin@example.com` and `admin@example.com` could be two accounts; emails with a trailing newline were
   accepted
 - Any user with `roles:assign` could grant themselves `admin`; any user with
   `permissions:assign` could grant any permission
