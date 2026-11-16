@@ -12,13 +12,16 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
     package.json
     config/dev.exs
     packages/shared-components/package.json
-    packages/shared-components/src/env.ts
-    packages/shared-components/src/vite-env.d.ts
+    packages/shared-components/src/index.ts
+    packages/shared-components/src/config.ts
     apps/example/package.json
+    apps/example/app.config.ts
     apps/example/vite.config.ts
     apps/example/index.html
+    apps/example/.env.example
     apps/example/src/router.tsx
     apps/example-astro/package.json
+    apps/example-astro/app.config.ts
     apps/example-astro/astro.config.ts
     apps/example-astro/wrangler.jsonc
     apps/example-astro/.env.example
@@ -66,20 +69,28 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
         do: {Path.relative_to(path, tmp_dir), File.read!(path)}
   end
 
-  # The dev port given to a Vite app, from the shared env.
-  defp vite_port(tmp_dir, var) do
-    env = read(tmp_dir, "packages/shared-components/src/env.ts")
-    [_, port] = Regex.run(~r/#{var}\s*\|\|\s*'(\d+)'/, env)
-    String.to_integer(port)
+  # The `basename` and `port` an app's app.config.ts declares.
+  defp app_config(tmp_dir, app) do
+    config = read(tmp_dir, "apps/#{app}/app.config.ts")
+    [_, basename] = Regex.run(~r/basename: "([^"]*)"/, config)
+    [_, port] = Regex.run(~r/port: (\d+)/, config)
+    %{basename: basename, port: String.to_integer(port)}
   end
 
   # Every number that looks like a port in the files the task reads, before
   # it runs. The project may already have generated apps of its own.
   defp ports_in_use(tmp_dir) do
-    ~w(packages/shared-components/src/env.ts config/dev.exs apps/example/vite.config.ts
-       apps/example-astro/astro.config.ts)
+    ~w(config/dev.exs apps/example/app.config.ts apps/example/vite.config.ts
+       apps/example-astro/app.config.ts apps/example-astro/astro.config.ts)
     |> Enum.flat_map(&Regex.scan(~r/\b(\d{4,5})\b/, read(tmp_dir, &1), capture: :all_but_first))
     |> MapSet.new(fn [port] -> String.to_integer(port) end)
+  end
+
+  # Every file under packages/, to show the task leaves the shared code alone.
+  defp packages(tmp_dir) do
+    tmp_dir
+    |> snapshot()
+    |> Map.filter(fn {path, _} -> String.starts_with?(path, "packages/") end)
   end
 
   defp script_keys(tmp_dir) do
@@ -96,13 +107,32 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
   describe "a Vite app (the default template)" do
     test "copies the template and registers the app", %{tmp_dir: tmp_dir} do
       in_use = ports_in_use(tmp_dir)
+      template_config = read(tmp_dir, "apps/example/app.config.ts")
+      packages_before = packages(tmp_dir)
       gen(tmp_dir, ["demo"])
 
       assert %{"name" => "rephi-demo"} = json(tmp_dir, "apps/demo/package.json")
-      assert read(tmp_dir, "apps/demo/vite.config.ts") =~ "env.APPS.demo.basename"
-      refute read(tmp_dir, "apps/demo/vite.config.ts") =~ "env.APPS.example"
-      assert read(tmp_dir, "apps/demo/src/router.tsx") =~ "env.APPS.demo.basename"
+
+      # The app's own settings: served by Phoenix at /app/demo, on a free port.
+      assert %{basename: "/app/demo", port: port} = app_config(tmp_dir, "demo")
+      refute port in in_use
+      assert read(tmp_dir, "apps/demo/app.config.ts") =~ "export const appConfig = {"
+
+      # vite.config.ts reads app.config.ts: it is copied as it is.
+      assert read(tmp_dir, "apps/demo/vite.config.ts") ==
+               read(tmp_dir, "apps/example/vite.config.ts")
+
       assert File.exists?(Path.join(tmp_dir, "apps/demo/index.html"))
+
+      # Mentions of the template in the copied sources follow the new app.
+      refute read(tmp_dir, "apps/demo/src/router.tsx") =~ "/app/example"
+      assert read(tmp_dir, "apps/demo/src/router.tsx") =~ "/app/demo/"
+      assert read(tmp_dir, "apps/demo/.env.example") =~ "VITE_PORT=#{port}"
+      refute read(tmp_dir, "apps/demo/.env.example") =~ "/app/example"
+
+      # The template and the shared package are untouched.
+      assert read(tmp_dir, "apps/example/app.config.ts") == template_config
+      assert packages(tmp_dir) == packages_before
 
       # Build output, dependencies and local env files stay behind.
       refute File.exists?(Path.join(tmp_dir, "apps/demo/node_modules"))
@@ -112,17 +142,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       scripts = json(tmp_dir, "package.json")["scripts"]
       assert scripts["demo:dev"] == "yarn workspace rephi-demo dev"
       assert scripts["demo:build"] == "yarn workspace rephi-demo build"
-
-      env = read(tmp_dir, "packages/shared-components/src/env.ts")
-      assert env =~ ~r/demo: \{\s+basename: "\/app\/demo",/
-      assert env =~ "import.meta.env.VITE_DEMO_PORT || '"
-      port = vite_port(tmp_dir, "VITE_DEMO_PORT")
-      refute port in in_use
-      # The template's entry is untouched.
-      assert env =~ "import.meta.env.VITE_EXAMPLE_PORT || '5001'"
-
-      assert read(tmp_dir, "packages/shared-components/src/vite-env.d.ts") =~
-               "readonly VITE_DEMO_PORT: number"
 
       assert read(tmp_dir, "config/dev.exs") =~ ~s("http://localhost:#{port}")
 
@@ -134,7 +153,10 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       output = Enum.join([output | collect_info()], "\n")
       assert output =~ "yarn shared:build"
       assert output =~ "yarn demo:dev"
+      assert output =~ "http://localhost:#{port}/app/demo/"
       assert output =~ "http://localhost:4000/app/demo/"
+      assert output =~ "apps/demo/app.config.ts"
+      refute output =~ "from the shared package"
     end
 
     test "keeps package.json valid and formatted like Yarn writes it", %{tmp_dir: tmp_dir} do
@@ -174,8 +196,7 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       gen(tmp_dir, ["demo2"])
       gen(tmp_dir, ["demo3", "--port", "5050"])
 
-      ports =
-        Enum.map(~w(VITE_DEMO_PORT VITE_DEMO2_PORT VITE_DEMO3_PORT), &vite_port(tmp_dir, &1))
+      ports = Enum.map(~w(demo demo2 demo3), &app_config(tmp_dir, &1).port)
 
       assert [_, _, 5050] = ports
       assert ports == Enum.uniq(ports)
@@ -190,23 +211,35 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       for port <- ports, do: assert("http://localhost:#{port}" in origins)
     end
 
-    test "a name that is not a JavaScript identifier is quoted", %{tmp_dir: tmp_dir} do
+    test "a name with dashes", %{tmp_dir: tmp_dir} do
       gen(tmp_dir, ["admin-panel"])
 
-      assert read(tmp_dir, "apps/admin-panel/vite.config.ts") =~
-               ~s(env.APPS["admin-panel"].basename)
-
-      env = read(tmp_dir, "packages/shared-components/src/env.ts")
-      assert env =~ ~s("admin-panel": {)
-      assert env =~ "VITE_ADMIN_PANEL_PORT"
+      assert %{basename: "/app/admin-panel"} = app_config(tmp_dir, "admin-panel")
       assert %{"name" => "rephi-admin-panel"} = json(tmp_dir, "apps/admin-panel/package.json")
+
+      assert json(tmp_dir, "package.json")["scripts"]["admin-panel:dev"] ==
+               "yarn workspace rephi-admin-panel dev"
+    end
+
+    test "a port taken by another app's app.config.ts is skipped", %{tmp_dir: tmp_dir} do
+      # An app the CORS list does not know about yet.
+      File.mkdir_p!(Path.join(tmp_dir, "apps/other"))
+
+      File.write!(
+        Path.join(tmp_dir, "apps/other/app.config.ts"),
+        ~s(export const appConfig = { basename: "/app/other", port: 5002 } as const;\n)
+      )
+
+      assert gen_error(tmp_dir, ["a", "--port", "5002"]) =~ "Port 5002 is already used"
+
+      gen(tmp_dir, ["demo"])
+      refute app_config(tmp_dir, "demo").port in [5001, 5002]
     end
   end
 
   describe "an Astro site (--template example-astro)" do
     test "copies the site with its own name and port", %{tmp_dir: tmp_dir} do
-      env_before = read(tmp_dir, "packages/shared-components/src/env.ts")
-
+      packages_before = packages(tmp_dir)
       in_use = ports_in_use(tmp_dir)
       gen(tmp_dir, ["site", "--template", "example-astro"])
 
@@ -214,16 +247,23 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       # Still a static site that Phoenix does not serve unless asked to.
       assert read(tmp_dir, "apps/site/package.json") =~ ~s("copyToPhoenix": false)
 
-      [_, port] = Regex.run(~r/port: (\d+)/, read(tmp_dir, "apps/site/astro.config.ts"))
-      refute String.to_integer(port) in in_use
+      # It keeps the template's base path ("/", for a static host).
+      assert %{basename: "/", port: port} = app_config(tmp_dir, "site")
+      refute port in in_use
+      assert port >= 4322
+
+      assert read(tmp_dir, "apps/site/astro.config.ts") ==
+               read(tmp_dir, "apps/example-astro/astro.config.ts")
+
       assert read(tmp_dir, "apps/site/wrangler.jsonc") =~ ~s("name": "rephi-site")
       assert read(tmp_dir, "apps/site/.env.example") =~ "ASTRO_BASE=/app/site"
+      # `.env.example` is a file name, not the template's name.
+      assert read(tmp_dir, "apps/site/.env.example") =~ "Copy to `.env`"
 
       assert json(tmp_dir, "package.json")["scripts"]["site:build"] ==
                "yarn workspace rephi-site build"
 
-      # Astro sites do not use the shared env's APPS.
-      assert read(tmp_dir, "packages/shared-components/src/env.ts") == env_before
+      assert packages(tmp_dir) == packages_before
       assert read(tmp_dir, "config/dev.exs") =~ ~s("http://localhost:#{port}")
     end
   end
@@ -291,22 +331,44 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
                "neither a Vite app"
     end
 
-    test "a shared env.ts without the template's entry", %{tmp_dir: tmp_dir} do
-      env = Path.join(tmp_dir, "packages/shared-components/src/env.ts")
-      File.write!(env, String.replace(File.read!(env), "example: {", "renamed: {"))
-      before = snapshot(tmp_dir)
+    test "a template without app.config.ts", %{tmp_dir: tmp_dir} do
+      for template <- ~w(example example-astro) do
+        File.rm!(Path.join(tmp_dir, "apps/#{template}/app.config.ts"))
+        before = snapshot(tmp_dir)
 
-      assert gen_error(tmp_dir, ["demo"]) =~ "Could not find the example entry"
-      assert snapshot(tmp_dir) == before
-      refute File.exists?(Path.join(tmp_dir, "apps/demo"))
+        assert gen_error(tmp_dir, ["demo", "--template", template]) =~
+                 "apps/#{template} has no app.config.ts"
+
+        assert snapshot(tmp_dir) == before
+        refute File.exists?(Path.join(tmp_dir, "apps/demo"))
+      end
     end
 
-    test "a template whose config does not use the shared env", %{tmp_dir: tmp_dir} do
+    test "an app.config.ts whose basename or port the task cannot find", %{tmp_dir: tmp_dir} do
+      config = Path.join(tmp_dir, "apps/example/app.config.ts")
+      original = File.read!(config)
+
+      for {edit, error} <- [
+            {&String.replace(&1, ~s(basename: "/app/example"), "basename: BASE"),
+             ~s(Could not find `basename: "<path>"`)},
+            {&String.replace(&1, ~r/port: \d+/, "port: PORT"), "Could not find `port: <number>`"},
+            {&(&1 <> "export const other = { port: 1234 };\n"),
+             "`port: <number>` appears 2 times"}
+          ] do
+        File.write!(config, edit.(original))
+        before = snapshot(tmp_dir)
+
+        assert gen_error(tmp_dir, ["demo"]) =~ error
+        assert snapshot(tmp_dir) == before
+      end
+    end
+
+    test "a template whose config does not read app.config.ts", %{tmp_dir: tmp_dir} do
       vite = Path.join(tmp_dir, "apps/example/vite.config.ts")
-      File.write!(vite, String.replace(File.read!(vite), "env.APPS.example", "settings"))
+      File.write!(vite, String.replace(File.read!(vite), ~s(from "./app.config"), ~s(from "./x")))
       before = snapshot(tmp_dir)
 
-      assert gen_error(tmp_dir, ["demo"]) =~ ~s[Could not find "env.APPS.example"]
+      assert gen_error(tmp_dir, ["demo"]) =~ "vite.config.ts does not import ./app.config"
       assert snapshot(tmp_dir) == before
     end
   end

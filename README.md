@@ -146,15 +146,16 @@ Names use lowercase letters, digits, `_` and `-` (the names Phoenix serves under
 `/app/<name>/`). The generator checks everything before writing anything, so a refused run
 changes nothing. It creates `apps/NAME/` (package `rephi-NAME`), adds the `NAME:dev` and
 `NAME:build` scripts to `package.json`, picks a free dev port and adds its origin to the
-development CORS list in `config/dev.exs`. A Vite app also gets its entry in
-`packages/shared-components/src/env.ts` (base path and port). The router does not change:
-Phoenix serves every directory of `priv/static/apps/`.
+development CORS list in `config/dev.exs`. The app's base path and dev port live in its own
+`apps/NAME/app.config.ts` (a Vite app is served at `/app/NAME`; an Astro site keeps `/`). Nothing
+in `packages/` changes, and neither does the router: Phoenix serves every directory of
+`priv/static/apps/`.
 
 Then:
 
 ```bash
 yarn install
-yarn shared:build          # the app reads its base path and port from the shared package
+yarn shared:build          # the app imports the compiled shared package
 yarn NAME:dev              # dev server (restart `mix phx.server` first: config/dev.exs changed)
 yarn build                 # served by Phoenix at http://localhost:4000/app/NAME/
 ```
@@ -165,9 +166,9 @@ generator prints how to build it for Phoenix instead. See `mix help rephi.gen.fr
 ### Frontend Architecture
 
 Each frontend app generated from the example template:
-- Is served at `/app/APP_NAME` with automatic CSRF token injection
-- Has its own development port configured
-- Uses React Router with the correct basename
+- Is served at `/app/APP_NAME` (the `basename` of its `app.config.ts`)
+- Has its own development port (the `port` of its `app.config.ts`, on the dev CORS list)
+- Uses React Router with the base path Vite builds it for (`import.meta.env.BASE_URL`)
 - Shares common components from `packages/shared-components`
 - Builds to `priv/static/apps/APP_NAME` for Phoenix to serve
 

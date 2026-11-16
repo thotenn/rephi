@@ -14,20 +14,25 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
 
   ## Options
 
-    * `--template` - the app to copy (default: `example`). Two kinds of apps
-      are understood, by the config file they have:
+    * `--template` - the app to copy (default: `example`). Every app keeps
+      the settings that depend on where it runs in its own `app.config.ts`:
+
+          export const appConfig = {
+            basename: "/app/example",
+            port: 5001,
+          } as const;
+
+      Two kinds of apps are understood, by the config file that reads it:
 
         * a Vite single-page app (`vite.config.ts`), like `apps/example`. It
           is built into `priv/static/apps/NAME` by `yarn build` and served by
-          Phoenix at `/app/NAME/`. Its base path and dev server port live in
-          `packages/shared-components/src/env.ts`, where the new app gets its
-          own entry.
+          Phoenix at `/app/NAME/`, so its `basename` becomes `/app/NAME`.
 
         * an Astro site (`astro.config.ts`), like `apps/example-astro`. It is
-          a static site meant for any static host, so it keeps
-          `"rephi": { "copyToPhoenix": false }` and `yarn build` does not copy
-          it into Phoenix (see the printed instructions to serve it from
-          Phoenix anyway).
+          a static site meant for any static host: it keeps its `basename`
+          (`/`) and `"rephi": { "copyToPhoenix": false }`, so `yarn build`
+          does not copy it into Phoenix (see the printed instructions to
+          serve it from Phoenix anyway).
 
     * `--port` - the port of the app's dev server. By default the first port
       not used by another app, starting at 5001 for Vite apps and at 4322 for
@@ -36,16 +41,17 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   ## What it changes
 
     * `apps/NAME/` - the copy of the template, with its package name
-      (`rephi-NAME`), base path and dev server port. Build output,
-      `node_modules` and local `.env` files are not copied.
+      (`rephi-NAME`) and its `app.config.ts` (`basename`, `port`). Build
+      output, `node_modules`, caches and local `.env` files are not copied.
+      Mentions of the template's package, scripts, path and dev port in the
+      copied sources and docs are renamed too.
     * `package.json` - the `NAME:dev` and `NAME:build` scripts.
-    * `packages/shared-components/src/env.ts` (Vite apps) - the app's entry in
-      `APPS`, and its `VITE_<NAME>_PORT` variable in `vite-env.d.ts`.
     * `config/dev.exs` - the dev server's origin in the development CORS list,
       so the app can call the API while it runs on its own port.
 
-  Phoenix needs no change: `RephiWeb.Plugs.FrontendAppPlug` serves any
-  directory of `priv/static/apps/`.
+  Nothing in `packages/` changes, and Phoenix needs no change either:
+  `RephiWeb.Plugs.FrontendAppPlug` serves any directory of
+  `priv/static/apps/`.
 
   NAME uses lowercase letters, digits, `_` and `-`, starts with a letter or a
   digit and has at most 64 characters (the names `FrontendAppPlug` serves).
@@ -57,8 +63,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
 
   @apps_dir "apps"
   @root_package "package.json"
-  @shared_env "packages/shared-components/src/env.ts"
-  @shared_env_types "packages/shared-components/src/vite-env.d.ts"
+  @app_config "app.config.ts"
   @dev_config "config/dev.exs"
 
   # Same pattern as RephiWeb.Plugs.FrontendAppPlug.
@@ -69,6 +74,14 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
 
   # Left out of the copy: build output, dependencies, caches and local env files.
   @skip_copy ~w(node_modules dist .astro .vite .wrangler .cache .turbo .env .env.local .dev.vars)
+
+  # The two values of app.config.ts the task rewrites. Each must appear once.
+  @basename_line ~r/\bbasename:\s*(["'])[^"'\n]*\1/
+  @port_line ~r/\bport:\s*\d+/
+
+  # Copied files whose text is checked for mentions of the template.
+  @text_extensions ~w(.ts .tsx .mts .js .jsx .mjs .cjs .astro .md .html .json .jsonc .toml)
+  @text_files ~w(.env.example)
 
   @switches [template: :string, port: :integer]
 
@@ -133,17 +146,29 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     target_dir = Path.join(@apps_dir, name)
 
     with :ok <- check_template_name(template),
-         {:ok, kind} <- template_kind(template_dir),
+         {:ok, kind, config_file} <- template_kind(template_dir),
          :ok <- check_free(target_dir),
+         {:ok, app_config} <- read_app_config(template_dir, config_file),
          {:ok, root} <- read_json(@root_package),
          {:ok, template_pkg} <- read_json(Path.join(template_dir, "package.json")),
          {:ok, prefix} <- package_prefix(template_pkg, template),
          package = prefix <> name,
          :ok <- check_package_name_free(package),
          {:ok, root} <- add_scripts(root, name, package),
-         {:ok, port} <- pick_port(kind, port),
-         {:ok, app_files} <- app_files(kind, template_dir, template, name, package, port),
-         {:ok, shared_files} <- shared_files(kind, template, name, port) do
+         {:ok, port} <- pick_port(kind, port) do
+      source = %{
+        name: template,
+        dir: template_dir,
+        package: template_pkg["name"],
+        port: config_port(app_config)
+      }
+
+      app_files =
+        [
+          {"package.json", encode_json(put_ordered(template_pkg, "name", package))},
+          {@app_config, set_app_config(app_config, kind, name, port)}
+        ] ++ renamed_texts(kind, source, name, package, port)
+
       {cors, cors_files} =
         case dev_cors(port) do
           {:ok, config} -> {:added, [{@dev_config, config}]}
@@ -160,7 +185,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
          template_dir: template_dir,
          target_dir: target_dir,
          app_files: app_files,
-         files: [{@root_package, encode_json(root)} | shared_files] ++ cors_files,
+         files: [{@root_package, encode_json(root)} | cors_files],
          cors: cors
        }}
     end
@@ -177,24 +202,15 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   defp template_kind(dir) do
     cond do
       not File.dir?(dir) ->
-        templates =
-          @apps_dir
-          |> File.ls()
-          |> case do
-            {:ok, entries} -> entries |> Enum.filter(&File.dir?(Path.join(@apps_dir, &1)))
-            _ -> []
-          end
-          |> Enum.sort()
-
         {:error,
          "Template app #{dir} not found. Run the task from the root of the project. " <>
-           "Available templates: #{Enum.join(templates, ", ")}"}
+           "Available templates: #{Enum.join(Enum.sort(existing_apps()), ", ")}"}
 
       File.regular?(Path.join(dir, "vite.config.ts")) ->
-        {:ok, :vite}
+        {:ok, :vite, "vite.config.ts"}
 
-      astro_config(dir) ->
-        {:ok, :astro}
+      config = astro_config(dir) ->
+        {:ok, :astro, config}
 
       true ->
         {:error,
@@ -217,6 +233,147 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
       :ok
     end
   end
+
+  ## app.config.ts
+
+  # The template's app.config.ts, checked: the Vite/Astro config imports it,
+  # and it has exactly one `basename: "..."` and one `port: N`.
+  defp read_app_config(template_dir, config_file) do
+    path = Path.join(template_dir, @app_config)
+
+    with {:ok, config} <- read(Path.join(template_dir, config_file)),
+         :ok <- check_imports_app_config(config, Path.join(template_dir, config_file)),
+         {:ok, app_config} <- read_existing(path, template_dir),
+         :ok <- check_once(app_config, @basename_line, ~s(basename: "<path>"), path),
+         :ok <- check_once(app_config, @port_line, "port: <number>", path) do
+      {:ok, app_config}
+    end
+  end
+
+  defp check_imports_app_config(config, path) do
+    if config =~ ~r/from\s+["']\.\/app\.config(?:\.[mc]?[jt]s)?["']/ do
+      :ok
+    else
+      {:error,
+       "#{path} does not import ./app.config, so the new app's base path and dev server " <>
+         "port could not be set."}
+    end
+  end
+
+  defp read_existing(path, template_dir) do
+    if File.regular?(path) do
+      read(path)
+    else
+      {:error,
+       "#{template_dir} has no #{@app_config} (`export const appConfig = { basename, port }`), " <>
+         "so it cannot be used as a template."}
+    end
+  end
+
+  defp check_once(contents, regex, what, path) do
+    case length(Regex.scan(regex, contents)) do
+      1 ->
+        :ok
+
+      0 ->
+        {:error, "Could not find `#{what}` in #{path}."}
+
+      count ->
+        {:error,
+         "`#{what}` appears #{count} times in #{path}: it must appear once, so the task " <>
+           "knows which one to change."}
+    end
+  end
+
+  defp config_port(app_config) do
+    [port] = Regex.run(~r/\bport:\s*(\d+)/, app_config, capture: :all_but_first)
+    String.to_integer(port)
+  end
+
+  # A Vite app is served by Phoenix at /app/NAME; an Astro site keeps the
+  # template's basename ("/", for a static host).
+  defp set_app_config(app_config, kind, name, port) do
+    app_config =
+      if kind == :vite do
+        Regex.replace(@basename_line, app_config, ~s(basename: "/app/#{name}"))
+      else
+        app_config
+      end
+
+    Regex.replace(@port_line, app_config, "port: #{port}")
+  end
+
+  ## The rest of the copy: mentions of the template in texts and docs
+
+  # Renames, in every text file of the template, its package name, its root
+  # scripts (`yarn example:dev`), its path under Phoenix (`/app/example`) and
+  # its dev server origin. An Astro site's Wrangler project, `.env.example`
+  # and README also name the template itself (`example-astro`).
+  defp renamed_texts(kind, template, name, package, port) do
+    template.dir
+    |> text_files()
+    |> Enum.reject(&(&1 in ["package.json", @app_config]))
+    |> Enum.flat_map(fn file ->
+      original = File.read!(Path.join(template.dir, file))
+
+      renamed =
+        original
+        |> replace_token(template.package, package)
+        |> String.replace("yarn #{template.name}:", "yarn #{name}:")
+        |> replace_token("/app/#{template.name}", "/app/#{name}")
+        |> replace_token("localhost:#{template.port}", "localhost:#{port}")
+        |> rename_in_file(file, kind, template.name, name, port)
+
+      if renamed == original, do: [], else: [{file, renamed}]
+    end)
+  end
+
+  # Text files of the template, relative to it, as `copy_tree/2` copies them.
+  defp text_files(dir, prefix \\ "") do
+    dir
+    |> File.ls!()
+    |> Enum.reject(&skip_copy?/1)
+    |> Enum.flat_map(fn entry ->
+      path = Path.join(dir, entry)
+      relative = if prefix == "", do: entry, else: Path.join(prefix, entry)
+
+      case File.lstat!(path).type do
+        :directory ->
+          text_files(path, relative)
+
+        :regular ->
+          if Path.extname(entry) in @text_extensions or entry in @text_files,
+            do: [relative],
+            else: []
+
+        _ ->
+          []
+      end
+    end)
+  end
+
+  # `VITE_PORT=5001` in a Vite app's .env.example; the template's own name in
+  # the files of an Astro site that name its Cloudflare project or document it.
+  defp rename_in_file(text, ".env.example", :vite, _template, _name, port),
+    do: Regex.replace(~r/\b(VITE_PORT=)\d+/, text, "\\g{1}#{port}")
+
+  defp rename_in_file(text, file, :astro, template, name, _port)
+       when file in ~w(wrangler.jsonc wrangler.json wrangler.toml .env.example README.md),
+       do: Regex.replace(~r/(?<![a-z0-9_.-])#{Regex.escape(template)}(?![a-z0-9_-])/, text, name)
+
+  defp rename_in_file(text, _file, _kind, _template, _name, _port), do: text
+
+  # `token` when it is not part of a longer name: `/app/example` but not
+  # `/app/example-astro`, `rephi-example` but not `rephi-example-astro`.
+  defp replace_token(text, token, replacement) do
+    Regex.replace(
+      ~r/(?<![a-z0-9_-])#{Regex.escape(token)}(?![a-z0-9_-])/,
+      text,
+      fn _ -> replacement end
+    )
+  end
+
+  ## package.json files
 
   defp read_json(path) do
     with {:ok, contents} <- read(path),
@@ -266,8 +423,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
       :ok
     end
   end
-
-  ## Root package.json
 
   defp add_scripts(%Jason.OrderedObject{} = root, name, package) do
     case root["scripts"] do
@@ -320,8 +475,14 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
 
   defp existing_apps do
     case File.ls(@apps_dir) do
-      {:ok, entries} -> Enum.filter(entries, &File.dir?(Path.join(@apps_dir, &1)))
-      _ -> []
+      {:ok, entries} ->
+        Enum.filter(
+          entries,
+          &(not String.starts_with?(&1, ".") and File.dir?(Path.join(@apps_dir, &1)))
+        )
+
+      _ ->
+        []
     end
   end
 
@@ -349,12 +510,15 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     {:ok, Enum.find(first..65_535, &(&1 not in used))}
   end
 
-  # Every port mentioned by the apps' configs, the shared env and the dev CORS
-  # list, plus Phoenix's own (dev and test).
+  # The ports of every app's app.config.ts, any port written in the apps'
+  # Vite/Astro configs or local env files (`VITE_PORT=`), the origins of the
+  # dev CORS list, plus Phoenix's own (dev and test).
   defp used_ports do
     sources =
-      [@shared_env, @dev_config] ++
-        Path.wildcard("apps/*/{vite,astro}.config.{ts,mts,mjs,js}")
+      [@dev_config] ++
+        Path.wildcard("apps/*/#{@app_config}") ++
+        Path.wildcard("apps/*/{vite,astro}.config.{ts,mts,mjs,js}") ++
+        Path.wildcard("apps/*/.env{,.local,.development,.development.local}")
 
     from_files =
       sources
@@ -362,7 +526,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
         case File.read(path) do
           {:ok, contents} ->
             Regex.scan(
-              ~r/(?:port:\s*|_PORT\s*\|\|\s*['"]?|localhost:|\|\|\s*)(\d{4,5})\b/,
+              ~r/(?:\bport:\s*|_PORT\s*=\s*['"]?|localhost:|\|\|\s*)(\d{4,5})\b/,
               contents,
               capture: :all_but_first
             )
@@ -374,265 +538,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
       |> Enum.map(fn [port] -> String.to_integer(port) end)
 
     MapSet.new([4000, 4002 | from_files])
-  end
-
-  ## The app's own files
-
-  defp app_files(:vite, template_dir, template, name, package, _port) do
-    pkg_path = Path.join(template_dir, "package.json")
-
-    with {:ok, pkg} <- read_json(pkg_path),
-         {:ok, vite} <- read(Path.join(template_dir, "vite.config.ts")),
-         :ok <- require_anchor(vite, apps_ref(template), "#{template_dir}/vite.config.ts") do
-      router_path = Path.join([template_dir, "src", "router.tsx"])
-
-      router =
-        case File.read(router_path) do
-          {:ok, router} -> [{"src/router.tsx", replace_apps_ref(router, template, name)}]
-          _ -> []
-        end
-
-      {:ok,
-       [
-         {"package.json", encode_json(put_ordered(pkg, "name", package))},
-         {"vite.config.ts", replace_apps_ref(vite, template, name)}
-         | router
-       ]}
-    end
-  end
-
-  defp app_files(:astro, template_dir, template, name, package, port) do
-    pkg_path = Path.join(template_dir, "package.json")
-    config_file = astro_config(template_dir)
-
-    with {:ok, pkg} <- read_json(pkg_path),
-         {:ok, config} <- read(Path.join(template_dir, config_file)),
-         :ok <-
-           require_anchor(config, ~r/port:\s*\d+/, "the dev server port in #{config_file}") do
-      config = Regex.replace(~r/port:\s*\d+/, config, "port: #{port}", global: false)
-      template_package = pkg["name"]
-
-      # Plain-text files that name the template (Wrangler project, docs).
-      texts =
-        ~w(wrangler.jsonc wrangler.json wrangler.toml .env.example README.md)
-        |> Enum.flat_map(fn file ->
-          case File.read(Path.join(template_dir, file)) do
-            {:ok, text} -> [{file, rename_text(text, template_package, package, template, name)}]
-            _ -> []
-          end
-        end)
-
-      {:ok,
-       [
-         {"package.json", encode_json(put_ordered(pkg, "name", package))},
-         {config_file, config} | texts
-       ]}
-    end
-  end
-
-  defp rename_text(text, template_package, package, template, name) do
-    text
-    |> String.replace(template_package, package)
-    |> then(&Regex.replace(~r/(?<![a-z0-9_-])#{Regex.escape(template)}(?![a-z0-9_-])/, &1, name))
-  end
-
-  defp require_anchor(contents, %Regex{} = regex, what) do
-    if contents =~ regex, do: :ok, else: {:error, "Could not find #{what}."}
-  end
-
-  defp require_anchor(contents, anchor, file) when is_binary(anchor) do
-    if String.contains?(contents, anchor),
-      do: :ok,
-      else: {:error, "Could not find #{inspect(anchor)} in #{file}."}
-  end
-
-  # `env.APPS.example`, or `env.APPS["my-app"]` for names that are not
-  # JavaScript identifiers.
-  defp apps_ref(name) do
-    if identifier?(name), do: "env.APPS.#{name}", else: ~s(env.APPS["#{name}"])
-  end
-
-  defp apps_key(name), do: if(identifier?(name), do: name, else: ~s("#{name}"))
-
-  defp identifier?(name), do: name =~ ~r/\A[a-z_][a-z0-9_]*\z/
-
-  defp replace_apps_ref(contents, template, name) do
-    String.replace(contents, apps_ref(template), apps_ref(name))
-  end
-
-  defp env_var(name), do: "VITE_#{name |> String.upcase() |> String.replace("-", "_")}_PORT"
-
-  ## Shared files (Vite apps)
-
-  defp shared_files(:astro, _template, _name, _port), do: {:ok, []}
-
-  defp shared_files(:vite, template, name, port) do
-    with {:ok, env} <- read(@shared_env),
-         {:ok, env} <- add_app_entry(env, template, name, port) do
-      types =
-        case File.read(@shared_env_types) do
-          {:ok, types} -> add_port_type(types, template, name)
-          _ -> nil
-        end
-
-      {:ok, [{@shared_env, env} | if(types, do: [{@shared_env_types, types}], else: [])]}
-    end
-  end
-
-  # Copies the template's entry of `APPS` in env.ts, renamed, and appends it as
-  # the last entry of the object.
-  defp add_app_entry(env, template, name, port) do
-    with {:ok, apps_open, apps_close} <- object_after(env, ~r/\bAPPS\s*:\s*\{/),
-         body = binary_part(env, apps_open, apps_close - apps_open),
-         {:ok, entry_start, entry_end} <- template_entry(body, template) do
-      entry = binary_part(body, entry_start, entry_end - entry_start)
-      template_var = env_var(template)
-
-      with :ok <- require_anchor(entry, template_var, "the #{template} entry of #{@shared_env}"),
-           :ok <-
-             require_anchor(
-               entry,
-               ~r/#{template_var}\s*\|\|\s*['"]?\d+/,
-               "the default port of #{template_var} in #{@shared_env}"
-             ) do
-        new_entry =
-          entry
-          |> String.replace(~r/\A#{Regex.escape(apps_key(template))}/, apps_key(name))
-          |> String.replace("/app/#{template}\"", "/app/#{name}\"")
-          |> String.replace("/app/#{template}'", "/app/#{name}'")
-          |> String.replace(
-            ~r/#{template_var}(\s*\|\|\s*['"]?)\d+/,
-            "#{env_var(name)}\\g{1}#{port}"
-          )
-
-        # Insert after the last entry: keep what follows it (whitespace before
-        # the closing brace), adding a comma unless there is one already.
-        trimmed = String.trim_trailing(body)
-        separator = if String.ends_with?(trimmed, ","), do: "", else: ","
-        indent = indentation(body, entry_start)
-        tail = binary_part(body, byte_size(trimmed), byte_size(body) - byte_size(trimmed))
-
-        new_body = trimmed <> separator <> "\n" <> indent <> new_entry <> tail
-
-        {:ok,
-         binary_part(env, 0, apps_open) <>
-           new_body <> binary_part(env, apps_close, byte_size(env) - apps_close)}
-      end
-    else
-      :error -> {:error, "Could not find the APPS object in #{@shared_env}."}
-      {:error, _} = error -> error
-    end
-  end
-
-  defp template_entry(body, template) do
-    key = ~r/(?:^|[\s,{])(#{Regex.escape(apps_key(template))})\s*:\s*\{/
-
-    case Regex.run(key, body, return: :index) do
-      [_, {start, _}] ->
-        case object_after(body, key) do
-          {:ok, _open, close} -> {:ok, start, close + 1}
-          :error -> {:error, "The #{template} entry of #{@shared_env} is not closed."}
-        end
-
-      nil ->
-        {:error,
-         "Could not find the #{template} entry in the APPS object of #{@shared_env}. " <>
-           "Vite apps keep their base path and dev port there."}
-    end
-  end
-
-  defp indentation(body, offset) do
-    line_start =
-      case :binary.matches(binary_part(body, 0, offset), "\n") do
-        [] -> 0
-        matches -> matches |> List.last() |> then(fn {pos, _} -> pos + 1 end)
-      end
-
-    body |> binary_part(line_start, offset - line_start) |> String.replace(~r/\S.*/, "")
-  end
-
-  # Finds the `{` that ends the first match of `regex` and its matching `}`.
-  # Returns the offsets just after the `{` and of the `}`. Strings and
-  # comments are skipped while counting braces.
-  defp object_after(text, regex) do
-    case Regex.run(regex, text, return: :index) do
-      [{start, length} | _] ->
-        open = start + length
-
-        case closing_brace(text, open, 1) do
-          nil -> :error
-          close -> {:ok, open, close}
-        end
-
-      nil ->
-        :error
-    end
-  end
-
-  defp closing_brace(text, pos, depth) when pos < byte_size(text) do
-    case :binary.at(text, pos) do
-      ?{ ->
-        closing_brace(text, pos + 1, depth + 1)
-
-      ?} when depth == 1 ->
-        pos
-
-      ?} ->
-        closing_brace(text, pos + 1, depth - 1)
-
-      quote when quote in [?", ?', ?`] ->
-        closing_brace(text, skip_string(text, pos + 1, quote), depth)
-
-      ?/ ->
-        case :binary.at(text, pos + 1) do
-          ?/ -> closing_brace(text, skip_until(text, pos, "\n"), depth)
-          ?* -> closing_brace(text, skip_until(text, pos, "*/") + 1, depth)
-          _ -> closing_brace(text, pos + 1, depth)
-        end
-
-      _ ->
-        closing_brace(text, pos + 1, depth)
-    end
-  end
-
-  defp closing_brace(_text, _pos, _depth), do: nil
-
-  defp skip_string(text, pos, quote) when pos < byte_size(text) do
-    case :binary.at(text, pos) do
-      ?\\ -> skip_string(text, pos + 2, quote)
-      ^quote -> pos + 1
-      _ -> skip_string(text, pos + 1, quote)
-    end
-  end
-
-  defp skip_string(text, _pos, _quote), do: byte_size(text)
-
-  defp skip_until(text, pos, marker) do
-    rest = binary_part(text, pos, byte_size(text) - pos)
-
-    case :binary.match(rest, marker) do
-      {at, _} -> pos + at + 1
-      :nomatch -> byte_size(text)
-    end
-  end
-
-  # `readonly VITE_EXAMPLE_PORT: number` -> the same line for the new app,
-  # after the last `VITE_*_PORT` line.
-  defp add_port_type(types, template, name) do
-    template_line = ~r/^[ \t]*readonly\s+#{env_var(template)}\s*:[^\n]*$/m
-    port_line = ~r/^[ \t]*readonly\s+VITE_\w+_PORT\s*:[^\n]*$/m
-
-    with [line] <- Regex.run(template_line, types),
-         [_ | _] = matches <- Regex.scan(port_line, types, return: :index) do
-      [{start, length}] = List.last(matches)
-      at = start + length
-      new_line = String.replace(line, env_var(template), env_var(name))
-
-      binary_part(types, 0, at) <>
-        "\n" <> new_line <> binary_part(types, at, byte_size(types) - at)
-    else
-      _ -> nil
-    end
   end
 
   ## Development CORS
@@ -679,7 +584,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   ## Applying the plan
 
   # The app is assembled in a temporary directory and moved into place in one
-  # rename; the shared files are written afterwards, and restored if writing
+  # rename; the root files are written afterwards, and restored if writing
   # one of them fails.
   defp apply_plan(plan) do
     tmp_dir = Path.join(@apps_dir, ".#{plan.name}.tmp-#{System.unique_integer([:positive])}")
@@ -716,12 +621,14 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     end)
   end
 
+  defp skip_copy?(entry), do: entry in @skip_copy or String.ends_with?(entry, ".log")
+
   defp copy_tree(source, target) do
     File.mkdir_p!(target)
 
     source
     |> File.ls!()
-    |> Enum.reject(&(&1 in @skip_copy or String.ends_with?(&1, ".log")))
+    |> Enum.reject(&skip_copy?/1)
     |> Enum.each(fn entry ->
       from = Path.join(source, entry)
       to = Path.join(target, entry)
@@ -741,11 +648,13 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     """
 
     Frontend app #{plan.name} created in #{plan.target_dir} (#{plan.package}).
+    Its base path (/app/#{plan.name}) and dev server port (#{plan.port}) are in
+    #{plan.target_dir}/#{@app_config}.
 
     Next steps, from the root of the project:
 
         yarn install          # links the new workspace
-        yarn shared:build     # the app reads its base path and port from the shared package
+        yarn shared:build     # the app imports the compiled shared package
         yarn #{plan.name}:dev#{dev_padding(plan.name)}# http://localhost:#{plan.port}/app/#{plan.name}/
         yarn build            # builds every app and copies them to priv/static/apps
 
@@ -758,6 +667,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     """
 
     Astro site #{plan.name} created in #{plan.target_dir} (#{plan.package}).
+    Its dev server port (#{plan.port}) is in #{plan.target_dir}/#{@app_config}.
 
     Next steps, from the root of the project:
 

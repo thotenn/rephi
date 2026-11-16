@@ -10,8 +10,8 @@ export const appConfig = {
    */
   basename: "/",
   /**
-   * Port of the Astro dev server. It must be on the backend's CORS list (in
-   * development: 3000, 5173, 5001, 5010, 4321, 8788).
+   * Port of the Astro dev server. Its origin must be on the backend's CORS list
+   * (`:cors_origins` in config/dev.exs).
    */
   port: 4321,
 } as const;
