@@ -33,8 +33,8 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
 
 ### Prerequisites
 
-- **Elixir** 1.14 or higher
-- **Erlang** 24 or higher
+- **Elixir** 1.19 or higher (developed on 1.20.5)
+- **Erlang/OTP** 28 or higher (developed on 29.1.2)
 - **PostgreSQL** 12 or higher
 - **Node.js** 20 or higher
 - **Yarn** 4.x (included via corepack)

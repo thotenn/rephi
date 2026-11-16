@@ -21,7 +21,6 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   """
 
   use Mix.Task
-  require Logger
 
   @impl Mix.Task
   def run([app_name]) do

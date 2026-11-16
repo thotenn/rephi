@@ -32,7 +32,7 @@ config :rephi, RephiWeb.Endpoint,
 config :rephi, Rephi.Mailer, adapter: Swoosh.Adapters.Local
 
 # Configures Elixir's Logger
-config :logger, :console,
+config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
 
@@ -53,8 +53,11 @@ config :rephi, :phoenix_swagger,
       router: RephiWeb.Router,
       endpoint: RephiWeb.Endpoint
     ]
-  },
-  json_library: Jason
+  }
+
+# Use Jason for JSON encoding in Phoenix Swagger (it defaults to Poison,
+# which is not a dependency of this project)
+config :phoenix_swagger, json_library: Jason
 
 # Load environment variables from .env file in dev/test
 if config_env() in [:dev, :test] do

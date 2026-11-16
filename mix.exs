@@ -9,11 +9,12 @@ defmodule Rephi.MixProject do
     [
       app: :rephi,
       version: @version,
-      elixir: "~> 1.14",
+      elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      listeners: [Phoenix.CodeReloader],
 
       # Hex
       name: "Rephi",
@@ -43,27 +44,24 @@ defmodule Rephi.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:bandit, "~> 1.10.0"},
+      {:bandit, "~> 1.14.1"},
       {:bcrypt_elixir, "~> 3.3.2"},
       {:cors_plug, "~> 3.0.3"},
-      {:dns_cluster, "~> 0.2.0"},
-      {:ecto_sql, "~> 3.13.4"},
-      {:ex_doc, "~> 0.39.1", only: :dev, runtime: false, warn_if_outdated: true},
-      {:ex_json_schema, "~> 0.5"},
-      {:finch, "~> 0.20.0"},
-      {:gettext, "~> 0.26.2"},
-      {:guardian, "~> 2.4.0"},
-      {:jason, "~> 1.4.4"},
-      {:phoenix, "~> 1.8.3"},
+      {:dns_cluster, "~> 0.3.1"},
+      {:ecto_sql, "~> 3.14.0"},
+      {:ex_doc, "~> 0.40.4", only: :dev, runtime: false, warn_if_outdated: true},
+      {:finch, "~> 0.24.0"},
+      {:gettext, "~> 1.0.2"},
+      {:guardian, "~> 2.5.0"},
+      {:jason, "~> 1.4.5"},
+      {:phoenix, "~> 1.8.16"},
       {:phoenix_ecto, "~> 4.7.0"},
-      {:phoenix_live_dashboard, "~> 0.8.7"},
-      {:phoenix_swagger, "~> 0.8.3"},
-      {:plug, "~> 1.18.1"},
-      {:plug_cowboy, "~> 2.7.3"},
-      {:poison, "~> 3.0"},
-      {:postgrex, ">= 0.19.0"},
-      {:swoosh, "~> 1.20.0"},
-      {:telemetry_metrics, "~> 1.1.0"},
+      {:phoenix_live_dashboard, "~> 0.9.1"},
+      {:phoenix_swagger, "~> 0.8.5"},
+      {:plug, "~> 1.20.3"},
+      {:postgrex, "~> 0.22.4"},
+      {:swoosh, "~> 1.29.3"},
+      {:telemetry_metrics, "~> 1.2.0"},
       {:telemetry_poller, "~> 1.3.0"}
     ]
   end

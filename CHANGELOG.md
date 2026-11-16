@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Backend toolchain upgraded to Elixir 1.20.5 and Erlang/OTP 29.1.2 (`.tool-versions`).
+  The project and the `rephi_new` installer now require Elixir `~> 1.19`
+- All Hex dependencies updated to their latest releases: Phoenix 1.8.16, Phoenix LiveView 1.2,
+  Phoenix LiveDashboard 0.9, Ecto / Ecto SQL 3.14, Plug 1.20, Bandit 1.14, Gettext 1.0, Guardian 2.5,
+  Swoosh 1.29, Finch 0.24, DNSCluster 0.3, Telemetry Metrics 1.2, Phoenix Swagger 0.8.5, ExDoc 0.40
+- Logger configuration moved from the legacy `config :logger, :console` key to `:default_formatter`
+- `swagger.json` no longer contains `null` placeholder fields next to each `$ref`
+
+### Removed
+- `plug_cowboy`: the endpoint has always been served by Bandit, so Cowboy was never started
+- `poison` and `ex_json_schema`: both are optional in Phoenix Swagger 0.8.5. Swagger documents are
+  now encoded with Jason (`config :phoenix_swagger, json_library: Jason`)
+
+### Fixed
+- `Phoenix.CodeReloader` is registered as a Mix listener, as Phoenix requires on Elixir 1.18+
+- Compiler and type-checker warnings reported by Elixir 1.20
+
 ## [0.1.0] - 2025-06-23
 
 ### Added
