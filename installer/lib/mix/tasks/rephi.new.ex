@@ -16,37 +16,16 @@ defmodule Mix.Tasks.Rephi.New do
 
   ## Options
 
-    * `--app` - the OTP application name (`acme_hub`): lowercase letters,
-      digits and underscores, starting with a letter. Defaults to the last
-      segment of `PATH`.
-    * `--module` - the base module name (`AcmeHub`). Defaults to the camelized
-      application name.
-    * `--no-install` - do not run `mix deps.get` and `mix format` in the new
-      project. The generated code is formatted for the template's names, so
-      run `mix format` after fetching the dependencies yourself.
+    * `--app` - the OTP application name (default: the last segment of `PATH`).
+    * `--module` - the base module name (default: the camelized app name).
+    * `--no-install` - skip `mix deps.get` and `mix format`; run both yourself.
     * `--no-git` - do not create a Git repository with an initial commit.
-    * `--from` - where to take the template from: a Git URL or the path of a
-      local clone (its committed `HEAD`). Defaults to #{inspect("https://github.com/thotenn/rephi.git")}.
-    * `--branch` - the branch or tag of the template to use (default: the
-      repository's default branch).
+    * `--from` - the template: a Git URL or a local clone (its committed `HEAD`).
+      Defaults to #{inspect("https://github.com/thotenn/rephi.git")}.
+    * `--branch` - the template's branch or tag (default: its default branch).
 
-  ## What it does
-
-  It clones the template into a temporary directory next to `PATH`, renames
-  the application and its modules (`rephi` -> APP, `Rephi` -> MODULE, in code,
-  configuration, seeds, migrations, tests and docs; file names too), gives the
-  project its own secrets and salts, writes a README, fetches the
-  dependencies, formats the code, creates the Git repository with an initial
-  commit and only then moves the result to `PATH`. If any step fails, nothing
-  is left behind.
-
-  Kept as they are: `mix rephi.gen.frontend` (the generator keeps its name,
-  like `mix phx.gen.*`), the npm names of the frontend workspaces and URLs.
-  See `RephiNew.Rename`.
-
-  Next, inside the project, `./setup.sh` checks the toolchain, writes a
-  development `.env` with fresh secrets, creates and seeds the database and
-  builds the frontends.
+  The project is built in a temporary directory and moved to `PATH` only when
+  every step succeeds.
   """
 
   use Mix.Task
@@ -64,11 +43,8 @@ defmodule Mix.Tasks.Rephi.New do
     git: :boolean
   ]
 
-  # Files and directories of the template that a project does not get.
   @drop ~w(.git installer LICENSE CHANGELOG.md)
 
-  # Directories copied as they are: the frontends (npm names are kept, see
-  # RephiNew.Rename), dependencies and build output.
   @verbatim_dirs ~w(apps packages node_modules deps _build .yarn priv/static)
 
   @impl Mix.Task
@@ -161,8 +137,6 @@ defmodule Mix.Tasks.Rephi.New do
     end
   end
 
-  ## Building the project
-
   defp build(source, target, names) do
     files =
       source
@@ -193,7 +167,6 @@ defmodule Mix.Tasks.Rephi.New do
         copy_mode(Path.join(source, file), destination)
       end)
 
-      # Executable scripts keep their mode under their new names too.
       for {file, _} <- files, file == "setup.sh" do
         File.chmod!(Path.join(target, file), 0o755)
       end
@@ -210,7 +183,6 @@ defmodule Mix.Tasks.Rephi.New do
     end
   end
 
-  # Relative paths of every regular file under `dir`.
   defp list_files(dir) do
     dir
     |> Path.join("**")
@@ -232,8 +204,6 @@ defmodule Mix.Tasks.Rephi.New do
   end
 
   defp text?(contents), do: String.valid?(contents) and not String.contains?(contents, <<0>>)
-
-  ## Dependencies, formatting and Git
 
   defp install(_dir, false), do: :ok
 
@@ -263,7 +233,7 @@ defmodule Mix.Tasks.Rephi.New do
           :ok
 
         {output, _} ->
-          # Usually a missing user.name / user.email: the files stay staged.
+          # Usually a missing git user.name / user.email.
           Mix.shell().error(
             "The initial commit could not be created; the files are staged.\n#{output}"
           )
@@ -290,8 +260,6 @@ defmodule Mix.Tasks.Rephi.New do
   rescue
     error in ErlangError -> {:error, "Could not run #{command}: #{Exception.message(error)}"}
   end
-
-  ## Output
 
   defp readme(%{app: app, module: module}) do
     """

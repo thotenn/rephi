@@ -61,7 +61,6 @@ defmodule RephiNew.SecretsTest do
 
     assert byte_size(salt) == 8
 
-    # Values read from the environment at runtime are not secrets to replace.
     assert {"config/runtime.exs", @runtime} in files
   end
 

@@ -1,32 +1,12 @@
 defmodule RephiNew.Rename do
   @moduledoc """
-  Renames the template (`rephi` / `Rephi`) to the new project's names.
-
-  The template's names are replaced as whole names, in one pass, so a project
-  whose own name contains the template's (`morephi`) is never renamed twice.
-  A name is whole when it is not glued to other letters or digits: `rephi_web`,
-  `_rephi_key` and `:rephi` are renamed, `morephi` is not. An underscore is a
-  separator for the lowercase name and part of the name for the module name.
-
-  Left as they are, on purpose:
-
-    * URLs (`https://github.com/thotenn/rephi`): they point at the template;
-    * the Mix task namespace: `mix rephi.gen.frontend` keeps its name in every
-      project, the way `mix phx.gen.*` does (`Mix.Tasks.Rephi.*`,
-      `rephi.gen.*`, `rephi.new`);
-    * npm names: the private Yarn workspaces (`@rephi/shared-components`,
-      `rephi-example`, ...) and the `"rephi"` field of an app's package.json
-      are internal to the monorepo and are never published, so renaming them
-      would only mean rewriting every import of the frontends.
+  Renames the template (`rephi` / `Rephi`) to the new project's names, as whole
+  names in one pass. URLs, the `rephi.*` Mix tasks and npm names are kept on purpose.
   """
 
   @url ~r{https?://[^\s"'`<>)\]]+}
 
-  @doc """
-  Replaces the template's names in `text`.
-
-  `names` is a map with `:app` (`"acme_hub"`) and `:module` (`"AcmeHub"`).
-  """
+  @doc "Replaces the template's names in `text`."
   @spec text(String.t(), %{app: String.t(), module: String.t()}) :: String.t()
   def text(text, %{app: app, module: module}) do
     @url
@@ -44,23 +24,14 @@ defmodule RephiNew.Rename do
     end)
   end
 
-  # One alternation, so a replacement is never matched again.
-  #
-  #   * `Rephi` not after a letter, digit, `_` or `.` (`Mix.Tasks.Rephi`), and
-  #     not followed by a lowercase letter or digit (`RephiWeb` is renamed);
-  #   * `rephi` not glued to letters or digits, nor part of an npm name
-  #     (`@rephi/`, `rephi-example`), a Mix task (`rephi.gen.`, `rephi.new`),
-  #     the `"rephi"` field of a package.json or the frontends' `~/lib/rephi`
-  #     module;
-  #   * `REPHI` (`REPHI_SOMETHING`).
+  # One alternation, so a replacement is never matched again. Skips `Mix.Tasks.Rephi.*`,
+  # `rephi.gen`/`rephi.new`, npm names (`@rephi/`, `rephi-*`), `"rephi":` and `~/lib/rephi`.
   defp name_regex do
     ~r/(?<![A-Za-z0-9_.])Rephi(?![a-z0-9])(?!\.(?:Gen|New)\b)|(?<![A-Za-z0-9@.-])(?<!~\/lib\/)rephi(?![A-Za-z0-9-])(?!\.(?:gen|new)\b)(?!":)(?!\.copyToPhoenix)|(?<![A-Za-z0-9])REPHI(?![A-Z0-9])/
   end
 
   @doc """
-  Renames every segment of a relative `path` (`lib/rephi_web/endpoint.ex` ->
-  `lib/acme_hub_web/endpoint.ex`). Mix task files (`rephi.gen.frontend.ex`)
-  keep their names.
+  Renames every segment of a relative `path`; Mix task files keep their names.
   """
   @spec path(Path.t(), %{app: String.t(), module: String.t()}) :: Path.t()
   def path(path, names) do
@@ -73,8 +44,6 @@ defmodule RephiNew.Rename do
   @app_pattern ~r/\A[a-z][a-z0-9_]*\z/
   @module_pattern ~r/\A[A-Z][A-Za-z0-9]*(\.[A-Z][A-Za-z0-9]*)*\z/
 
-  # Applications that a project cannot be named after: the ones of Erlang and
-  # Elixir it starts, and the dependencies of the template.
   @reserved_apps ~w(
     elixir eex ex_unit iex logger mix kernel stdlib crypto ssl public_key
     runtime_tools inets compiler

@@ -1,11 +1,8 @@
 defmodule RephiNew.MixProject do
   use Mix.Project
 
-  # Bump it with every change to the installer.
   @version "0.2.0"
 
-  # The installer is distributed as a Mix archive built from this directory
-  # (see README.md); it is not published to Hex.
   def project do
     [
       app: :rephi_new,

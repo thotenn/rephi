@@ -3,8 +3,6 @@ defmodule Mix.Tasks.Rephi.NewTest do
 
   @moduletag :tmp_dir
 
-  # The template this installer lives in (the repository root), when the
-  # tests run from a Git checkout.
   @template Path.expand("../../../..", __DIR__)
 
   setup %{tmp_dir: tmp_dir} do
@@ -28,8 +26,6 @@ defmodule Mix.Tasks.Rephi.NewTest do
      template: fixture_template(Path.join(tmp_dir, "template")), out: Path.join(tmp_dir, "out")}
   end
 
-  # A minimal template with the shape of the real one: names to rename,
-  # secrets to replace, files to keep as they are.
   defp fixture_template(dir) do
     files = %{
       "mix.exs" => """
@@ -120,7 +116,6 @@ defmodule Mix.Tasks.Rephi.NewTest do
     assert read(project, "priv/repo/seeds.exs") == "AcmeHub.Seeds.run()\n"
     assert read(project, ".env.example") == "# DB_NAME=acme_hub_dev\n"
 
-    # The generator keeps its name; the npm names and binary files are untouched.
     assert read(project, "lib/mix/tasks/rephi.gen.frontend.ex") ==
              "defmodule Mix.Tasks.Rephi.Gen.Frontend do\n  # rephi-example, AcmeHubWeb\nend\n"
 
@@ -135,7 +130,6 @@ defmodule Mix.Tasks.Rephi.NewTest do
     assert read(project, "README.md") =~ "# AcmeHub"
     assert read(project, "README.md") =~ "./setup.sh"
 
-    # Secrets: every template value replaced.
     all_config =
       Enum.map_join(
         ~w(config/config.exs config/dev.exs config/test.exs lib/acme_hub_web/endpoint.ex),
@@ -217,8 +211,6 @@ defmodule Mix.Tasks.Rephi.NewTest do
     assert new_error([Path.join(out, "a"), Path.join(out, "b")]) =~ "single PATH"
   end
 
-  # The real template: everything that names the template is renamed. Runs
-  # when the installer sits in its Git checkout (its committed HEAD is used).
   @tag :template
   test "the Rephi template", %{out: out} do
     if File.dir?(Path.join(@template, ".git")) do
@@ -236,7 +228,6 @@ defmodule Mix.Tasks.Rephi.NewTest do
             String.valid?(contents),
             line <- String.split(contents, "\n"),
             line =~ ~r/rephi/i,
-            # What is kept on purpose (see RephiNew.Rename).
             stripped =
               line
               |> String.replace(~r{\[Rephi\]\(https?://\S+}, "")

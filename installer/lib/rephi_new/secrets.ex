@@ -1,26 +1,10 @@
 defmodule RephiNew.Secrets do
   @moduledoc """
-  Gives a new project its own secrets.
-
-  The template commits, like `mix phx.new` does, the values that development
-  and test need to boot without any setup:
-
-    * `secret_key_base` of the endpoint in `config/dev.exs` (the default of
-      `SECRET_KEY_BASE`) and `config/test.exs`;
-    * `secret_key` of Guardian (the JWT signing key) in `config/dev.exs` and
-      `config/test.exs`;
-    * `signing_salt` of the session cookie (`endpoint.ex`) and of LiveView
-      (`config/config.exs`).
-
-  None of them is used in production, which reads `SECRET_KEY_BASE` and
-  `GUARDIAN_SECRET_KEY` from the environment, but the salts are compiled into
-  the release, and every project must still have values nobody else knows.
-  Each one is replaced by a fresh random value of the same kind.
+  Replaces the dev/test secrets and signing salts the template commits with fresh
+  random values, so no two projects share them.
   """
 
-  # Pattern, kind of value, and how many the template must have. A template
-  # that does not match exactly is refused instead of generating a project
-  # that silently shares a secret with every other one.
+  # Exact counts: a template that does not match is refused rather than sharing a secret.
   @rules [
     {:secret_key_base,
      ~r/(secret_key_base:\s*(?:System\.get_env\(\s*"SECRET_KEY_BASE",\s*)?)"[^"]*"/, 2},
@@ -28,10 +12,7 @@ defmodule RephiNew.Secrets do
     {:signing_salt, ~r/(signing_salt:\s*)"[^"]*"/, 2}
   ]
 
-  @doc """
-  The files, among the given relative paths, whose secrets are replaced:
-  `config/*.exs` and `lib/*_web/endpoint.ex`.
-  """
+  @doc "The files, among the given relative paths, whose secrets are replaced."
   @spec files_in([Path.t()]) :: [Path.t()]
   def files_in(paths) do
     Enum.filter(paths, fn path ->
@@ -44,10 +25,8 @@ defmodule RephiNew.Secrets do
   end
 
   @doc """
-  Replaces the secrets of the given `{path, contents}` files.
-
-  Returns `{:ok, files}` with the new contents, or `{:error, message}` when the
-  template does not have exactly the expected secrets.
+  Replaces the secrets of the given `{path, contents}` files, or returns an error
+  when the template does not have exactly the expected secrets.
   """
   @spec regenerate([{Path.t(), String.t()}]) ::
           {:ok, [{Path.t(), String.t()}]} | {:error, String.t()}
@@ -79,10 +58,7 @@ defmodule RephiNew.Secrets do
     end)
   end
 
-  @doc """
-  A new random value: 64 characters for keys, 8 for salts (what
-  `mix phx.gen.secret` and `mix phx.new` use).
-  """
+  @doc "A new random value: 64 characters for keys, 8 for salts."
   @spec generate(atom()) :: String.t()
   def generate(:signing_salt), do: random(8)
   def generate(_key), do: random(64)
