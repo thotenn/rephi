@@ -91,6 +91,7 @@ defmodule RephiWeb.RoleController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :invalid_page,
         ok: {"One page of roles", Schemas.RolesResponse},
         forbidden: "Forbidden - requires roles:view"
@@ -110,6 +111,7 @@ defmodule RephiWeb.RoleController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         ok: {"The role", Schemas.RoleDetailResponse},
         forbidden: "Forbidden - requires roles:view",
         not_found: "Role not found"
@@ -129,6 +131,7 @@ defmodule RephiWeb.RoleController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :body_errors,
         created: {"Role created", Schemas.RoleDetailResponse},
         forbidden: "Forbidden - requires roles:create",
@@ -153,6 +156,7 @@ defmodule RephiWeb.RoleController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :body_errors,
         ok: {"Role updated", Schemas.RoleDetailResponse},
         forbidden: "Forbidden - requires roles:edit",
@@ -174,6 +178,7 @@ defmodule RephiWeb.RoleController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         no_content: "Role deleted",
         forbidden: "Forbidden - requires roles:delete",
         not_found: "Role not found",
@@ -196,6 +201,7 @@ defmodule RephiWeb.RoleController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :body_errors,
         created: {"Role assigned", Schemas.UserRoleAssignmentResponse},
         forbidden: "Forbidden - requires roles:assign, and holding the role or being an admin",
@@ -227,6 +233,7 @@ defmodule RephiWeb.RoleController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         no_content: "Role removed",
         forbidden: "Forbidden - requires roles:assign, and holding the role or being an admin",
         not_found: "User or role not found, or the role is not assigned to the user",
@@ -249,6 +256,7 @@ defmodule RephiWeb.RoleController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         ok: {"The permissions of the role", Schemas.RolePermissionsResponse},
         forbidden: "Forbidden - requires roles:view",
         not_found: "Role not found"
@@ -260,17 +268,66 @@ defmodule RephiWeb.RoleController do
     end
   end
 
+  operation :get_role_parents,
+    summary: "List the parent roles of a role",
+    description:
+      "The roles this role inherits from directly (not their own ancestors; the permissions inherited through the whole chain are in inherited_permissions of GET /api/roles/{id}), by slug, each with its link. Not paginated. Requires roles:view.",
+    parameters: [id_param(:id, "Role ID")],
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        ok: {"The parent roles", Schemas.RoleLinksResponse},
+        forbidden: "Forbidden - requires roles:view",
+        not_found: "Role not found"
+      ])
+
   def get_role_parents(conn, %{"id" => id}) do
     with {:ok, role} <- Authorization.fetch_role(id) do
       render(conn, :links, links: Authorization.list_parent_roles(role))
     end
   end
 
+  operation :get_role_children,
+    summary: "List the child roles of a role",
+    description:
+      "The roles that inherit from this role directly, by slug, each with its link. Not paginated. Requires roles:view.",
+    parameters: [id_param(:id, "Role ID")],
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        ok: {"The child roles", Schemas.RoleLinksResponse},
+        forbidden: "Forbidden - requires roles:view",
+        not_found: "Role not found"
+      ])
+
   def get_role_children(conn, %{"id" => id}) do
     with {:ok, role} <- Authorization.fetch_role(id) do
       render(conn, :links, links: Authorization.list_child_roles(role))
     end
   end
+
+  operation :add_parent,
+    summary: "Make a role inherit from another",
+    description:
+      "Links parent_id as a parent of role_id: every holder of role_id gets the permissions of parent_id and of its ancestors. Requires roles:edit, and holding both roles (assigned or inherited) or being an admin. The body is optional. assigned_by is the caller. Refused (409) when it would make a role inherit from itself (parent_id is role_id or one of its descendants) or the parent is already linked.",
+    parameters: [
+      id_param(:role_id, "Role ID (the child)"),
+      id_param(:parent_id, "Parent role ID")
+    ],
+    request_body: body("Optional notes", Schemas.AssignmentNotes, required: false),
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        :body_errors,
+        created: {"Parent linked", Schemas.RoleParentAssignmentResponse},
+        forbidden: "Forbidden - requires roles:edit, and holding both roles or being an admin",
+        not_found: "Role or parent role not found",
+        conflict: "The role would inherit from itself, or the parent is already linked",
+        unprocessable_entity: "notes is not a string or is too long"
+      ])
 
   def add_parent(conn, %{"role_id" => role_id, "parent_id" => parent_id} = params) do
     opts = [actor: current_access(conn), notes: params["notes"]]
@@ -287,6 +344,24 @@ defmodule RephiWeb.RoleController do
       |> render(:parent_assignment, link: link)
     end
   end
+
+  operation :remove_parent,
+    summary: "Remove a parent from a role",
+    description:
+      "role_id stops inheriting from parent_id. Requires roles:edit, and holding both roles (assigned or inherited) or being an admin. The links of the default hierarchy (is_system) cannot be removed, nor a link through which the last admins hold the admin role (409).",
+    parameters: [
+      id_param(:role_id, "Role ID (the child)"),
+      id_param(:parent_id, "Parent role ID")
+    ],
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        no_content: "Parent removed",
+        forbidden: "Forbidden - requires roles:edit, and holding both roles or being an admin",
+        not_found: "Role or parent role not found, or the role does not inherit from it",
+        conflict: "A link of the default hierarchy, or it would leave nobody with the admin role"
+      ])
 
   def remove_parent(conn, %{"role_id" => role_id, "parent_id" => parent_id}) do
     with {:ok, role} <- Authorization.fetch_role(role_id),

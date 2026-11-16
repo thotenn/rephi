@@ -39,6 +39,7 @@ defmodule RephiWeb.NotificationController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :body_errors,
         ok: {"Notification sent", Schemas.NotificationResponse},
         forbidden: "Forbidden - requires notifications:broadcast",

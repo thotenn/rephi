@@ -78,6 +78,20 @@ defmodule RephiWeb.ApiContractTest do
       end
     end
 
+    test "documents the password gate on exactly the routes behind it" do
+      paths = document()["paths"]
+
+      for route <- controller_routes() do
+        op = paths[open_api_path(route.path)][to_string(route.verb)]
+        where = "#{String.upcase(to_string(route.verb))} #{route.path}"
+        gated? = gated?(route)
+        forbidden = get_in(op, ["responses", "403", "description"]) || ""
+
+        assert String.contains?(forbidden, "PUT /api/me/password") == gated?,
+               "#{where}: the 403 of the password gate (gated: #{gated?})"
+      end
+    end
+
     test "every example matches its schema" do
       spec = RephiWeb.ApiSpec.spec()
 
@@ -116,8 +130,12 @@ defmodule RephiWeb.ApiContractTest do
           response = op["responses"][to_string(status)]
           assert response, "#{where} does not document #{status}"
 
-          for {header, _header} <- response["headers"] || %{} do
-            assert get_resp_header(conn, header) != [], "#{where}: no #{header} header"
+          for {header, %{"schema" => schema}} <- response["headers"] || %{} do
+            values = get_resp_header(conn, header)
+            assert values != [], "#{where}: no #{header} header"
+
+            if schema["enum"],
+              do: assert(Enum.all?(values, &(&1 in schema["enum"])), "#{where}: #{header}")
           end
 
           operation = Map.fetch!(spec.paths[path], String.to_existing_atom(verb))
@@ -134,6 +152,31 @@ defmodule RephiWeb.ApiContractTest do
 
       assert MapSet.difference(documented, MapSet.union(exercised, @not_exercised)) ==
                MapSet.new()
+    end
+
+    test "is the password gate's 403 for a user whose password was reset" do
+      {:ok, user, _password} = Accounts.reset_password(create_user())
+      {:ok, token, _claims} = RephiWeb.Auth.Guardian.encode_and_sign(Accounts.get_user(user.id))
+      spec = strict(RephiWeb.ApiSpec.spec())
+      document = document()
+
+      gated = Enum.filter(controller_routes(), &gated?/1)
+
+      assert length(gated) > 20
+
+      for route <- gated do
+        path = open_api_path(route.path)
+        conn = call(route.verb, fill(path, 1), token, %{})
+        where = "#{String.upcase(to_string(route.verb))} #{route.path}"
+
+        assert %{"errors" => %{"detail" => "Your password was reset" <> _}} =
+                 json_response(conn, 403),
+               where
+
+        response = get_in(document, ["paths", path, to_string(route.verb), "responses", "403"])
+        operation = Map.fetch!(spec.paths[path], route.verb)
+        assert_body(conn, operation.responses[403], response, spec, document, where)
+      end
     end
   end
 
@@ -515,6 +558,13 @@ defmodule RephiWeb.ApiContractTest do
         match?(["RephiWeb" | _], Module.split(route.plug)),
         Code.ensure_loaded?(route.plug),
         do: route
+  end
+
+  defp gated?(route) do
+    verb = route.verb |> to_string() |> String.upcase()
+    path = Regex.replace(~r/:[^\/]+/, route.path, "1")
+    info = Phoenix.Router.route_info(RephiWeb.Router, verb, path, "www.example.com")
+    :password_settled in info.pipe_through
   end
 
   defp open_api_path(path), do: Regex.replace(~r/:([^\/]+)/, path, "{\\1}")

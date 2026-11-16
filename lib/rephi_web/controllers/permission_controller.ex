@@ -66,6 +66,7 @@ defmodule RephiWeb.PermissionController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :invalid_page,
         ok: {"One page of permissions", Schemas.PermissionsResponse},
         forbidden: "Forbidden - requires permissions:view"
@@ -84,6 +85,7 @@ defmodule RephiWeb.PermissionController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         ok: {"The permission", Schemas.PermissionResponse},
         forbidden: "Forbidden - requires permissions:view",
         not_found: "Permission not found"
@@ -103,6 +105,7 @@ defmodule RephiWeb.PermissionController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :body_errors,
         created: {"Permission created", Schemas.PermissionResponse},
         forbidden: "Forbidden - requires permissions:create",
@@ -129,6 +132,7 @@ defmodule RephiWeb.PermissionController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :body_errors,
         ok: {"Permission updated", Schemas.PermissionResponse},
         forbidden: "Forbidden - requires permissions:edit",
@@ -153,6 +157,7 @@ defmodule RephiWeb.PermissionController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         no_content: "Permission deleted",
         forbidden: "Forbidden - requires permissions:delete",
         not_found: "Permission not found",
@@ -175,6 +180,7 @@ defmodule RephiWeb.PermissionController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :body_errors,
         created: {"Permission assigned", Schemas.RolePermissionAssignmentResponse},
         forbidden:
@@ -207,6 +213,7 @@ defmodule RephiWeb.PermissionController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         no_content: "Permission removed",
         forbidden:
           "Forbidden - requires permissions:assign, and holding the permission or being an admin",
@@ -225,6 +232,25 @@ defmodule RephiWeb.PermissionController do
     end
   end
 
+  operation :assign_to_user,
+    summary: "Grant a permission to a user",
+    description:
+      "Grants the permission to the user directly, on top of what its roles grant. Requires permissions:assign, and holding the permission or being an admin. The body is optional. assigned_by is the caller.",
+    parameters: [id_param(:user_id, "User ID"), id_param(:permission_id, "Permission ID")],
+    request_body: body("Optional notes", Schemas.AssignmentNotes, required: false),
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        :body_errors,
+        created: {"Permission granted", Schemas.UserPermissionAssignmentResponse},
+        forbidden:
+          "Forbidden - requires permissions:assign, and holding the permission or being an admin",
+        not_found: "User or permission not found",
+        conflict: "Permission already granted to the user directly",
+        unprocessable_entity: "notes is not a string or is too long"
+      ])
+
   def assign_to_user(conn, %{"user_id" => user_id, "permission_id" => permission_id} = params) do
     opts = [actor: current_access(conn), notes: params["notes"]]
 
@@ -239,6 +265,22 @@ defmodule RephiWeb.PermissionController do
       |> render(:user_assignment, user_permission: user_permission)
     end
   end
+
+  operation :remove_from_user,
+    summary: "Revoke a permission from a user",
+    description:
+      "Revokes a permission granted to the user directly. Requires permissions:assign, and holding the permission or being an admin. A permission the user only holds through a role must be removed from that role, or the role from the user (409).",
+    parameters: [id_param(:user_id, "User ID"), id_param(:permission_id, "Permission ID")],
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        no_content: "Permission revoked",
+        forbidden:
+          "Forbidden - requires permissions:assign, and holding the permission or being an admin",
+        not_found: "User or permission not found, or the user does not hold it",
+        conflict: "The user only holds the permission through a role"
+      ])
 
   def remove_from_user(conn, %{"user_id" => user_id, "permission_id" => permission_id}) do
     with {:ok, user} <- Accounts.fetch_user(user_id),

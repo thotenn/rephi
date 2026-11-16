@@ -49,10 +49,13 @@ defmodule RephiWeb.ApiSpec do
   @tags [
     %Tag{name: "Auth", description: "Sessions and the signed-in user"},
     %Tag{name: "Users", description: "User management (users:*)"},
-    %Tag{name: "Roles", description: "Roles and their assignment to users (roles:*)"},
+    %Tag{
+      name: "Roles",
+      description: "Roles, their hierarchy and their assignment to users (roles:*)"
+    },
     %Tag{
       name: "Permissions",
-      description: "Permissions and their assignment to roles (permissions:*)"
+      description: "Permissions and their assignment to roles and users (permissions:*)"
     },
     %Tag{name: "Notifications", description: "Real-time notifications"},
     %Tag{name: "Health", description: "Liveness and readiness checks"},

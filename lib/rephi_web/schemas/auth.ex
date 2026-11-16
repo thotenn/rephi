@@ -89,13 +89,19 @@ defmodule RephiWeb.Schemas.SessionUser do
       properties: %{
         id: %Schema{type: :integer},
         email: %Schema{type: :string},
+        must_change_password: %Schema{
+          type: :boolean,
+          description:
+            "An administrator reset the password: until the user sets a new one with PUT /api/me/password, every other authenticated route but GET /api/me and POST /api/users/logout answers 403"
+        },
         roles: %Schema{type: :array, items: Grant},
         permissions: %Schema{type: :array, items: Grant}
       },
-      required: [:id, :email, :roles, :permissions],
+      required: [:id, :email, :must_change_password, :roles, :permissions],
       example: %{
         id: 2,
         email: "user@example.com",
+        must_change_password: false,
         roles: [%{id: 3, name: "User", slug: "user"}],
         permissions: []
       }
@@ -133,6 +139,7 @@ defmodule RephiWeb.Schemas.AuthResponse do
           user: %{
             id: 2,
             email: "user@example.com",
+            must_change_password: false,
             roles: [%{id: 3, name: "User", slug: "user"}],
             permissions: []
           },

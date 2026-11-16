@@ -36,6 +36,7 @@ defmodule RephiWeb.UserController do
 
   import RephiWeb.ApiSpec.Operations
 
+  alias OpenApiSpex.{Header, Schema}
   alias Rephi.Accounts
   alias Rephi.Authorization
   alias RephiWeb.Schemas
@@ -61,6 +62,7 @@ defmodule RephiWeb.UserController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :invalid_page,
         ok: {"One page of users", Schemas.UsersResponse},
         forbidden: "Forbidden - requires users:view"
@@ -79,6 +81,7 @@ defmodule RephiWeb.UserController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         ok: {"The user", Schemas.UserResponse},
         forbidden: "Forbidden - requires users:view",
         not_found: "User not found"
@@ -99,6 +102,7 @@ defmodule RephiWeb.UserController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         :body_errors,
         ok: {"User updated", Schemas.UserResponse},
         forbidden: "Forbidden - requires users:edit, or the user holds roles the caller does not",
@@ -125,6 +129,7 @@ defmodule RephiWeb.UserController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         no_content: "User deleted",
         forbidden:
           "Forbidden - requires users:delete, or the user holds roles the caller does not",
@@ -149,6 +154,7 @@ defmodule RephiWeb.UserController do
     responses:
       responses([
         :unauthorized,
+        :password_settled,
         ok: {"The roles of the user", Schemas.UserRolesResponse},
         forbidden: "Forbidden - requires users:view",
         not_found: "User not found"
@@ -160,11 +166,48 @@ defmodule RephiWeb.UserController do
     end
   end
 
+  operation :get_user_permissions,
+    summary: "List the permissions of a user",
+    description:
+      "direct: the permissions granted to the user itself (the ones DELETE /api/users/{user_id}/permissions/{permission_id} revokes), with who granted them. effective: everything the user may do, each with where it comes from: direct (granted to the user itself) and roles (the roles that grant it, assigned to the user or inherited through the hierarchy). Both by slug. Not paginated. Requires users:view.",
+    parameters: [id_param(:id, "User ID")],
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        ok: {"The permissions of the user", Schemas.UserPermissionsResponse},
+        forbidden: "Forbidden - requires users:view",
+        not_found: "User not found"
+      ])
+
   def get_user_permissions(conn, %{"id" => id}) do
     with {:ok, user} <- Accounts.fetch_user(id) do
       render(conn, :permissions, sources: Authorization.get_user_permission_sources(user))
     end
   end
+
+  operation :reset_password,
+    summary: "Reset the password of a user",
+    description:
+      "Replaces the user's password with a random temporary one, returned once in this response (never stored in clear; cache-control: no-store). Every token of the user is revoked and its WebSocket connections are closed. The user signs in with the temporary password and must then set a new one with PUT /api/me/password: until then every other route but GET /api/me and POST /api/users/logout answers 403, and its session reports must_change_password: true. No body. Requires users:reset_password, and holding every role of the user or being an admin. Your own password is changed with PUT /api/me/password (409 here).",
+    parameters: [id_param(:id, "User ID")],
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        ok:
+          {"Password reset", Schemas.PasswordResetResponse,
+           headers: %{
+             "cache-control" => %Header{
+               description: "no-store: the temporary password must not be cached",
+               schema: %Schema{type: :string, enum: ["no-store"]}
+             }
+           }},
+        forbidden:
+          "Forbidden - requires users:reset_password, or the user holds roles the caller does not",
+        not_found: "User not found",
+        conflict: "The caller's own account"
+      ])
 
   def reset_password(conn, %{"id" => id}) do
     with {:ok, user} <- Accounts.fetch_user(id),

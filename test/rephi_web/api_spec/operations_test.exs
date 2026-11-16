@@ -62,6 +62,22 @@ defmodule RephiWeb.ApiSpec.OperationsTest do
       assert responses[413].description == "Body larger than 1 MB"
     end
 
+    test ":password_settled joins the 403 of the operation" do
+      responses = responses([:password_settled, forbidden: "Forbidden - requires x:view"])
+
+      assert responses[403].description =~
+               ~r/^Forbidden - requires x:view; or .+PUT \/api\/me\/password/
+
+      assert responses[403].content["application/json"].schema == Schemas.ErrorResponse
+    end
+
+    test ":password_settled alone is its own 403" do
+      assert %{403 => %Response{description: "Forbidden - " <> rest}} =
+               responses([:password_settled])
+
+      assert rest =~ "PUT /api/me/password"
+    end
+
     test "an unknown standard response is an error" do
       assert_raise ArgumentError, ~r/unknown standard response :nope/, fn ->
         responses([:nope])

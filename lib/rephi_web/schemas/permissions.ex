@@ -165,3 +165,48 @@ defmodule RephiWeb.Schemas.RolePermissionAssignmentResponse do
     struct?: false
   )
 end
+
+defmodule RephiWeb.Schemas.UserPermissionAssignment do
+  require OpenApiSpex
+  alias OpenApiSpex.Schema
+
+  OpenApiSpex.schema(
+    %{
+      description: "The grant created by giving a permission to a user directly",
+      type: :object,
+      properties: %{
+        user_id: %Schema{type: :integer},
+        permission_id: %Schema{type: :integer},
+        assigned_by: %Schema{
+          type: :integer,
+          nullable: true,
+          description: "The user who granted it (null once that user is deleted)"
+        },
+        notes: %Schema{type: :string, nullable: true},
+        inserted_at: RephiWeb.Schemas.timestamp()
+      },
+      required: [:user_id, :permission_id, :assigned_by, :notes, :inserted_at]
+    },
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.UserPermissionAssignmentResponse do
+  require OpenApiSpex
+
+  OpenApiSpex.schema(
+    RephiWeb.Schemas.data(RephiWeb.Schemas.UserPermissionAssignment,
+      description: "The grant created by giving a permission to a user directly",
+      example: %{
+        data: %{
+          user_id: 5,
+          permission_id: 12,
+          assigned_by: 1,
+          notes: "Temporary access for the audit",
+          inserted_at: "2026-01-03T10:00:00Z"
+        }
+      }
+    ),
+    struct?: false
+  )
+end

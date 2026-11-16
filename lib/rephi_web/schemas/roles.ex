@@ -282,3 +282,121 @@ defmodule RephiWeb.Schemas.RolePermissionsResponse do
     struct?: false
   )
 end
+
+defmodule RephiWeb.Schemas.RoleLink do
+  require OpenApiSpex
+  alias OpenApiSpex.Schema
+
+  OpenApiSpex.schema(
+    %{
+      description:
+        "A role linked to another one in the hierarchy (one of its parents or children), with the attributes of the link",
+      type: :object,
+      properties: %{
+        id: %Schema{type: :integer, description: "The linked role"},
+        name: %Schema{type: :string},
+        slug: %Schema{type: :string},
+        description: %Schema{type: :string, nullable: true},
+        is_system: %Schema{type: :boolean, description: "The linked role is a system role"},
+        system_link: %Schema{
+          type: :boolean,
+          description: "The link is part of the default hierarchy: it cannot be removed"
+        },
+        assigned_by: %Schema{
+          type: :integer,
+          nullable: true,
+          description:
+            "The user who made the link (null for seeded links and once that user is deleted)"
+        },
+        notes: %Schema{type: :string, nullable: true},
+        linked_at: RephiWeb.Schemas.timestamp()
+      },
+      required: [
+        :id,
+        :name,
+        :slug,
+        :description,
+        :is_system,
+        :system_link,
+        :assigned_by,
+        :notes,
+        :linked_at
+      ],
+      example: %{
+        id: 3,
+        name: "User",
+        slug: "user",
+        description: "Basic user access",
+        is_system: true,
+        system_link: true,
+        assigned_by: nil,
+        notes: nil,
+        linked_at: "2026-01-03T10:00:00Z"
+      }
+    },
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.RoleLinksResponse do
+  require OpenApiSpex
+  alias OpenApiSpex.Schema
+
+  OpenApiSpex.schema(
+    RephiWeb.Schemas.data(
+      %Schema{type: :array, items: RephiWeb.Schemas.RoleLink},
+      description: "The parents or the children of a role, by slug"
+    ),
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.RoleParentAssignment do
+  require OpenApiSpex
+  alias OpenApiSpex.Schema
+
+  OpenApiSpex.schema(
+    %{
+      description: "The link created by making a role inherit from another",
+      type: :object,
+      properties: %{
+        role_id: %Schema{type: :integer, description: "The child role"},
+        parent_id: %Schema{type: :integer, description: "The parent role"},
+        is_system: %Schema{
+          type: :boolean,
+          description: "Part of the default hierarchy (always false for a new link)"
+        },
+        assigned_by: %Schema{
+          type: :integer,
+          nullable: true,
+          description: "The user who made the link (null once that user is deleted)"
+        },
+        notes: %Schema{type: :string, nullable: true},
+        inserted_at: RephiWeb.Schemas.timestamp()
+      },
+      required: [:role_id, :parent_id, :is_system, :assigned_by, :notes, :inserted_at]
+    },
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.RoleParentAssignmentResponse do
+  require OpenApiSpex
+
+  OpenApiSpex.schema(
+    RephiWeb.Schemas.data(RephiWeb.Schemas.RoleParentAssignment,
+      description: "The link created by making a role inherit from another",
+      example: %{
+        data: %{
+          role_id: 7,
+          parent_id: 2,
+          is_system: false,
+          assigned_by: 1,
+          notes: nil,
+          inserted_at: "2026-01-03T10:00:00Z"
+        }
+      }
+    ),
+    struct?: false
+  )
+end

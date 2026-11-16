@@ -172,6 +172,7 @@ operation :archive,
   responses:
     responses([
       :unauthorized,       # 401 (every authenticated operation)
+      :password_settled,   # joins the gate's 403 (routes behind :password_settled)
       :body_errors,        # 400 + 413 (every operation that reads a body)
       ok: {"Archived", Schemas.ThingResponse},
       forbidden: "Forbidden - requires things:archive",
@@ -186,7 +187,10 @@ def archive(conn, %{"id" => id}), do: ...
 - `responses/1`: an error is just its description (`ErrorResponse`; `ValidationErrors` for 422;
   `ErrorResponse` + `retry-after` for 429); `"..."` on a 2xx is a response without a body
   (`no_content: "Deleted"`); `{"desc", Schema}` / `{"desc", Schema, headers: ...}` is a JSON body.
-  Other standard entries: `:invalid_page` (422 of `page_params()`), `:too_many_requests`.
+  Other standard entries: `:invalid_page` (422 of `page_params()`), `:too_many_requests`, and
+  `:password_settled` for every route behind that pipeline: it appends the reset-password gate to
+  the operation's own 403 description (or adds the 403). The contract test checks it is on exactly
+  the gated routes and that each of them answers the gate's 403.
 - Envelopes: `RephiWeb.Schemas.data(schema)` (`{"data": ...}`), `page(item)` (`data` + `meta`).
   Nullable: `nullable: true` (OpenAPI 3.0), never `x-nullable`; not on a `$ref` (inline the
   object instead).

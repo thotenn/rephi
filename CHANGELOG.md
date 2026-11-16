@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the account: until the user sets a new password with `PUT /api/me/password`, every other route
   but `GET /api/me` and logout answers `403` (`RephiWeb.Auth.PasswordChangeGate`). Own account
   `409`; a user holding roles the caller does not hold `403`
+- The new endpoints are in the OpenAPI document with their schemas (`RoleLink`,
+  `RoleLinksResponse`, `RoleParentAssignmentResponse`, `UserPermissionAssignmentResponse`,
+  `DirectUserPermission`, `EffectiveUserPermission`, `UserPermissionsResponse`,
+  `PasswordResetResponse`, with `cache-control: no-store` on the reset) and in the contract test;
+  `User` and `SessionUser` require `must_change_password`, and every operation behind the
+  password gate documents its `403` (`:password_settled` in `RephiWeb.ApiSpec.Operations`)
 - `must_change_password` in the session user (register, login, `/api/me`, password change) and in
   the user listings
 - `role_roles` gets `assigned_by`, `notes` and `is_system` (links of the default hierarchy, marked
@@ -92,6 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   marked as system links (the migration already marks links between two system roles)
 - Clients reading the user object should handle `must_change_password` (send the user to the
   password change form)
+- API documentation consumers: read `/api/openapi` (OpenAPI 3.0) instead of
+  `/api/swagger/swagger.json`, and drop `mix phx.swagger.generate` from any build script
 
 ## [0.2.0] - 2026-11-16
 

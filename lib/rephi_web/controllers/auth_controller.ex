@@ -106,7 +106,7 @@ defmodule RephiWeb.AuthController do
   operation :change_password,
     summary: "Change my password",
     description:
-      "Sets a new password for the signed-in user, who must send the current one. Every token issued before (the one of this request included) is revoked and the user's WebSocket connections are closed; the response carries a new session. The attributes may also be wrapped under \"user\". Shares the rate limit of login.",
+      "Sets a new password for the signed-in user, who must send the current one. Every token issued before (the one of this request included) is revoked and the user's WebSocket connections are closed; the response carries a new session. It also clears must_change_password (a password reset by an administrator): this is how such a user gets the rest of the API back. The attributes may also be wrapped under \"user\". Shares the rate limit of login.",
     security: bearer_auth(),
     request_body: body("Current and new password", Schemas.PasswordChange),
     responses:

@@ -9,6 +9,7 @@ defmodule RephiWeb.ApiSpec.Operations do
   alias RephiWeb.Schemas
 
   @json "application/json"
+  @password_gate "the caller's password was reset by an administrator and must be changed first with PUT /api/me/password"
 
   @doc "Needs an access token; pair it with `:unauthorized` in `responses/1`."
   def bearer_auth, do: [%{"bearerAuth" => []}]
@@ -47,10 +48,12 @@ defmodule RephiWeb.ApiSpec.Operations do
 
   @doc """
   Responses by status. Bare atoms are standard ones (`:unauthorized`, `:body_errors`,
-  `:invalid_page`, `:too_many_requests`); an error is just its description.
+  `:invalid_page`, `:too_many_requests`, `:password_settled`); an error is just its description.
   """
   def responses(entries) when is_list(entries) do
     {standard, own} = Enum.split_with(entries, &is_atom/1)
+    {gate, standard} = Enum.split_with(standard, &(&1 == :password_settled))
+    own = if gate == [], do: own, else: with_password_gate(own)
 
     standard
     |> Enum.flat_map(&standard/1)
@@ -75,6 +78,17 @@ defmodule RephiWeb.ApiSpec.Operations do
 
   defp standard(other),
     do: raise(ArgumentError, "unknown standard response #{inspect(other)}")
+
+  # The gate shares 403 with the permission checks, so it joins their description.
+  defp with_password_gate(own) do
+    case Keyword.fetch(own, :forbidden) do
+      {:ok, description} when is_binary(description) ->
+        Keyword.put(own, :forbidden, "#{description}; or #{@password_gate}")
+
+      :error ->
+        own ++ [forbidden: "Forbidden - " <> @password_gate]
+    end
+  end
 
   defp response(_code, %Response{} = response), do: response
 
