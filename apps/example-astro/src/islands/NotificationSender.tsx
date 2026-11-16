@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import { api, describeError, usePermissions } from "~/lib/rephi";
 import IslandProviders from "~/components/react/IslandProviders";
 import { useRealtimeConnected } from "~/lib/realtime";
+import { NOTIFY_HASH } from "~/lib/routes";
 
 /** Permission the server requires to broadcast. */
 const BROADCAST_PERMISSION = "notifications:broadcast";
@@ -19,6 +20,19 @@ function NotificationSenderForm() {
   const connected = useRealtimeConnected();
   const [text, setText] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const messageRef = useRef<HTMLInputElement>(null);
+  const allowed = can(BROADCAST_PERMISSION);
+
+  // The client router may set the hash after this island mounts.
+  useEffect(() => {
+    if (!allowed) return;
+    const focusIfRequested = () => {
+      if (window.location.hash === NOTIFY_HASH) messageRef.current?.focus();
+    };
+    focusIfRequested();
+    document.addEventListener("astro:page-load", focusIfRequested);
+    return () => document.removeEventListener("astro:page-load", focusIfRequested);
+  }, [allowed]);
 
   const send = useMutation({
     mutationFn: (message: string) => api.post("/notifications/broadcast", { message }),
@@ -36,7 +50,7 @@ function NotificationSenderForm() {
     },
   });
 
-  if (!can(BROADCAST_PERMISSION)) return null;
+  if (!allowed) return null;
 
   const submit = () => {
     setFieldError(null);
@@ -49,9 +63,13 @@ function NotificationSenderForm() {
   };
 
   return (
-    <div className="mt-8 bg-white overflow-hidden shadow rounded-lg">
+    <section
+      id={NOTIFY_HASH.slice(1)}
+      aria-labelledby="notify-title"
+      className="mt-8 bg-white overflow-hidden shadow rounded-lg"
+    >
       <div className="px-4 py-5 sm:p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">
+        <h2 id="notify-title" className="text-lg font-medium text-gray-900 mb-4">
           Send Notification
         </h2>
         <p className="text-gray-600 mb-4">
@@ -71,6 +89,7 @@ function NotificationSenderForm() {
         </div>
         <div className="flex space-x-3">
           <input
+            ref={messageRef}
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -95,7 +114,7 @@ function NotificationSenderForm() {
         </div>
         {fieldError && <p className="mt-2 text-sm text-red-600">{fieldError}</p>}
       </div>
-    </div>
+    </section>
   );
 }
 

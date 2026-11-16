@@ -1744,6 +1744,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@playwright/test@npm:^1.65.1":
+  version: 1.65.1
+  resolution: "@playwright/test@npm:1.65.1"
+  dependencies:
+    playwright: "npm:1.65.1"
+  bin:
+    playwright: cli.js
+  checksum: 10c0/f3c0c6ce1d426c84c2ee370e7b7a81fcd4a7a8eaa9d51a880ec853e98ce437482772a09c58c7fbb4444002b127068f076458bec99cecca60c3b51e9ba93e2cc6
+  languageName: node
+  linkType: hard
+
 "@poppinss/colors@npm:^4.1.5":
   version: 4.1.6
   resolution: "@poppinss/colors@npm:4.1.6"
@@ -5548,6 +5559,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"playwright-core@npm:1.65.1":
+  version: 1.65.1
+  resolution: "playwright-core@npm:1.65.1"
+  bin:
+    playwright-core: cli.js
+  checksum: 10c0/4406d4f8eff668a93aaada8382d25fcce8da5f679e9f31311888178d631ed0270eb40c0288129e41e15709c957a31932cac9753fdb332547a19bc3541d317e44
+  languageName: node
+  linkType: hard
+
+"playwright@npm:1.65.1":
+  version: 1.65.1
+  resolution: "playwright@npm:1.65.1"
+  dependencies:
+    playwright-core: "npm:1.65.1"
+  bin:
+    playwright: cli.js
+  checksum: 10c0/30ce029c9fb2a6e88cf81b150b978fd60edb59b8af5a6460f5576f0fe6e2bb739454109f0ce4904eac63cb2cf10390518d7d71d335fd695b5897734a5af7250d
+  languageName: node
+  linkType: hard
+
 "postcss-selector-parser@npm:^7.1.0":
   version: 7.2.1
   resolution: "postcss-selector-parser@npm:7.2.1"
@@ -5756,6 +5787,7 @@ __metadata:
     "@eslint-react/eslint-plugin": "npm:^5.30.2"
     "@eslint/js": "npm:^10.0.1"
     "@hookform/resolvers": "npm:^7.0.6"
+    "@playwright/test": "npm:^1.65.1"
     "@rephi/shared-components": "workspace:*"
     "@tailwindcss/vite": "npm:^4.3.5"
     "@tanstack/react-query": "npm:^5.107.1"
@@ -5793,6 +5825,7 @@ __metadata:
     "@eslint-react/eslint-plugin": "npm:^5.30.2"
     "@eslint/js": "npm:^10.0.1"
     "@hookform/resolvers": "npm:^7.0.6"
+    "@playwright/test": "npm:^1.65.1"
     "@rephi/shared-components": "workspace:*"
     "@tailwindcss/postcss": "npm:^4.3.5"
     "@tanstack/react-query": "npm:^5.107.1"

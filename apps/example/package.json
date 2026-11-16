@@ -9,7 +9,8 @@
     "clean": "rm -rf dist",
     "lint": "eslint . --cache --cache-location ./node_modules/.cache/eslint/",
     "preview": "vite preview",
-    "typecheck": "tsc"
+    "typecheck": "tsc && tsc -p e2e/tsconfig.json",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.6",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@eslint-react/eslint-plugin": "^5.30.2",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^26.6.6",
     "@types/phoenix": "^1.6.8",

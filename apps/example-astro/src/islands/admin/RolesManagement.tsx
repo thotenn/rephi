@@ -5,6 +5,7 @@ import { describeError, getErrorMessage, usePermissions } from "~/lib/rephi";
 import IslandProviders from "~/components/react/IslandProviders";
 import { ErrorAlert, Pagination } from "~/components/react";
 import { ADMIN_PAGE_SIZE, adminKeys, rolesApi } from "~/lib/api/admin";
+import { NEW_RECORD_PARAM } from "~/lib/routes";
 import type { Role } from "~/types/admin.types";
 import SlugRecordModal, { type SlugRecordValues } from "./shared/SlugRecordModal";
 import { roleSlugFromName, validateRoleSlug } from "./shared/slugs";
@@ -13,11 +14,24 @@ import RolesTable from "./RolesTable";
 
 type Editing = { mode: "create" } | { mode: "edit"; role: Role } | null;
 
+const createRequested = () =>
+  new URLSearchParams(window.location.search).get(NEW_RECORD_PARAM) === "1";
+
+function forgetCreateRequest() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(NEW_RECORD_PARAM)) return;
+  url.searchParams.delete(NEW_RECORD_PARAM);
+  // Astro's client router keeps its own data in history.state.
+  window.history.replaceState(window.history.state, "", url);
+}
+
 function RolesManagementScreen() {
   const queryClient = useQueryClient();
   const { can } = usePermissions();
   const [page, setPage] = useState(1);
-  const [editing, setEditing] = useState<Editing>(null);
+  const [editing, setEditing] = useState<Editing>(() =>
+    createRequested() && can("roles:create") ? { mode: "create" } : null
+  );
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -34,7 +48,7 @@ function RolesManagementScreen() {
       editing?.mode === "edit" ? rolesApi.update(editing.role.id, values) : rolesApi.create(values),
     onSuccess: (role) => {
       toast.success(editing?.mode === "edit" ? `Role "${role.name}" updated` : `Role "${role.name}" created`);
-      setEditing(null);
+      closeForm();
       invalidate();
     },
   });
@@ -52,6 +66,11 @@ function RolesManagementScreen() {
   const openForm = (next: Editing) => {
     save.reset();
     setEditing(next);
+  };
+
+  const closeForm = () => {
+    setEditing(null);
+    forgetCreateRequest();
   };
 
   const handleDelete = (role: Role) => {
@@ -111,7 +130,7 @@ function RolesManagementScreen() {
               ? { ...editing.role, description: editing.role.description ?? "" }
               : null
           }
-          onClose={() => setEditing(null)}
+          onClose={closeForm}
           onSubmit={(values) => save.mutate(values)}
           submitting={save.isPending}
           serverFieldErrors={saveError?.fieldErrors ?? {}}

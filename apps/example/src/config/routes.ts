@@ -38,6 +38,14 @@ export const ROUTE_PATHS = {
   },
 } as const;
 
+export const NEW_RECORD_PARAM = "new";
+export const NOTIFY_HASH = "#notify";
+
+export const QUICK_LINKS = {
+  newRole: `${ROUTE_PATHS.admin.roles}?${NEW_RECORD_PARAM}=1`,
+  sendNotification: `${ROUTE_PATHS.home}${NOTIFY_HASH}`,
+} as const;
+
 /** Permission that opens each admin screen (and its entry in the Admin menu). */
 export const ADMIN_PERMISSIONS = {
   users: "users:view",

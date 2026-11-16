@@ -22,3 +22,7 @@ node_modules/
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Playwright output
+e2e/.results
+e2e/.report

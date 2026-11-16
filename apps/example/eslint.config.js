@@ -9,10 +9,13 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+const tsconfigRootDir = import.meta.dirname;
+
 export default defineConfig([
-  globalIgnores(["dist"]),
+  globalIgnores(["dist", "e2e/.results"]),
   {
     files: ["**/*.{ts,tsx}"],
+    ignores: ["e2e/**", "playwright.config.ts"],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,
@@ -26,10 +29,11 @@ export default defineConfig([
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.browser,
+      parserOptions: { tsconfigRootDir },
     },
     settings: {
       // Resolves the `~/*` alias and workspace packages through tsconfig.json.
-      "import-x/resolver-next": [createTypeScriptImportResolver()],
+      "import-x/resolver-next": [createTypeScriptImportResolver({ project: `${tsconfigRootDir}/tsconfig.json` })],
     },
     rules: {
       // eslint-plugin-react-hooks (maintained by the React team) owns the hooks
@@ -46,10 +50,28 @@ export default defineConfig([
     },
   },
   {
+    files: ["e2e/**/*.ts", "playwright.config.ts"],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      importX.flatConfigs.recommended,
+      importX.flatConfigs.typescript,
+    ],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node,
+      parserOptions: { tsconfigRootDir },
+    },
+    settings: {
+      "import-x/resolver-next": [createTypeScriptImportResolver({ project: `${tsconfigRootDir}/e2e/tsconfig.json` })],
+    },
+  },
+  {
     files: ["*.config.{js,ts}"],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: {
       globals: globals.node,
+      parserOptions: { tsconfigRootDir },
     },
   },
 ]);

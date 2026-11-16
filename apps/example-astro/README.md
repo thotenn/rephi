@@ -52,6 +52,7 @@ islands, and each one states how it is loaded:
 | `LogoutButton` | `client:load` | Same markup for everyone: prerendered (no layout shift), hydrated at once. |
 | `AdminMenu` | `client:only` | Lists the admin screens the user has the permissions for, which is known in the browser only. |
 | `UserInfoCard` | `client:only` | Shows the signed-in user (roles, permissions). |
+| `QuickActions` | `client:only` | Dashboard shortcuts, each shown only with the permissions its target needs. |
 | `NotificationSender` | `client:only` | Only for users with `notifications:broadcast`; shows the live state of the socket. |
 | `RealtimeHint` | `client:only` | One line with the state of the live notifications. |
 | `ChangePasswordForm` | `client:only` | Profile page; only makes sense with a session. |
@@ -61,7 +62,7 @@ islands, and each one states how it is loaded:
 `localStorage`, so at build time the only possible render is the signed-out one, which would be
 shipped for nothing and then replaced in the browser.
 
-The dashboard page, the header, the active navigation link, page titles and the 404 page are
+The dashboard page (except its quick actions), the header, the active navigation link, page titles and the 404 page are
 plain Astro and ship no JavaScript of their own.
 
 ### Navigation
@@ -168,10 +169,37 @@ Other scripts (run them with `yarn workspace rephi-example-astro <script>`):
 | `clean` | Removes `dist/` and the generated `.astro/` folder |
 | `pages:dev` | Serves `dist/` with the local Cloudflare Pages emulator |
 | `pages:deploy` | Uploads `dist/` to Cloudflare Pages |
+| `e2e` | Playwright end-to-end tests (see [End-to-end tests](#end-to-end-tests)) |
 
-In development, Astro's client router loads the next page in a hidden iframe when it contains
-`client:only` islands, to collect their styles. That is why a page may request its data twice
-while navigating in dev. It does not happen in a production build.
+### Dev server vs. production build
+
+The dev server is not representative of the site's speed. Vite serves every source file and
+dependency as a separate, unbundled module (about 80 requests and 10 MB, source maps included, on
+the first page), revalidates them, and Astro's dev toolbar adds its own. A client-side navigation
+then only requests the HTML of the next page and the modules that page has not loaded yet.
+
+Astro's client router would also load every next page a second time in development, in a hidden
+iframe, to collect styles injected by `client:only` islands (every page here has some). That
+doubled each navigation (one more document, 50 to 80 module requests, and the page's API calls).
+The islands of this app import no CSS, so `src/lib/dev-navigation.ts` replaces the router's
+loader in development with one that only fetches the HTML. If an island ever imports a CSS file,
+remove that script from `BaseLayout.astro` (or import the CSS from the page instead).
+
+The production build is what users get: bundled, minified chunks with a content hash in their
+name, shared between pages (React, the shared library, the forms code), and served with
+`Cache-Control: public, max-age=31536000, immutable` (`public/_headers`). After the first page,
+a navigation downloads only the chunks of islands not seen yet, then nothing at all: the page's
+HTML (about 1 kB) is the only request. To see it, compare the Network tab (cache enabled) of:
+
+```bash
+yarn example-astro:dev                              # http://localhost:4321
+
+yarn example-astro:build
+yarn workspace rephi-example-astro pages:dev        # http://localhost:8788
+```
+
+The `pages:dev` site needs its origin on the backend's CORS list (the development defaults
+include `http://localhost:8788`).
 
 ## Environment variables
 
@@ -362,3 +390,45 @@ yarn workspace rephi-example-astro typecheck
 ```
 
 Both also run as part of `yarn lint` and `yarn typecheck` at the repository root.
+
+## End-to-end tests
+
+`e2e/` holds a [Playwright](https://playwright.dev) suite that drives the site in Chrome against
+a running backend: sign-in and sign-out, the dashboard quick actions, the admin screens, a
+"no dead controls" pass that clicks every safe control of every page, and a performance check
+(on a production build: navigations go through the client router and re-download no
+JavaScript; on the dev server: no page is loaded twice).
+
+The tests create the users and roles they need through the API and delete them afterwards, so
+point them at a throwaway database. They sign in more often than the rate limiter allows, so the
+backend runs with `RATE_LIMIT_ENABLED=false`, and the site's origin must be on its CORS list:
+
+```bash
+# Backend, on a database of its own
+DB_NAME=rephi_e2e mix ecto.setup
+DB_NAME=rephi_e2e PORT=4110 RATE_LIMIT_ENABLED=false \
+  CORS_ORIGINS=http://localhost:4401,http://localhost:4402 mix phx.server
+
+# Against the dev server
+cd apps/example-astro
+PUBLIC_API_URL=http://localhost:4110/api PUBLIC_WS_URL=ws://localhost:4110/socket \
+  npx astro dev --port 4401
+yarn example-astro:e2e                                   # from the repository root
+
+# Against the production build, served the way Cloudflare Pages serves it
+PUBLIC_API_URL=http://localhost:4110/api PUBLIC_WS_URL=ws://localhost:4110/socket \
+  yarn example-astro:build
+yarn workspace rephi-example-astro pages:dev --port 4402
+E2E_BASE_URL=http://localhost:4402/ yarn example-astro:e2e
+```
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `E2E_BASE_URL` | `http://localhost:4401/` | The site under test |
+| `E2E_API_URL` | `http://localhost:4110/api` | The API the tests create their data with |
+| `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` | the development seed (`admin@admin.com`) | An administrator |
+| `E2E_BROWSER_CHANNEL` | `chrome` (the installed Google Chrome) | `msedge`, or `chromium` for Playwright's own build (`npx playwright install chromium`) |
+| `E2E_HEADED` | unset | `1` shows the browser |
+
+Arguments go to Playwright: `yarn example-astro:e2e dashboard` runs one file, `--ui` opens its
+UI. Failures leave a screenshot and a trace in `e2e/.results/`.

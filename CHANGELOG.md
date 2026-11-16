@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Both example apps: a Parent roles / Child roles section in the role detail, a Permissions modal
   and a Reset password action (with the temporary password shown once and a copy button) in the
   users screen, and a user who must change the password is kept on the profile page
+- **Browser tests of `apps/example`** - a Playwright suite (`apps/example/e2e/`, `yarn example:e2e`)
+  covering sign-in, registration, logout, password change, the dashboard quick actions, the
+  administration screens on throwaway data and a "no dead controls" check that clicks every link
+  and button of every page. Optional CI workflow `e2e-example.yml`
+- **Browser tests of `apps/example-astro`** - the same kind of Playwright suite
+  (`apps/example-astro/e2e/`, `yarn example-astro:e2e`), plus a performance check: on a production
+  build a navigation goes through the client router and downloads no JavaScript twice
 
 ### Changed
 - **API documentation in OpenAPI 3.0** (`open_api_spex` 3.22) instead of Swagger 2.0
@@ -91,6 +98,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The stored target is now resolved the way the browser does before it is followed, so
   `/\evil.example`, a path with a tab or newline, or `..` segments that leave `ASTRO_BASE` are
   ignored too
+- **Dashboard quick actions (`apps/example`)** - "Create New Item" and "View Reports" did nothing.
+  They are now links, each shown only with the permissions it needs: "New role" (opens the
+  create-role form), "Send notification" (the broadcast form, message field focused), "Manage
+  users" and "My profile"
+- **`apps/example`** - "Go Back" on the access-denied page did nothing (or left the app) on a page
+  opened directly; it now goes home. The error page (including unknown paths) links back home
+- **`apps/example`** - ESLint resolves its TypeScript config and `~/` imports when run from the
+  repository root, as an editor does
+- **Dashboard quick actions and "Go Back" (`apps/example-astro`)** - the same fixes as in
+  `apps/example`
+- **`apps/example-astro`** - the sign-in and registration forms could be submitted before their
+  island was hydrated, which sent the password in the URL; their buttons (and Logout) stay
+  disabled until then
+- **`apps/example-astro` dev server** - each navigation loaded the next page twice (Astro renders
+  pages with `client:only` islands again in a hidden iframe), with all its modules and API calls;
+  and the first page view could trigger a dependency re-optimization and a full reload. A
+  navigation now requests only the next page's HTML and its new modules
+- **`apps/example-astro`** - ESLint resolves its TypeScript config and `~/` imports when run from
+  the repository root
 
 ### Upgrading
 - Run the migrations (`20261116140000`, `20261116140100`), then seed again (`bin/seed` or

@@ -77,5 +77,10 @@ const homeUrl = href(ROUTES.home);
                       and visible toasts are not lost while navigating.
     */}
     <AppRuntime client:only="react" transition:persist="app-runtime" />
+    <script>
+      import { skipDevIframePreload } from "~/lib/dev-navigation";
+
+      if (import.meta.env.DEV) skipDevIframePreload();
+    </script>
   </body>
 </html>
