@@ -1,17 +1,5 @@
 #!/usr/bin/env bash
-#
-# Sets up a development environment, from a fresh clone or again after a pull:
-#
-#   1. checks the toolchain: Elixir and Erlang/OTP (the versions in
-#      .tool-versions are the minimums), Node.js (`engines` in package.json),
-#      Yarn 4 through Corepack, and that PostgreSQL answers;
-#   2. writes the development secrets into .env (scripts/dev_env.exs);
-#   3. `mix setup`: dependencies, database, migrations, seeds;
-#   4. installs the frontend dependencies and builds shared-components and
-#      every app into priv/static/apps.
-#
-# Safe to run again: nothing that exists is overwritten. Works from any
-# directory. Every failure stops the script with its own error.
+# Sets up the development environment from a fresh clone or after a pull. Safe to run again.
 
 set -euo pipefail
 
@@ -41,7 +29,6 @@ version_ge() {
   return 0
 }
 
-# tool_version NAME: the version of NAME in .tool-versions, if any.
 tool_version() {
   awk -v tool="$1" '$1 == tool { print $2; exit }' .tool-versions 2>/dev/null || true
 }
@@ -61,8 +48,6 @@ setting() {
 
 export MIX_ENV="${MIX_ENV:-dev}"
 [ "$MIX_ENV" = "dev" ] || fail "setup.sh prepares the development environment, but MIX_ENV is $MIX_ENV."
-
-# --- 1. Toolchain ------------------------------------------------------------
 
 step "Checking the toolchain"
 
@@ -91,8 +76,7 @@ node_version="${node_version%%-*}"
 version_ge "$node_version" "$node_min" || fail "Node.js $node_min or newer is required (found $node_version)."
 echo "Node.js $node_version"
 
-# Yarn comes from Corepack, pinned by "packageManager" in package.json. Node.js
-# 25 and newer no longer ship Corepack.
+# Node.js 25+ no longer ships Corepack.
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 yarn_major() { "$@" --version 2>/dev/null | cut -d. -f1; }
 if command -v yarn >/dev/null 2>&1 && [ "$(yarn_major yarn)" = "4" ]; then
@@ -113,17 +97,11 @@ else
   note "pg_isready not found; the database step below will report if PostgreSQL is unreachable."
 fi
 
-# --- 2. Development secrets --------------------------------------------------
-
 step "Writing the development secrets (.env)"
 elixir scripts/dev_env.exs
 
-# --- 3. Phoenix ----------------------------------------------------------------
-
 step "Setting up Phoenix: dependencies, database, seeds (mix setup)"
 mix setup
-
-# --- 4. Frontends --------------------------------------------------------------
 
 step "Installing the frontend dependencies"
 "${YARN[@]}" install
@@ -133,8 +111,6 @@ step "Building shared-components"
 
 step "Building the frontend apps into priv/static/apps"
 "${YARN[@]}" build
-
-# --- Done ------------------------------------------------------------------------
 
 port="$(setting PORT 4000)"
 

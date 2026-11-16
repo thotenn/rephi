@@ -1,6 +1,5 @@
 #!/bin/sh
-# Default roles, permissions and the first administrator (ADMIN_EMAIL and
-# ADMIN_PASSWORD). Idempotent: safe to run after every upgrade.
+# Idempotent: safe to run after every upgrade.
 set -eu
 
 cd -P -- "$(dirname -- "$0")"

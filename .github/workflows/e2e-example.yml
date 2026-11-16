@@ -1,6 +1,3 @@
-# Optional: not a required check. Browser tests of apps/example against a real
-# API on a throwaway Postgres (see apps/example/e2e/README.md). Uses the
-# runner's Google Chrome.
 name: E2E (example)
 
 on:

@@ -1,16 +1,4 @@
-# Writes the development secrets into `.env` (git-ignored):
-#
-#     elixir scripts/dev_env.exs
-#
-# `./setup.sh` runs it. It creates `.env` with a new SECRET_KEY_BASE and
-# GUARDIAN_SECRET_KEY when the file does not exist, and adds whichever of the
-# two is missing when it does. Values already set are never changed, and the
-# values are never printed.
-#
-# Development also boots without them (config/dev.exs has defaults); a
-# `.env` of your own keeps your local sessions and tokens signed with keys
-# that are not in the repository. Production never reads `.env`: see
-# `.env.example` for the variables a release needs.
+# Writes development secrets into `.env` (run by ./setup.sh); never changes or prints existing values.
 
 defmodule DevEnv do
   @keys ~w(SECRET_KEY_BASE GUARDIAN_SECRET_KEY)
@@ -35,9 +23,7 @@ defmodule DevEnv do
     end
   end
 
-  # Whether `.env` assigns a non-empty value to `key` (`KEY=value`, with an
-  # optional `export `). An empty value counts as not set, as it does for the
-  # loader in config/dotenv.exs.
+  # An empty value counts as unset, as in config/dotenv.exs.
   defp set?(contents, key) do
     contents =~ ~r/^\s*(export\s+)?#{key}\s*=\s*[^\s#]/m
   end
@@ -52,7 +38,6 @@ defmodule DevEnv do
 
   defp assignments(keys), do: Enum.map_join(keys, &"#{&1}=#{secret()}\n")
 
-  # 64 characters, like `mix phx.gen.secret`.
   defp secret do
     48 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 64)
   end

@@ -3,21 +3,13 @@
 const fs = require('fs');
 const path = require('path');
 
-// Replaces `target` with a copy of `source`. The destination is removed first,
-// so hashed assets of earlier builds do not pile up in priv/static/apps.
+// Removed first so hashed assets of earlier builds do not pile up.
 function replaceDirectory(source, target) {
   fs.rmSync(target, { recursive: true, force: true });
   fs.cpSync(source, target, { recursive: true });
 }
 
-// Reads the optional "rephi" field of an app's package.json:
-//
-//   "rephi": { "copyToPhoenix": false }
-//
-// `copyToPhoenix: false` keeps the app out of priv/static/apps. Use it for apps
-// that are deployed elsewhere (a CDN, Cloudflare Pages...) or built for a base
-// path other than /app/<name>, which is where the Phoenix FrontendAppPlug
-// serves them (single-page apps and multi-page sites alike).
+// `"rephi": { "copyToPhoenix": false }` in an app's package.json keeps it out of priv/static/apps.
 function readAppConfig(appDir) {
   const packageJsonPath = path.join(appDir, 'package.json');
 
@@ -33,8 +25,7 @@ function readAppConfig(appDir) {
   }
 }
 
-// `--app <name>` (repeatable) copies only the named apps, including the ones
-// that opted out with `copyToPhoenix: false`.
+// `--app <name>` (repeatable) also copies apps that opted out of priv/static/apps.
 function parseRequestedApps(argv) {
   const requested = [];
 
