@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
-import { api, describeError, usePermissions } from "~/lib/rephi";
-import IslandProviders from "~/components/react/IslandProviders";
+import {
+  broadcastNotification,
+  describeError,
+  sendTestNotification,
+  usePermissions,
+} from "~/lib/rephi";
+import IslandProviders, { queryClient } from "~/components/react/IslandProviders";
+import { dashboardKey } from "~/lib/api/dashboard";
 import { useRealtimeConnected } from "~/lib/realtime";
 import { NOTIFY_HASH } from "~/lib/routes";
 
-/** Permission the server requires to broadcast. */
 const BROADCAST_PERMISSION = "notifications:broadcast";
 const MAX_MESSAGE_LENGTH = 500;
+const DEFAULT_TEST_MESSAGE = "This is a test notification";
 
 /**
- * Broadcasts a notification to every connected user. Only rendered for users
- * with `notifications:broadcast`; incoming notifications are shown by
- * the `AppRuntime` island, not here.
+ * Sends notifications: to every connected user (with `notifications:broadcast`) or, for
+ * anyone, a test to the user's own tabs. Incoming ones are shown by the `AppRuntime` island.
  */
 function NotificationSenderForm() {
   const { can } = usePermissions();
@@ -21,46 +26,65 @@ function NotificationSenderForm() {
   const [text, setText] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const messageRef = useRef<HTMLInputElement>(null);
-  const allowed = can(BROADCAST_PERMISSION);
+  const canBroadcast = can(BROADCAST_PERMISSION);
 
   // The client router may set the hash after this island mounts.
   useEffect(() => {
-    if (!allowed) return;
+    if (!canBroadcast) return;
     const focusIfRequested = () => {
       if (window.location.hash === NOTIFY_HASH) messageRef.current?.focus();
     };
     focusIfRequested();
     document.addEventListener("astro:page-load", focusIfRequested);
     return () => document.removeEventListener("astro:page-load", focusIfRequested);
-  }, [allowed]);
+  }, [canBroadcast]);
 
-  const send = useMutation({
-    mutationFn: (message: string) => api.post("/notifications/broadcast", { message }),
-    onSuccess: () => {
-      setText("");
-      toast.success("Notification sent!");
-    },
-    onError: (error) => {
-      const { message, fieldErrors } = describeError(error, "Failed to send notification");
-      if (fieldErrors.message) {
-        setFieldError(`Message ${fieldErrors.message.join(", ")}`);
-      } else {
-        toast.error(message);
-      }
-    },
+  const onError = (error: unknown) => {
+    const { message, fieldErrors } = describeError(error, "Failed to send notification");
+    if (fieldErrors.message) {
+      setFieldError(`Message ${fieldErrors.message.join(", ")}`);
+    } else {
+      toast.error(message);
+    }
+  };
+
+  const onSent = (feedback: string) => {
+    setText("");
+    toast.success(feedback);
+    void queryClient.invalidateQueries({ queryKey: dashboardKey });
+  };
+
+  const broadcast = useMutation({
+    mutationFn: broadcastNotification,
+    onSuccess: () => onSent("Notification sent!"),
+    onError,
   });
 
-  if (!allowed) return null;
+  const selfTest = useMutation({
+    mutationFn: sendTestNotification,
+    onSuccess: () => onSent("Test notification sent to you"),
+    onError,
+  });
 
-  const submit = () => {
+  const pending = broadcast.isPending || selfTest.isPending;
+
+  const submitBroadcast = () => {
     setFieldError(null);
     const message = text.trim();
     if (!message) {
       setFieldError("Please enter a notification message");
       return;
     }
-    send.mutate(message);
+    broadcast.mutate(message);
   };
+
+  const submitSelfTest = () => {
+    setFieldError(null);
+    selfTest.mutate(text.trim() || DEFAULT_TEST_MESSAGE);
+  };
+
+  const buttonClass =
+    "inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
     <section
@@ -73,43 +97,56 @@ function NotificationSenderForm() {
           Send Notification
         </h2>
         <p className="text-gray-600 mb-4">
-          Send a notification to all connected users
+          {canBroadcast
+            ? "Send a notification to all connected users, or a test only to yourself."
+            : "Send a test notification to yourself: only your own open tabs receive it. Sending to everyone requires the notifications:broadcast permission."}
         </p>
         <div className="mb-4">
           <span
             data-testid="realtime-status"
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-              connected
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
+              connected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
             }`}
           >
             {connected ? "🟢 Connected" : "🔴 Disconnected"}
           </span>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap gap-3">
           <input
             ref={messageRef}
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Enter notification message"
+            placeholder={canBroadcast ? "Enter notification message" : DEFAULT_TEST_MESSAGE}
             aria-label="Notification message"
             aria-invalid={fieldError ? true : undefined}
             maxLength={MAX_MESSAGE_LENGTH}
             className="flex-1 min-w-0 block w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black"
-            disabled={send.isPending}
+            disabled={pending}
             onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
+              if (e.key === "Enter") {
+                if (canBroadcast) submitBroadcast();
+                else submitSelfTest();
+              }
             }}
           />
+          {canBroadcast && (
+            <button
+              type="button"
+              onClick={submitBroadcast}
+              disabled={pending}
+              className={`${buttonClass} border-transparent text-white bg-indigo-600 hover:bg-indigo-700`}
+            >
+              {broadcast.isPending ? "Sending..." : "Send"}
+            </button>
+          )}
           <button
             type="button"
-            onClick={submit}
-            disabled={send.isPending}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={submitSelfTest}
+            disabled={pending}
+            className={`${buttonClass} border-gray-300 text-gray-700 bg-white hover:bg-gray-50`}
           >
-            {send.isPending ? "Sending..." : "Send"}
+            {selfTest.isPending ? "Sending..." : "Send a test to myself"}
           </button>
         </div>
         {fieldError && <p className="mt-2 text-sm text-red-600">{fieldError}</p>}

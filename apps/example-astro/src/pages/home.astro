@@ -11,8 +11,8 @@ import AppLayout from "~/layouts/AppLayout.astro";
   <UserInfoCard client:only="react" />
 
   {/*
-    client:only - rendered only for users with `notifications:broadcast`, and
-    it displays the live socket state; neither is known at build time.
+    client:only - what it offers depends on the user's permissions, and it
+    displays the live socket state; neither is known at build time.
   */}
   <NotificationSender client:only="react" />
 

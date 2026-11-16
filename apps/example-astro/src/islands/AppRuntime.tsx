@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import { go, isEmbedded } from "~/lib/navigation";
-import { setRealtimeConnected } from "~/lib/realtime";
+import { setOnlineCounts, setRealtimeConnected } from "~/lib/realtime";
 import { isRoute, ROUTES } from "~/lib/routes";
 import {
   fetchMe,
@@ -11,6 +11,7 @@ import {
   PhoenixSocket,
   useAuthStore,
   useChannel,
+  presenceCounts,
   useChannelEvent,
   userTopic,
   type RephiNotification,
@@ -31,16 +32,24 @@ function NotificationToast({ notification }: { notification: RephiNotification }
 /**
  * Joins `user:lobby` (broadcasts) and `user:<id>` (the user's own
  * notifications) and turns their events into toasts. This is the only
- * subscriber in the app, so each notification is shown exactly once.
+ * subscriber in the app, so each notification is shown exactly once. The
+ * lobby's presence (who is online) goes to `~/lib/realtime` for other islands.
  */
 function Notifications({ userId }: { userId: number }) {
   const lobby = useChannel(LOBBY_TOPIC);
   const personal = useChannel(userTopic(userId));
 
+  const online = useMemo(() => presenceCounts(lobby.presences), [lobby.presences]);
+
   useEffect(() => {
     setRealtimeConnected(lobby.connected);
     return () => setRealtimeConnected(false);
   }, [lobby.connected]);
+
+  useEffect(() => {
+    setOnlineCounts(online);
+    return () => setOnlineCounts(null);
+  }, [online]);
 
   const show = useCallback((notification: RephiNotification) => {
     toast.success(<NotificationToast notification={notification} />, {
