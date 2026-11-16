@@ -29,7 +29,10 @@ export default function RouteGuard({ permission, children }: RouteGuardProps) {
 
   const redirectToLogin = useCallback(() => {
     if (arrivedSignedOut) {
-      setRedirectPath(window.location.pathname);
+      // With its query string (`/admin/users/?page=2`), like the SPA. The login
+      // only follows it after `isInternalPath()` (see useAuth.ts).
+      const { pathname, search } = window.location;
+      setRedirectPath(`${pathname}${search}`);
     }
     go(ROUTES.auth.login, { replace: true });
   }, [arrivedSignedOut]);

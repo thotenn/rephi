@@ -5,6 +5,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
+    // vite.config.ts imports "./app.config.ts" with its extension, which
+    // Node's type stripping (Vite's native config loader) requires.
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true,
     "strict": true
   },
   "include": ["vite.config.ts", "app.config.ts"]

@@ -250,8 +250,11 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
     end
   end
 
+  # The templates import "./app.config.ts" (Vite's native config loader needs
+  # the extension); an import without it, from a template of an older version,
+  # works as well.
   defp check_imports_app_config(config, path) do
-    if config =~ ~r/from\s+["']\.\/app\.config(?:\.[mc]?[jt]s)?["']/ do
+    if config =~ ~r/from\s+(["'])\.\/app\.config(?:\.[mc]?[jt]s)?\1/ do
       :ok
     else
       {:error,
