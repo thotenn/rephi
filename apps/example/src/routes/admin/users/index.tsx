@@ -1,132 +1,80 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
+import { getErrorMessage, useAuthStore, usePermissions } from "@rephi/shared-components";
 import Layout from "~/components/bedrock/Layout";
-import { usersApi, rolesApi } from "~/modules/api/admin";
-import type { UserWithAuth, Role } from "~/types/admin.types";
-import UsersTable from "./UsersTable";
+import { ErrorAlert, Pagination } from "~/components/commons";
+import { ADMIN_PAGE_SIZE, adminKeys, usersApi } from "~/modules/api/admin";
+import type { UserWithGrants } from "~/types/admin.types";
+import EditUserModal from "./EditUserModal";
 import UserRolesModal from "./UserRolesModal";
+import UsersTable from "./UsersTable";
 
 export default function UsersManagement() {
-  const [users, setUsers] = useState<UserWithAuth[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<UserWithAuth | null>(null);
-  const [userRoles, setUserRoles] = useState<Role[]>([]);
+  const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const [page, setPage] = useState(1);
+  const [rolesFor, setRolesFor] = useState<UserWithGrants | null>(null);
+  const [editing, setEditing] = useState<UserWithGrants | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadUsers = async () => {
-    try {
-      const response = await usersApi.getAll();
-      setUsers(response.data);
-    } catch {
-      setError("Error loading users");
-    } finally {
-      setLoading(false);
-    }
+  const usersQuery = useQuery({
+    queryKey: adminKeys.usersPage(page),
+    queryFn: () => usersApi.list({ page, page_size: ADMIN_PAGE_SIZE }),
+    placeholderData: keepPreviousData,
+  });
+
+  const remove = useMutation({
+    mutationFn: (user: UserWithGrants) => usersApi.delete(user.id),
+    onSuccess: (_, user) => {
+      toast.success(`User ${user.email} deleted`);
+      if (usersQuery.data?.data.length === 1 && page > 1) setPage(page - 1);
+      queryClient.invalidateQueries({ queryKey: adminKeys.users });
+    },
+    onError: (error) => setActionError(getErrorMessage(error, "Error deleting user")),
+  });
+
+  const handleDelete = (user: UserWithGrants) => {
+    if (!confirm(`Delete the user ${user.email}? This cannot be undone.`)) return;
+    setActionError(null);
+    remove.mutate(user);
   };
-
-  const loadRoles = async () => {
-    try {
-      const response = await rolesApi.getAll();
-      setRoles(response.data);
-    } catch (err) {
-      console.error("Error loading roles:", err);
-    }
-  };
-
-  useEffect(() => {
-    // The loader only sets state after its request settles, which the rule cannot
-    // see through the async call. Moving these fetches to react-query removes this.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadUsers();
-    loadRoles();
-  }, []);
-
-  const loadUserRoles = async (userId: number) => {
-    try {
-      const response = await usersApi.getRoles(userId);
-      setUserRoles(response.data);
-    } catch (err) {
-      console.error("Error loading user roles:", err);
-    }
-  };
-
-  const handleViewUserRoles = async (user: UserWithAuth) => {
-    setSelectedUser(user);
-    await loadUserRoles(user.id);
-  };
-
-  const handleAssignRole = async (roleId: number) => {
-    if (!selectedUser) return;
-
-    try {
-      await usersApi.assignRole(selectedUser.id, roleId);
-      await loadUserRoles(selectedUser.id);
-      await loadUsers(); // Refresh the main list
-    } catch {
-      setError("Error assigning role");
-    }
-  };
-
-  const handleRemoveRole = async (roleId: number) => {
-    if (!selectedUser) return;
-
-    try {
-      await usersApi.removeRole(selectedUser.id, roleId);
-      await loadUserRoles(selectedUser.id);
-      await loadUsers(); // Refresh the main list
-    } catch {
-      setError("Error removing role");
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  const getRoleColor = (roleSlug: string) => {
-    switch (roleSlug) {
-      case "admin":
-        return "bg-red-100 text-red-800";
-      case "manager":
-        return "bg-yellow-100 text-yellow-800";
-      case "user":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  if (loading) {
-    return <div className="flex justify-center p-8">Loading...</div>;
-  }
 
   return (
     <Layout title="User Management">
       <div className="max-w-7xl mx-auto p-6">
+        <ErrorAlert message={actionError} onDismiss={() => setActionError(null)} />
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
+        {usersQuery.isPending ? (
+          <div className="flex justify-center p-8 text-gray-500">Loading...</div>
+        ) : usersQuery.isError ? (
+          <ErrorAlert message={getErrorMessage(usersQuery.error, "Error loading users")} />
+        ) : (
+          <>
+            <UsersTable
+              users={usersQuery.data.data}
+              currentUserId={currentUserId}
+              canManageRoles={can("roles:assign")}
+              canEdit={can("users:edit")}
+              canDelete={can("users:delete")}
+              onManageRoles={setRolesFor}
+              onEdit={setEditing}
+              onDelete={handleDelete}
+            />
+            <Pagination
+              meta={usersQuery.data.meta}
+              onPageChange={setPage}
+              busy={usersQuery.isPlaceholderData}
+              label="Users pages"
+            />
+          </>
         )}
 
-        <UsersTable
-          users={users}
-          loading={loading}
-          onViewUserRoles={handleViewUserRoles}
-          formatDate={formatDate}
-          getRoleColor={getRoleColor}
-        />
-
-        <UserRolesModal
-          selectedUser={selectedUser}
-          userRoles={userRoles}
-          roles={roles}
-          onClose={() => setSelectedUser(null)}
-          onAssignRole={handleAssignRole}
-          onRemoveRole={handleRemoveRole}
-          getRoleColor={getRoleColor}
-        />
+        {rolesFor && (
+          <UserRolesModal key={rolesFor.id} user={rolesFor} onClose={() => setRolesFor(null)} />
+        )}
+        {editing && <EditUserModal key={editing.id} user={editing} onClose={() => setEditing(null)} />}
       </div>
     </Layout>
   );

@@ -1,12 +1,14 @@
 import type { User } from "@rephi/shared-components";
+import { roleBadgeClass } from "~/utils/roles";
 
 interface UserInfoProps {
   user: User | null;
-  showUpdatedAt?: boolean;
+  /** Also list the effective permissions. */
+  showPermissions?: boolean;
   className?: string;
 }
 
-export default function UserInfo({ user, showUpdatedAt = false, className = "" }: UserInfoProps) {
+export default function UserInfo({ user, showPermissions = false, className = "" }: UserInfoProps) {
   if (!user) {
     return null;
   }
@@ -26,36 +28,42 @@ export default function UserInfo({ user, showUpdatedAt = false, className = "" }
             <dt className="text-sm font-medium text-gray-500">User ID</dt>
             <dd className="mt-1 text-sm text-gray-900">{user.id}</dd>
           </div>
-          {user.created_at && (
-            <div>
-              <dt className="text-sm font-medium text-gray-500">
-                Member Since
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900">
-                {new Date(user.created_at).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </dd>
-            </div>
-          )}
-          {showUpdatedAt && user.updated_at && (
-            <div>
-              <dt className="text-sm font-medium text-gray-500">
-                Last Updated
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900">
-                {new Date(user.updated_at).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </dd>
-            </div>
-          )}
+          <div>
+            <dt className="text-sm font-medium text-gray-500">Roles</dt>
+            <dd className="mt-1 flex flex-wrap gap-1" data-testid="user-roles">
+              {user.roles.length > 0 ? (
+                user.roles.map((role) => (
+                  <span
+                    key={role.id}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass(role.slug)}`}
+                  >
+                    {role.name}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-gray-400">No roles</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm font-medium text-gray-500">Permissions</dt>
+            <dd className="mt-1 text-sm text-gray-900">
+              {showPermissions && user.permissions.length > 0 ? (
+                <span className="flex flex-wrap gap-1">
+                  {user.permissions.map((permission) => (
+                    <code
+                      key={permission.id}
+                      className="bg-gray-100 px-2 py-0.5 rounded text-xs text-gray-700"
+                    >
+                      {permission.slug}
+                    </code>
+                  ))}
+                </span>
+              ) : (
+                user.permissions.length
+              )}
+            </dd>
+          </div>
         </dl>
       </div>
     </div>

@@ -1,11 +1,10 @@
 import { Suspense } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router";
-import { env } from "@rephi/shared-components";
 import App from "./App";
 import { allRoutes, type RouteConfig } from "./config/routes";
 import { ProtectedRoute } from "./components/bedrock/routes/ProtectedRoute";
 import { PublicRoute } from "./components/bedrock/routes/PublicRoute";
-import { AdminRoute } from "./components/bedrock/routes/AdminRoute";
+import { PermissionRoute } from "./components/bedrock/routes/PermissionRoute";
 import RouteLoading from "./components/bedrock/routes/RouteLoading";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -31,11 +30,11 @@ const processRoutes = (routes: RouteConfig[]): RouteObject[] => {
       );
       
       // Wrap with appropriate route protection
-      if (route.meta?.requireAdmin) {
+      if (route.meta?.permission) {
         processedRoute.element = (
-          <AdminRoute>
+          <PermissionRoute permission={route.meta.permission}>
             {element}
-          </AdminRoute>
+          </PermissionRoute>
         );
       } else if (route.meta?.requireAuth) {
         processedRoute.element = (
@@ -72,5 +71,6 @@ export const router = createBrowserRouter([
     children: processRoutes(allRoutes),
   },
 ], {
-  basename: env.APPS.example.basename,
+  // `base` of vite.config.ts ("/app/example/"), without the trailing slash.
+  basename: import.meta.env.BASE_URL.replace(/\/+$/, ""),
 });

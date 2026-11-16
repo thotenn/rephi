@@ -1,27 +1,29 @@
 import { Navigate, useLocation } from "react-router";
-import { ROUTES } from "~/config/routes";
-import { useAuthStore, setRedirectPath } from "@rephi/shared-components";
+import { useAuthStore } from "@rephi/shared-components";
+import { ROUTE_PATHS } from "~/config/routes";
+import type { LoginLocationState } from "~/utils/redirect";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+/**
+ * Renders the page for signed-in users and sends everyone else to the login.
+ *
+ * A visitor who arrives signed out is sent back here after logging in (the
+ * location travels in the navigation state). When the session ends on this
+ * page (logout, expired token) the login starts fresh instead.
+ */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const sessionEndReason = useAuthStore((state) => state.sessionEndReason);
 
   if (!isAuthenticated) {
-    // Save the attempted location
-    if (import.meta.env.DEV) {
-      console.log("ProtectedRoute: Saving redirect path:", location.pathname);
-    }
-    setRedirectPath(location.pathname);
-    
-    // Redirect to login page
-    return <Navigate 
-      to={ROUTES.auth.login} 
-      replace 
-    />;
+    const state: LoginLocationState = sessionEndReason
+      ? { sessionEnded: sessionEndReason }
+      : { from: `${location.pathname}${location.search}` };
+    return <Navigate to={ROUTE_PATHS.auth.login} replace state={state} />;
   }
 
   return <>{children}</>;

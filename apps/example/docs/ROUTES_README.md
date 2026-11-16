@@ -5,12 +5,13 @@
 ```
 src/
 ├── config/
-│   ├── routes.ts              # Configuración principal de rutas
-│   └── routes/
-│       └── modules.example.ts # Ejemplos de módulos de rutas
-├── router.tsx                 # Router principal
+│   └── routes.ts              # Tabla de rutas: ROUTE_PATHS, ADMIN_PERMISSIONS y los arrays de rutas
+├── router.tsx                 # Router principal (guards según `meta`)
 └── routes/                    # Componentes de las páginas
 ```
+
+Las rutas son relativas al `basename` del router (`/app/example`, el `base` de Vite). Ver
+[ROUTER_GUIDE.md](ROUTER_GUIDE.md) para los guards (`requireAuth`, `permission`, `publicOnly`).
 
 ## Cómo Agregar Nuevas Rutas
 
@@ -22,7 +23,7 @@ Edita `src/config/routes.ts` y agrega tu ruta en la sección correspondiente:
 // En la sección dashboardRoutes
 {
   path: "nueva-pagina",
-  element: lazy(() => import("../routes/nueva-pagina")),
+  element: lazy(() => import("~/routes/nueva-pagina")),
   meta: {
     title: "Nueva Página",
     requireAuth: true,
@@ -38,11 +39,11 @@ Edita `src/config/routes.ts` y agrega tu ruta en la sección correspondiente:
   children: [
     {
       index: true,
-      element: lazy(() => import("../routes/seccion/index")),
+      element: lazy(() => import("~/routes/seccion/index")),
     },
     {
       path: "subseccion",
-      element: lazy(() => import("../routes/seccion/subseccion")),
+      element: lazy(() => import("~/routes/seccion/subseccion")),
     },
   ],
 }
@@ -56,7 +57,7 @@ Para secciones grandes, crea un archivo separado:
 
 ```typescript
 import { lazy } from "react";
-import type { RouteConfig } from "../routes";
+import type { RouteConfig } from "~/config/routes";
 
 export const miModuloRoutes: RouteConfig[] = [
   {
@@ -84,27 +85,27 @@ export const allRoutes: RouteConfig[] = [
 
 ## Navegación
 
-### Usando las constantes ROUTES
+### Usando las constantes ROUTE_PATHS
 
 ```typescript
-import { ROUTES } from "~/router";
 import { Link } from "react-router";
+import { ROUTE_PATHS } from "~/config/routes";
 
 // En tu componente
-<Link to={ROUTES.dashboard.profile}>Ir al Perfil</Link>
+<Link to={ROUTE_PATHS.pages.profile}>Ir al Perfil</Link>
 ```
 
 ### Usando navegación programática
 
 ```typescript
 import { useNavigate } from "react-router";
-import { ROUTES } from "~/router";
+import { ROUTE_PATHS } from "~/config/routes";
 
 function MyComponent() {
   const navigate = useNavigate();
-  
+
   const handleClick = () => {
-    navigate(ROUTES.dashboard.home);
+    navigate(ROUTE_PATHS.home);
   };
   
   return <button onClick={handleClick}>Ir a Home</button>;
@@ -117,7 +118,7 @@ function MyComponent() {
 
 ```typescript
 import { lazy } from "react";
-import type { RouteConfig } from "../routes";
+import type { RouteConfig } from "~/config/routes";
 
 export const inventoryRoutes: RouteConfig[] = [
   {
@@ -125,7 +126,7 @@ export const inventoryRoutes: RouteConfig[] = [
     children: [
       {
         index: true,
-        element: lazy(() => import("../../routes/inventario/dashboard")),
+        element: lazy(() => import("~/routes/inventario/dashboard")),
         meta: {
           title: "Dashboard Inventario",
           requireAuth: true,
@@ -133,7 +134,7 @@ export const inventoryRoutes: RouteConfig[] = [
       },
       {
         path: "productos",
-        element: lazy(() => import("../../routes/inventario/productos")),
+        element: lazy(() => import("~/routes/inventario/productos")),
         meta: {
           title: "Productos",
           requireAuth: true,
@@ -141,10 +142,11 @@ export const inventoryRoutes: RouteConfig[] = [
       },
       {
         path: "categorias",
-        element: lazy(() => import("../../routes/inventario/categorias")),
+        element: lazy(() => import("~/routes/inventario/categorias")),
         meta: {
           title: "Categorías",
-          requireAuth: true,
+          // Sólo para quien tenga el permiso (y sesión iniciada).
+          permission: "inventory:manage",
         },
       },
     ],
@@ -165,10 +167,10 @@ export const allRoutes: RouteConfig[] = [
 ];
 ```
 
-3. Agrega las constantes en `src/router.tsx` (opcional):
+3. Agrega las constantes en `ROUTE_PATHS` de `src/config/routes.ts` (opcional):
 
 ```typescript
-export const ROUTES = {
+export const ROUTE_PATHS = {
   // ... rutas existentes
   inventory: {
     home: "/inventario",
@@ -182,9 +184,10 @@ export const ROUTES = {
 
 1. **Lazy Loading**: Siempre usa `lazy()` para cargar componentes
 2. **Organización**: Agrupa rutas relacionadas en módulos
-3. **Metadata**: Incluye `title` y `requireAuth` en meta
-4. **Constantes**: Usa `ROUTES` para evitar strings hardcodeados
-5. **Tipos**: TypeScript te ayudará con autocompletado
+3. **Metadata**: Incluye `title` y `requireAuth` (o `permission`) en meta
+4. **Constantes**: Usa `ROUTE_PATHS` para evitar strings hardcodeados
+5. **Permisos, no roles**: protegé por permiso (`meta.permission`), no por el slug de un rol
+6. **Tipos**: TypeScript te ayudará con autocompletado
 
 ## Estructura de Carpetas Recomendada
 
@@ -197,10 +200,7 @@ src/routes/
 ├── pages/                # Páginas generales
 │   ├── profile/
 │   └── dashboard/
-├── admin/                # Módulo admin
-│   ├── dashboard.tsx
-│   ├── users.tsx
-│   └── settings.tsx
+├── admin/                # Módulo admin (users/, roles/, permissions/)
 └── inventario/           # Módulo inventario
     ├── dashboard.tsx
     ├── productos.tsx
@@ -213,5 +213,8 @@ src/routes/
 - El ErrorBoundary captura errores en cualquier ruta
 - Las rutas públicas no requieren autenticación
 - Las rutas con `requireAuth: true` necesitan que el usuario esté logueado
+- Las rutas con `permission: "x:y"` necesitan además ese permiso; si no, muestran "Access Denied"
+- Una ruta no puede terminar en algo con forma de extensión (`/users/john.doe`): Phoenix la
+  trata como archivo y responde 404
 
 Este sistema te permite mantener las rutas organizadas y escalables mientras el proyecto crece.

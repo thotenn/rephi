@@ -1,244 +1,112 @@
 # Router Configuration Guide
 
-This document explains how to use and extend the new routing system in the Rephi frontend.
+How routing works in `apps/example` and how to extend it.
 
 ## Overview
 
-The routing system has been refactored to be more modular, type-safe, and maintainable. It uses a configuration-based approach that separates route definitions from the router implementation.
+Routes are declared as data in `src/config/routes.ts` and turned into React Router routes by
+`src/router.tsx`, which wraps each page in `Suspense` (lazy loading) and in the guard its `meta`
+asks for. The router's basename is the app's Vite `base` (`/app/example`, from the folder name),
+so every path below is relative to it.
 
 ## File Structure
 
 ```
 src/
 ├── config/
-│   ├── routes.config.ts     # Main route configuration
-│   ├── routes.types.ts      # TypeScript types for routes
-│   └── routes/              # Modular route configurations
-│       └── admin.routes.ts  # Example of modular routes
-├── router.tsx               # Main router setup
-├── components/
-│   └── guards/
-│       └── AuthGuard.tsx    # Route protection component
-└── hooks/
-    └── useAppNavigation.ts  # Navigation utilities
+│   └── routes.ts                # Route table: ROUTE_PATHS, ADMIN_PERMISSIONS, route arrays
+├── router.tsx                   # createBrowserRouter + guards from route meta
+├── App.tsx                      # Root element: socket lifecycle, session events, realtime
+├── components/bedrock/routes/
+│   ├── ProtectedRoute.tsx       # Signed-in users only
+│   ├── PermissionRoute.tsx      # Signed-in users with a given permission
+│   ├── PublicRoute.tsx          # Signed-out visitors only (login, register)
+│   └── RouteLoading.tsx         # Suspense fallback
+└── utils/redirect.ts            # Navigation state of the login page
 ```
 
-## Adding New Routes
+## Adding a Route
 
-### 1. Simple Route
-
-Add a new route to `routes.config.ts`:
+Add an entry to one of the arrays of `src/config/routes.ts` (`publicRoutes`, `authRoutes`,
+`dashboardRoutes`, `adminRoutes`) and, if it is linked from somewhere, its path to `ROUTE_PATHS`:
 
 ```typescript
-{
-  path: "/new-feature",
-  element: lazy(() => import("../routes/new-feature")),
-  flag: RouteFlags.AUTHENTICATED,
-  meta: {
-    title: "New Feature",
-    description: "Description of the new feature",
+// src/config/routes.ts
+export const ROUTE_PATHS = {
+  // ...
+  reports: "/reports",
+} as const;
+
+export const dashboardRoutes: RouteConfig[] = [
+  // ...
+  {
+    path: "reports",
+    element: lazy(() => import("~/routes/reports")),
+    meta: { title: "Reports", requireAuth: true },
   },
-}
-```
-
-### 2. Nested Routes
-
-Add routes with children:
-
-```typescript
-{
-  path: "/section",
-  flag: RouteFlags.AUTHENTICATED,
-  children: [
-    {
-      path: "subsection",
-      element: lazy(() => import("../routes/section/subsection")),
-      flag: RouteFlags.USER,
-      meta: {
-        title: "Subsection",
-      },
-    },
-  ],
-}
-```
-
-### 3. Modular Routes
-
-For large sections, create a separate file in `config/routes/`:
-
-```typescript
-// config/routes/inventory.routes.ts
-export const inventoryRoutes: RouteConfig = {
-  path: "/inventory",
-  flag: RouteFlags.AUTHENTICATED,
-  children: [
-    // ... inventory routes
-  ],
-};
-```
-
-Then import it in `routes.config.ts`:
-
-```typescript
-import { inventoryRoutes } from "./routes/inventory.routes";
-
-export const routeConfigs: RouteConfig[] = [
-  // ... other routes
-  inventoryRoutes,
 ];
 ```
 
-## Route Flags (Permissions)
+### Route meta
 
-Available flags:
-- `RouteFlags.PUBLIC` - Accessible by everyone
-- `RouteFlags.AUTHENTICATED` - Requires login
-- `RouteFlags.USER` - Standard user access
-- `RouteFlags.ADMIN` - Admin access only
+| Key | Effect |
+|---|---|
+| `requireAuth: true` | `ProtectedRoute`: signed-out visitors go to the login page and come back after signing in |
+| `permission: "users:view"` | `PermissionRoute`: signed in **and** holding the permission; others see the access-denied screen |
+| `publicOnly: true` | `PublicRoute`: signed-in users are sent to the page they wanted, or `/home` |
+| `title`, `description` | Free metadata |
 
-## Using Navigation
+Authorize by **permission**, not by role: the session's `permissions` are the effective ones
+(inherited included), while `roles` only lists the roles assigned directly. The admin screens
+use `ADMIN_PERMISSIONS` (`users:view`, `roles:view`, `permissions:view`), and the Admin menu of
+`Header.tsx` shows each entry by the same permission.
 
-### With Hook
+A path must not end in something that looks like a file extension (`/users/john.doe`): Phoenix
+answers those with a 404 instead of the app's `index.html`.
 
-```typescript
-import { useAppNavigation } from "~/hooks/useAppNavigation";
-
-function MyComponent() {
-  const { goToHome, goToProfile, navigateTo } = useAppNavigation();
-  
-  return (
-    <>
-      <button onClick={goToHome}>Home</button>
-      <button onClick={goToProfile}>Profile</button>
-      <button onClick={() => navigateTo("/custom-path")}>Custom</button>
-    </>
-  );
-}
-```
-
-### With Link Component
-
-```typescript
-import { Link } from "react-router";
-import { ROUTES } from "~/router";
-
-function MyComponent() {
-  return (
-    <Link to={ROUTES.dashboard.profile}>Go to Profile</Link>
-  );
-}
-```
-
-## Protected Routes
-
-Routes are automatically protected based on their flags. To manually protect a component:
-
-```typescript
-import { AuthGuard } from "~/components/guards/AuthGuard";
-
-function ProtectedComponent() {
-  return (
-    <AuthGuard>
-      <YourComponent />
-    </AuthGuard>
-  );
-}
-```
-
-## Route Metadata
-
-Add metadata to routes for SEO or other purposes:
+## Nested Routes
 
 ```typescript
 {
-  path: "/about",
-  element: lazy(() => import("../routes/about")),
-  meta: {
-    title: "About Us",
-    description: "Learn more about our company",
-    requiresAuth: false,
-    permissions: ["view_about"],
-  },
+  path: "reports",
+  children: [
+    { index: true, element: lazy(() => import("~/routes/reports/index")), meta: { requireAuth: true } },
+    { path: "monthly", element: lazy(() => import("~/routes/reports/monthly")), meta: { permission: "reports:view" } },
+  ],
 }
+```
+
+## Navigating
+
+```typescript
+import { Link, useNavigate } from "react-router";
+import { ROUTE_PATHS } from "~/config/routes";
+
+<Link to={ROUTE_PATHS.pages.profile}>Profile</Link>;
+
+const navigate = useNavigate();
+navigate(ROUTE_PATHS.home);
+```
+
+Logging in, logging out and losing the session do not navigate by hand: the guards follow the
+auth store (`isAuthenticated`) and redirect, which also covers a sign-out in another tab and a
+token the server revoked.
+
+## Showing Parts of a Page by Permission
+
+```tsx
+import { PermissionGuard, usePermissions } from "@rephi/shared-components";
+
+const { can } = usePermissions();
+{can("roles:create") && <button>Create Role</button>}
+
+<PermissionGuard permissions={["users:delete"]}>
+  <DeleteButton />
+</PermissionGuard>
 ```
 
 ## Error Handling
 
-Custom error boundaries can be added to specific routes:
-
-```typescript
-{
-  path: "/risky-feature",
-  element: lazy(() => import("../routes/risky-feature")),
-  errorElement: <CustomErrorBoundary />,
-}
-```
-
-## Best Practices
-
-1. **Keep routes organized**: Group related routes in modular files
-2. **Use constants**: Define path constants to avoid typos
-3. **Lazy load components**: Always use `lazy()` for better performance
-4. **Add metadata**: Include title and description for better UX
-5. **Set appropriate flags**: Ensure proper access control
-6. **Type safety**: Leverage TypeScript types for route configuration
-
-## Migration from Old Routes
-
-If you need to maintain backward compatibility:
-
-1. Keep the `urls` export in `env.ts`
-2. Update it to reference the new `ROUTES` constants
-3. Gradually migrate components to use `ROUTES` directly
-
-## Examples
-
-### E-commerce Module Routes
-
-```typescript
-// config/routes/ecommerce.routes.ts
-export const ecommerceRoutes: RouteConfig = {
-  path: "/shop",
-  flag: RouteFlags.PUBLIC,
-  children: [
-    {
-      path: "products",
-      element: lazy(() => import("../../routes/shop/products")),
-      flag: RouteFlags.PUBLIC,
-    },
-    {
-      path: "cart",
-      element: lazy(() => import("../../routes/shop/cart")),
-      flag: RouteFlags.AUTHENTICATED,
-    },
-    {
-      path: "checkout",
-      element: lazy(() => import("../../routes/shop/checkout")),
-      flag: RouteFlags.AUTHENTICATED,
-    },
-  ],
-};
-```
-
-### Admin Dashboard Routes
-
-```typescript
-// config/routes/admin.routes.ts
-export const adminRoutes: RouteConfig = {
-  path: "/admin",
-  flag: RouteFlags.ADMIN,
-  element: lazy(() => import("../../routes/admin/layout")),
-  children: [
-    {
-      index: true,
-      element: lazy(() => import("../../routes/admin/dashboard")),
-    },
-    {
-      path: "users",
-      element: lazy(() => import("../../routes/admin/users")),
-    },
-  ],
-};
-```
-
-This new routing system provides better organization, type safety, and scalability for your application.
+`ErrorBoundary` (the router's `errorElement`) catches render errors of every route. Request
+errors are `ApiError`s from `@rephi/shared-components`: show them with `getErrorMessage(error)`
+or `describeError(error)` (which also returns the field errors of a 422).

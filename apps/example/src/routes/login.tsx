@@ -1,31 +1,51 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useLogin } from "../hooks/useAuth";
-import { urls } from "../env";
 import type { LoginCredentials } from "@rephi/shared-components";
+import { ROUTE_PATHS } from "~/config/routes";
+import { useLogin } from "~/hooks/useAuth";
+import { applyServerErrors } from "~/utils/forms";
+import type { LoginLocationState } from "~/utils/redirect";
 
+// No minimum length here: accounts created under older, shorter password
+// rules can still sign in. The rules apply when a password is set.
 const loginSchema = z.object({
   email: z.email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(1, "Password is required"),
 });
+
+const sessionNotices = {
+  logout: "You have been signed out.",
+  unauthorized: "Your session has ended. Please sign in again.",
+} as const;
 
 export default function Login() {
   const location = useLocation();
-  const from = location.state?.from;
+  const state = (location.state ?? {}) as LoginLocationState;
+  const notice = state.sessionEnded
+    ? sessionNotices[state.sessionEnded]
+    : state.from
+      ? "You need to login to access that page."
+      : null;
   const loginMutation = useLogin();
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<LoginCredentials>({
     resolver: zodResolver(loginSchema),
   });
 
   const onSubmit = (data: LoginCredentials) => {
-    loginMutation.mutate(data);
+    setServerError(null);
+    loginMutation.mutate(data, {
+      onError: (error) => setServerError(applyServerErrors(error, setError, ["email", "password"])),
+    });
   };
 
   return (
@@ -38,7 +58,7 @@ export default function Login() {
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{" "}
             <Link
-              to={urls.auth.register}
+              to={ROUTE_PATHS.auth.register}
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
               create a new account
@@ -46,21 +66,16 @@ export default function Login() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          {from && (
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+          {notice && !serverError && (
             <div className="rounded-md bg-blue-50 p-4">
-              <div className="text-sm text-blue-800">
-                You need to login to access that page.
-              </div>
+              <div className="text-sm text-blue-800">{notice}</div>
             </div>
           )}
-          
-          {loginMutation.isError && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-800">
-                {loginMutation.error?.message ||
-                  "An error occurred during login"}
-              </div>
+
+          {serverError && (
+            <div className="rounded-md bg-red-50 p-4" role="alert">
+              <div className="text-sm text-red-800">{serverError}</div>
             </div>
           )}
 

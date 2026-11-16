@@ -53,9 +53,11 @@ export default function Modal({
       ref={dialogRef}
     >
       <div
-        className={`bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative ${
-          className || ""
-        }`}
+        // A caller's own max-w-* replaces the default width instead of
+        // competing with it.
+        className={`bg-white rounded-lg shadow-lg w-full p-6 relative ${
+          className?.includes("max-w-") ? "" : "max-w-lg"
+        } ${className || ""}`}
         role="dialog"
         tabIndex={-1}
       >

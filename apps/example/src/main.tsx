@@ -1,3 +1,5 @@
+// Configures the shared library before anything else can use it.
+import "./lib/rephi";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";

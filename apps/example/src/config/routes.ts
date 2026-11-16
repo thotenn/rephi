@@ -11,11 +11,15 @@ export interface RouteConfig {
     description?: string;
     requireAuth?: boolean;
     publicOnly?: boolean; // For login/register pages
-    requireAdmin?: boolean; // For admin-only pages
+    /** Permission the user needs (e.g. "users:view"); implies requireAuth. */
+    permission?: string;
   };
 }
 
-// Route paths - centralized for easy management
+// Route paths - centralized for easy management. Relative to the router's
+// basename (`/app/example`). A path must not end in something that looks like a
+// file extension (`/users/john.doe`): Phoenix answers those with a 404 instead
+// of the app's index.html.
 export const ROUTE_PATHS = {
   home: "/home",
   auth: {
@@ -27,21 +31,18 @@ export const ROUTE_PATHS = {
     dashboard: "/pages/dashboard",
   },
   admin: {
+    root: "/admin",
     users: "/admin/users",
     roles: "/admin/roles",
     permissions: "/admin/permissions",
   },
 } as const;
 
-// Re-export as ROUTES for backward compatibility
-export const ROUTES = {
-  home: "/",
-  auth: ROUTE_PATHS.auth,
-  dashboard: {
-    home: ROUTE_PATHS.home,
-    main: ROUTE_PATHS.pages.dashboard,
-    profile: ROUTE_PATHS.pages.profile,
-  },
+/** Permission that opens each admin screen (and its entry in the Admin menu). */
+export const ADMIN_PERMISSIONS = {
+  users: "users:view",
+  roles: "roles:view",
+  permissions: "permissions:view",
 } as const;
 
 // Auth routes
@@ -121,17 +122,15 @@ export const adminRoutes: RouteConfig[] = [
         element: lazy(() => import("~/routes/admin/users/index")),
         meta: {
           title: "User Management",
-          requireAuth: true,
-          requireAdmin: true,
+          permission: ADMIN_PERMISSIONS.users,
         },
       },
       {
         path: "roles",
         element: lazy(() => import("~/routes/admin/roles/index")),
         meta: {
-          title: "Roles Management", 
-          requireAuth: true,
-          requireAdmin: true,
+          title: "Roles Management",
+          permission: ADMIN_PERMISSIONS.roles,
         },
       },
       {
@@ -139,8 +138,7 @@ export const adminRoutes: RouteConfig[] = [
         element: lazy(() => import("~/routes/admin/permissions/index")),
         meta: {
           title: "Permissions Management",
-          requireAuth: true,
-          requireAdmin: true,
+          permission: ADMIN_PERMISSIONS.permissions,
         },
       },
     ],

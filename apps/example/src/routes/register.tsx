@@ -1,39 +1,38 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useRegister } from "../hooks/useAuth";
-import { urls } from "../env";
 import type { RegisterCredentials } from "@rephi/shared-components";
+import { ROUTE_PATHS } from "~/config/routes";
+import { useRegister } from "~/hooks/useAuth";
+import { applyServerErrors } from "~/utils/forms";
+import { registrationSchema } from "~/utils/passwords";
 
 type RegisterFormData = RegisterCredentials;
 
-const registerSchema = z
-  .object({
-    email: z.email("Invalid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    password_confirmation: z
-      .string()
-      .min(6, "Password must be at least 6 characters"),
-  })
-  .refine((data) => data.password === data.password_confirmation, {
-    error: "Passwords don't match",
-    path: ["password_confirmation"],
-  });
+const registerSchema = registrationSchema;
 
 export default function Register() {
   const registerMutation = useRegister();
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
 
   const onSubmit = (data: RegisterFormData) => {
-    registerMutation.mutate(data);
+    setServerError(null);
+    registerMutation.mutate(data, {
+      onError: (error) =>
+        setServerError(
+          applyServerErrors(error, setError, ["email", "password", "password_confirmation"])
+        ),
+    });
   };
 
   return (
@@ -46,7 +45,7 @@ export default function Register() {
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{" "}
             <Link
-              to={urls.auth.login}
+              to={ROUTE_PATHS.auth.login}
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
               sign in to your existing account
@@ -54,13 +53,10 @@ export default function Register() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          {registerMutation.isError && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-800">
-                {registerMutation.error?.message ||
-                  "An error occurred during registration"}
-              </div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+          {serverError && (
+            <div className="rounded-md bg-red-50 p-4" role="alert">
+              <div className="text-sm text-red-800">{serverError}</div>
             </div>
           )}
 
