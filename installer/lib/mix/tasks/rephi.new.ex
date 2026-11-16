@@ -1,232 +1,352 @@
 defmodule Mix.Tasks.Rephi.New do
-  @moduledoc """
-  Creates a new Rephi project by cloning from the template repository.
+  @shortdoc "Creates a new Rephi project"
 
-      mix rephi.new PATH [--module MODULE] [--app APP]
+  @moduledoc """
+  Creates a new project from the Rephi template.
+
+      mix rephi.new PATH [--app APP] [--module MODULE] [--no-install] [--no-git]
+
+  The project is created in `PATH` (which must not exist), named after the last
+  segment of the path unless `--app` says otherwise.
 
   ## Examples
 
-      mix rephi.new my_app
-      mix rephi.new my_app --module MyApp --app my_app
+      mix rephi.new acme_hub
+      mix rephi.new ~/code/hub --app acme_hub --module AcmeHub
 
+  ## Options
+
+    * `--app` - the OTP application name (`acme_hub`): lowercase letters,
+      digits and underscores, starting with a letter. Defaults to the last
+      segment of `PATH`.
+    * `--module` - the base module name (`AcmeHub`). Defaults to the camelized
+      application name.
+    * `--no-install` - do not run `mix deps.get` and `mix format` in the new
+      project. The generated code is formatted for the template's names, so
+      run `mix format` after fetching the dependencies yourself.
+    * `--no-git` - do not create a Git repository with an initial commit.
+    * `--from` - where to take the template from: a Git URL or the path of a
+      local clone (its committed `HEAD`). Defaults to #{inspect("https://github.com/thotenn/rephi.git")}.
+    * `--branch` - the branch or tag of the template to use (default: the
+      repository's default branch).
+
+  ## What it does
+
+  It clones the template into a temporary directory next to `PATH`, renames
+  the application and its modules (`rephi` -> APP, `Rephi` -> MODULE, in code,
+  configuration, seeds, migrations, tests and docs; file names too), gives the
+  project its own secrets and salts, writes a README, fetches the
+  dependencies, formats the code, creates the Git repository with an initial
+  commit and only then moves the result to `PATH`. If any step fails, nothing
+  is left behind.
+
+  Kept as they are: `mix rephi.gen.frontend` (the generator keeps its name,
+  like `mix phx.gen.*`), the npm names of the frontend workspaces and URLs.
+  See `RephiNew.Rename`.
+
+  Next, inside the project, `./setup.sh` checks the toolchain, writes a
+  development `.env` with fresh secrets, creates and seeds the database and
+  builds the frontends.
   """
+
   use Mix.Task
 
-  @rephi_repo "https://github.com/thotenn/rephi.git"
-  @requirements []
+  alias RephiNew.{Rename, Secrets}
+
+  @default_source "https://github.com/thotenn/rephi.git"
+
+  @switches [
+    app: :string,
+    module: :string,
+    from: :string,
+    branch: :string,
+    install: :boolean,
+    git: :boolean
+  ]
+
+  # Files and directories of the template that a project does not get.
+  @drop ~w(.git installer LICENSE CHANGELOG.md)
+
+  # Directories copied as they are: the frontends (npm names are kept, see
+  # RephiNew.Rename), dependencies and build output.
+  @verbatim_dirs ~w(apps packages node_modules deps _build .yarn priv/static)
 
   @impl Mix.Task
   def run(argv) do
-    case parse_opts(argv) do
-      {_opts, []} ->
+    case OptionParser.parse(argv, strict: @switches) do
+      {_opts, [], []} ->
         Mix.Tasks.Help.run(["rephi.new"])
 
-      {opts, [path | _]} ->
+      {opts, [path], []} ->
         generate(path, opts)
+
+      {_opts, _args, [{switch, _} | _]} ->
+        fail("Unknown or invalid option #{switch}. See: mix help rephi.new")
+
+      {_opts, _args, []} ->
+        fail("Expected a single PATH. See: mix help rephi.new")
     end
   end
 
-  defp parse_opts(argv) do
-    {opts, args, _} =
-      OptionParser.parse(argv,
-        strict: [
-          app: :string,
-          module: :string
-        ]
-      )
-
-    {opts, args}
+  defp fail(message) do
+    Mix.shell().error(message)
+    exit({:shutdown, 1})
   end
 
   defp generate(path, opts) do
     path = Path.expand(path)
     app = opts[:app] || Path.basename(path)
     module = opts[:module] || Macro.camelize(app)
+    names = %{app: app, module: module}
 
-    Mix.shell().info("""
-    Creating new Rephi project: #{app}
-    Module: #{module}
-    Path: #{path}
-    """)
+    with :ok <- Rename.validate_app(app),
+         :ok <- Rename.validate_module(module),
+         :ok <- check_path(path),
+         {:ok, git} <- find_git() do
+      parent = Path.dirname(path)
+      File.mkdir_p!(parent)
+      suffix = "#{Path.basename(path)}.rephi-new-#{System.unique_integer([:positive])}"
+      clone_dir = Path.join(parent, ".#{suffix}.clone")
+      build_dir = Path.join(parent, ".#{suffix}")
 
-    # Clone the repository
-    Mix.shell().info("Cloning Rephi template...")
-    
-    case System.cmd("git", ["clone", @rephi_repo, path]) do
-      {_, 0} ->
-        File.cd!(path, fn ->
-          # Remove git history
-          File.rm_rf!(".git")
-          System.cmd("git", ["init"])
-          
-          # Update project files
-          update_project_files(app, module)
-          
-          Mix.shell().info("""
-          
-          ✅ Project created successfully!
-          
-          Next steps:
-          
-              cd #{path}
-              
-              # Configure your environment
-              cp .env.example .env
-              # Edit .env with your database credentials
-              
-              # Install and setup
-              mix setup
-              
-              # Start the server
-              mix phx.server
-              
-          Your Rephi application is ready at http://localhost:4000
-          """)
-        end)
-        
-      {error, _} ->
-        Mix.raise("Failed to clone repository: #{error}")
-    end
-  end
-
-  defp update_project_files(app, module) do
-    Mix.shell().info("Updating project configuration...")
-    
-    # Update mix.exs
-    update_mix_exs(app, module)
-    
-    # Update application files
-    update_application_files(app, module)
-    
-    # Update config files
-    update_config_files(app, module)
-    
-    # Clean up
-    File.rm_rf!("installer")
-    File.rm("LICENSE")
-    File.rm("CHANGELOG.md")
-    
-    # Create new README
-    create_readme(app, module)
-  end
-
-  defp update_mix_exs(app, module) do
-    content = File.read!("mix.exs")
-    
-    new_content = content
-    |> String.replace("defmodule Rephi.MixProject", "defmodule #{module}.MixProject")
-    |> String.replace("app: :rephi", "app: :#{app}")
-    |> String.replace("mod: {Rephi.Application", "mod: {#{module}.Application")
-    |> String.replace(~r/@version ".*"/, "@version \"0.1.0\"")
-    |> String.replace(~r/@source_url ".*"/, "@source_url \"https://github.com/yourusername/#{app}\"")
-    |> String.replace(~r/@manteiners \[.*\]/, "@manteiners [\"Your Name\"]")
-    |> String.replace(~r/name: ".*"/, "name: \"#{module}\"")
-    |> String.replace(~r/description\(\)/, "\"#{module} application built with Rephi\"")
-    
-    # Remove hex package info
-    new_content = Regex.replace(~r/# Hex.*?source_url: @source_url,?\n/ms, new_content, "")
-    new_content = Regex.replace(~r/defp package.*?end\n/ms, new_content, "")
-    new_content = Regex.replace(~r/defp docs.*?end\n/ms, new_content, "")
-    
-    File.write!("mix.exs", new_content)
-  end
-
-  defp update_application_files(app, module) do
-    # Update all .ex and .exs files
-    Path.wildcard("{lib,test,config}/**/*.{ex,exs}")
-    |> Enum.each(fn file ->
-      if File.exists?(file) do
-        content = File.read!(file)
-        new_content = content
-        |> String.replace("Rephi", module)
-        |> String.replace("rephi", app)
-        |> String.replace("REPHI", String.upcase(app))
-        
-        File.write!(file, new_content)
+      try do
+        with :ok <- clone(git, opts[:from] || @default_source, opts[:branch], clone_dir),
+             :ok <- build(clone_dir, build_dir, names),
+             :ok <- install(build_dir, Keyword.get(opts, :install, true)),
+             :ok <- init_git(git, build_dir, Keyword.get(opts, :git, true)),
+             :ok <- File.rename(build_dir, path) do
+          Mix.shell().info(next_steps(path, app, Keyword.get(opts, :install, true)))
+        else
+          {:error, message} when is_binary(message) -> fail(message)
+          {:error, reason} -> fail("Could not create #{path}: #{inspect(reason)}")
+        end
+      after
+        File.rm_rf(clone_dir)
+        File.rm_rf(build_dir)
       end
-    end)
-    
-    # Rename directories
-    if File.exists?("lib/rephi") do
-      File.rename!("lib/rephi", "lib/#{app}")
-    end
-    
-    if File.exists?("lib/rephi_web") do
-      File.rename!("lib/rephi_web", "lib/#{app}_web")
-    end
-    
-    if File.exists?("test/rephi") do
-      File.rename!("test/rephi", "test/#{app}")
-    end
-    
-    if File.exists?("test/rephi_web") do
-      File.rename!("test/rephi_web", "test/#{app}_web")
+    else
+      {:error, message} -> fail(message)
     end
   end
 
-  defp update_config_files(app, module) do
-    # Update endpoint references in config
-    Path.wildcard("config/*.exs")
-    |> Enum.each(fn file ->
-      content = File.read!(file)
-      new_content = content
-      |> String.replace("RephiWeb.Endpoint", "#{module}Web.Endpoint")
-      |> String.replace("Rephi.Repo", "#{module}.Repo")
-      |> String.replace("Rephi.Mailer", "#{module}.Mailer")
-      |> String.replace("rephi:", "#{app}:")
-      |> String.replace("ecto_repos: [Rephi.Repo]", "ecto_repos: [#{module}.Repo]")
-      
-      File.write!(file, new_content)
-    end)
+  defp check_path(path) do
+    if File.exists?(path) do
+      {:error, "#{path} already exists. Choose another path or remove it first."}
+    else
+      :ok
+    end
   end
 
-  defp create_readme(_app, module) do
-    readme = """
+  defp find_git do
+    case System.find_executable("git") do
+      nil -> {:error, "Git is required to fetch the template and was not found in the PATH."}
+      git -> {:ok, git}
+    end
+  end
+
+  defp clone(git, source, branch, dir) do
+    Mix.shell().info([:green, "* fetching ", :reset, "the template from #{source}"])
+
+    local? = File.dir?(source)
+    source = if local?, do: Path.expand(source), else: source
+
+    args =
+      ["clone", "--quiet"] ++
+        if(local?, do: [], else: ["--depth", "1"]) ++
+        if(branch, do: ["--branch", branch], else: []) ++ [source, dir]
+
+    case System.cmd(git, args, stderr_to_stdout: true) do
+      {_, 0} -> :ok
+      {output, _} -> {:error, "Could not fetch the template from #{source}:\n#{output}"}
+    end
+  end
+
+  ## Building the project
+
+  defp build(source, target, names) do
+    files =
+      source
+      |> list_files()
+      |> Enum.reject(&dropped?/1)
+
+    renamed =
+      Enum.map(files, fn file ->
+        contents = File.read!(Path.join(source, file))
+
+        if verbatim?(file) or not text?(contents) do
+          {file, contents}
+        else
+          {Rename.path(file, names), Rename.text(contents, names)}
+        end
+      end)
+
+    secret_files = MapSet.new(Secrets.files_in(Enum.map(renamed, &elem(&1, 0))))
+    {with_secrets, others} = Enum.split_with(renamed, &(elem(&1, 0) in secret_files))
+
+    with {:ok, with_secrets} <- Secrets.regenerate(with_secrets) do
+      files = others ++ with_secrets ++ [{"README.md", readme(names)}]
+
+      Enum.each(files, fn {file, contents} ->
+        destination = Path.join(target, file)
+        File.mkdir_p!(Path.dirname(destination))
+        File.write!(destination, contents)
+        copy_mode(Path.join(source, file), destination)
+      end)
+
+      # Executable scripts keep their mode under their new names too.
+      for {file, _} <- files, file == "setup.sh" do
+        File.chmod!(Path.join(target, file), 0o755)
+      end
+
+      Mix.shell().info([:green, "* created ", :reset, "#{length(files)} files"])
+      :ok
+    end
+  end
+
+  defp copy_mode(source, destination) do
+    case File.stat(source) do
+      {:ok, %{mode: mode}} -> File.chmod(destination, mode)
+      _ -> :ok
+    end
+  end
+
+  # Relative paths of every regular file under `dir`.
+  defp list_files(dir) do
+    dir
+    |> Path.join("**")
+    |> Path.wildcard(match_dot: true)
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.map(&Path.relative_to(&1, dir))
+    |> Enum.sort()
+  end
+
+  defp dropped?(file) do
+    [first | _] = Path.split(file)
+    first in @drop or file == "README.md"
+  end
+
+  defp verbatim?(file) do
+    Enum.any?(@verbatim_dirs, &(file == &1 or String.starts_with?(file, &1 <> "/"))) or
+      Path.basename(file) in ~w(package.json yarn.lock .yarnrc.yml) or
+      Path.extname(file) in ~w(.js .mjs .cjs .ts .tsx .json .lock)
+  end
+
+  defp text?(contents), do: String.valid?(contents) and not String.contains?(contents, <<0>>)
+
+  ## Dependencies, formatting and Git
+
+  defp install(_dir, false), do: :ok
+
+  defp install(dir, true) do
+    with :ok <- cmd("mix", ["deps.get"], dir, "fetching dependencies"),
+         :ok <- cmd("mix", ["format"], dir, "formatting the code") do
+      :ok
+    end
+  end
+
+  defp init_git(_git, _dir, false), do: :ok
+
+  defp init_git(git, dir, true) do
+    with :ok <-
+           cmd(
+             git,
+             ["init", "--quiet", "--initial-branch=main"],
+             dir,
+             "creating a Git repository"
+           ),
+         :ok <- cmd(git, ["add", "--all"], dir, nil) do
+      case System.cmd(git, ["commit", "--quiet", "-m", "Initial commit (mix rephi.new)"],
+             cd: dir,
+             stderr_to_stdout: true
+           ) do
+        {_, 0} ->
+          :ok
+
+        {output, _} ->
+          # Usually a missing user.name / user.email: the files stay staged.
+          Mix.shell().error(
+            "The initial commit could not be created; the files are staged.\n#{output}"
+          )
+
+          :ok
+      end
+    end
+  end
+
+  defp cmd(command, args, dir, label) do
+    if label, do: Mix.shell().info([:green, "* running ", :reset, label])
+    executable = System.find_executable(command) || command
+
+    # A clean environment for the new project's own Mix.
+    env = [{"MIX_ENV", nil}, {"MIX_EXS", nil}, {"MIX_BUILD_PATH", nil}, {"MIX_DEPS_PATH", nil}]
+
+    case System.cmd(executable, args, cd: dir, stderr_to_stdout: true, env: env) do
+      {_, 0} ->
+        :ok
+
+      {output, status} ->
+        {:error, "`#{command} #{Enum.join(args, " ")}` failed (#{status}):\n#{output}"}
+    end
+  rescue
+    error in ErlangError -> {:error, "Could not run #{command}: #{Exception.message(error)}"}
+  end
+
+  ## Output
+
+  defp readme(%{app: app, module: module}) do
+    """
     # #{module}
 
-    #{module} is built with Rephi - A Phoenix boilerplate with JWT auth, RBAC, WebSocket support, and multi-frontend architecture.
+    A Phoenix API with JWT authentication, role-based access control, real-time
+    notifications and React frontends, generated from
+    [Rephi](https://github.com/thotenn/rephi).
 
-    ## Getting Started
+    ## Getting started
 
-    1. **Configure environment**:
-       ```bash
-       cp .env.example .env
-       # Edit .env with your configuration
-       ```
+    Requirements: Elixir and Erlang/OTP (see `.tool-versions`), Node.js >= 22.22
+    with Yarn 4 through Corepack, and PostgreSQL.
 
-    2. **Install and setup**:
-       ```bash
-       mix setup
-       ```
+    ```bash
+    ./setup.sh          # checks the toolchain, writes .env, database + seeds, frontends
+    mix phx.server
+    ```
 
-    3. **Start Phoenix server**:
-       ```bash
-       mix phx.server
-       ```
+    Then open:
 
-    Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+    - http://localhost:4000/app/example/ - the example frontend (log in with the
+      development administrator that `./setup.sh` prints)
+    - http://localhost:4000/api/swagger - the API documentation
+    - http://localhost:4000/api/health - liveness check
 
-    ## Features
+    The development database is `#{app}_dev`; `.env.example` lists every setting.
 
-    - JWT Authentication
-    - Role-Based Access Control (RBAC)
-    - WebSocket support
-    - Multi-frontend architecture
-    - API documentation with Swagger
-    - CSRF protection for SPAs
+    ## Useful commands
 
-    ## Default Credentials
-
-    - Email: admin@admin.com
-    - Password: password123!!
-
-    ## Learn more
-
-    - Rephi: https://github.com/thotenn/rephi
-    - Phoenix: https://www.phoenixframework.org/
-    - Phoenix Guides: https://hexdocs.pm/phoenix/overview.html
+    ```bash
+    mix setup                         # Phoenix only: deps, database, seeds, swagger.json
+    mix precommit                     # format check, warnings, unused deps, tests
+    mix test
+    yarn shared:build && yarn build   # build the frontends into priv/static/apps
+    mix rephi.gen.frontend NAME       # a new frontend app (see `mix help rephi.gen.frontend`)
+    ```
     """
-    
-    File.write!("README.md", readme)
+  end
+
+  defp next_steps(path, app, installed?) do
+    format_step =
+      if installed?, do: "", else: "    mix deps.get && mix format\n"
+
+    """
+
+    Your project #{app} was created in #{path}.
+
+    Next steps:
+
+        cd #{Path.relative_to_cwd(path)}
+    #{format_step}    ./setup.sh
+        mix phx.server
+
+    Then open http://localhost:4000/app/example/ and http://localhost:4000/api/swagger
+    """
   end
 end
