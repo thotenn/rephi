@@ -3,31 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 
-// Helper function to copy directory recursively
-function copyRecursive(source, target) {
-  if (!fs.existsSync(source)) {
-    console.warn(`Source directory ${source} does not exist`);
-    return;
-  }
-
-  // Create target directory if it doesn't exist
-  if (!fs.existsSync(target)) {
-    fs.mkdirSync(target, { recursive: true });
-  }
-
-  // Read source directory
-  const files = fs.readdirSync(source);
-
-  files.forEach((file) => {
-    const sourcePath = path.join(source, file);
-    const targetPath = path.join(target, file);
-
-    if (fs.lstatSync(sourcePath).isDirectory()) {
-      copyRecursive(sourcePath, targetPath);
-    } else {
-      fs.copyFileSync(sourcePath, targetPath);
-    }
-  });
+// Replaces `target` with a copy of `source`. The destination is removed first,
+// so hashed assets of earlier builds do not pile up in priv/static/apps.
+function replaceDirectory(source, target) {
+  fs.rmSync(target, { recursive: true, force: true });
+  fs.cpSync(source, target, { recursive: true });
 }
 
 // Reads the optional "rephi" field of an app's package.json:
@@ -82,7 +62,7 @@ function copyBuilds() {
   // Get all apps directories
   const allApps = fs.readdirSync(appsDir).filter((item) => {
     const itemPath = path.join(appsDir, item);
-    return fs.lstatSync(itemPath).isDirectory();
+    return !item.startsWith('.') && fs.lstatSync(itemPath).isDirectory();
   });
 
   const requestedApps = parseRequestedApps(process.argv.slice(2));
@@ -95,6 +75,8 @@ function copyBuilds() {
   const apps = requestedApps.length > 0 ? requestedApps : allApps;
 
   console.log('🚀 Copying frontend builds to priv/static/apps...');
+
+  const missing = [];
 
   // Copy each app's dist folder
   apps.forEach((app) => {
@@ -114,12 +96,24 @@ function copyBuilds() {
 
     if (fs.existsSync(distPath)) {
       console.log(`📦 Copying ${app} build...`);
-      copyRecursive(distPath, targetPath);
+      replaceDirectory(distPath, targetPath);
       console.log(`✅ ${app} copied to priv/static/apps/${app}`);
     } else {
-      console.warn(`⚠️  No dist folder found for ${app} at ${distPath}`);
+      console.error(`❌ No dist folder found for ${app} at ${distPath} (build it first)`);
+      missing.push(app);
     }
   });
+
+  // Directories left over from apps that no longer exist are still served.
+  fs.readdirSync(targetDir)
+    .filter((entry) => !allApps.includes(entry))
+    .forEach((entry) => {
+      console.warn(`⚠️  priv/static/apps/${entry} has no app in apps/ (remove it if it is stale)`);
+    });
+
+  if (missing.length > 0) {
+    throw new Error(`No build to copy for: ${missing.join(', ')}`);
+  }
 
   console.log('✨ Done copying builds!');
 }
@@ -128,6 +122,6 @@ function copyBuilds() {
 try {
   copyBuilds();
 } catch (error) {
-  console.error('❌ Error copying builds:', error);
+  console.error(`❌ Error copying builds: ${error.message}`);
   process.exit(1);
 }
