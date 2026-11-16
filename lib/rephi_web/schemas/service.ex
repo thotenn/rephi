@@ -82,7 +82,7 @@ defmodule RephiWeb.Schemas.NotificationRequest do
 
   OpenApiSpex.schema(
     %{
-      description: "A broadcast",
+      description: "A notification to send",
       type: :object,
       properties: %{
         message: %Schema{
@@ -106,7 +106,7 @@ defmodule RephiWeb.Schemas.Notification do
   OpenApiSpex.schema(
     %{
       description:
-        "A notification, as the sockets of the user:lobby channel receive it (event new_notification)",
+        "A notification, as the sockets receive it (event new_notification on user:lobby or user:<id>)",
       type: :object,
       properties: %{
         message: %Schema{type: :string},
@@ -131,13 +131,112 @@ defmodule RephiWeb.Schemas.NotificationResponse do
 
   OpenApiSpex.schema(
     RephiWeb.Schemas.data(RephiWeb.Schemas.Notification,
-      description: "The notification that was broadcast, as the sockets received it",
+      description: "The notification that was sent, as the sockets received it",
       example: %{
         data: %{
           message: "Maintenance at 18:00 UTC",
           timestamp: "2026-01-01T12:00:00.000000Z",
           type: "general",
           from: %{id: 1, email: "admin@example.com"}
+        }
+      }
+    ),
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.DashboardUsers do
+  require OpenApiSpex
+  alias OpenApiSpex.Schema
+
+  OpenApiSpex.schema(
+    %{
+      type: :object,
+      properties: %{
+        total: %Schema{
+          type: :integer,
+          nullable: true,
+          description: "Every account; null without users:view"
+        }
+      },
+      required: [:total]
+    },
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.DashboardNotifications do
+  require OpenApiSpex
+  alias OpenApiSpex.Schema
+
+  OpenApiSpex.schema(
+    %{
+      type: :object,
+      properties: %{
+        sent_total: %Schema{
+          type: :integer,
+          nullable: true,
+          description: "Broadcasts sent by anyone; null without notifications:broadcast"
+        },
+        sent_by_me: %Schema{
+          type: :integer,
+          description: "Notifications the caller sent (broadcasts and tests to itself)"
+        }
+      },
+      required: [:sent_total, :sent_by_me]
+    },
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.DashboardSessions do
+  require OpenApiSpex
+  alias OpenApiSpex.Schema
+
+  OpenApiSpex.schema(
+    %{
+      description:
+        "Who is connected to the user:lobby channel right now (Phoenix Presence); clients joined to it keep it current with presence_state / presence_diff",
+      type: :object,
+      properties: %{
+        online_users: %Schema{type: :integer, description: "Distinct users"},
+        connections: %Schema{type: :integer, description: "Sockets (a user may have several)"}
+      },
+      required: [:online_users, :connections]
+    },
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.Dashboard do
+  require OpenApiSpex
+
+  OpenApiSpex.schema(
+    %{
+      description:
+        "Counters for the dashboard. A counter the caller may not see is null, never left out",
+      type: :object,
+      properties: %{
+        users: RephiWeb.Schemas.DashboardUsers,
+        notifications: RephiWeb.Schemas.DashboardNotifications,
+        sessions: RephiWeb.Schemas.DashboardSessions
+      },
+      required: [:users, :notifications, :sessions]
+    },
+    struct?: false
+  )
+end
+
+defmodule RephiWeb.Schemas.DashboardResponse do
+  require OpenApiSpex
+
+  OpenApiSpex.schema(
+    RephiWeb.Schemas.data(RephiWeb.Schemas.Dashboard,
+      example: %{
+        data: %{
+          users: %{total: 42},
+          notifications: %{sent_total: 17, sent_by_me: 3},
+          sessions: %{online_users: 5, connections: 7}
         }
       }
     ),

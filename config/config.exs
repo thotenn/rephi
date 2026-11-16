@@ -68,13 +68,14 @@ config :rephi, RephiWeb.Auth.Guardian,
 # CORS_ORIGINS overrides it at runtime. See `RephiWeb.CORS`.
 config :rephi, :cors_origins, []
 
-# Request throttling for the public authentication endpoints, per client IP.
-# See `RephiWeb.Plugs.RateLimit` for every option.
+# Request throttling: login and register per client IP, the notification a user
+# sends to itself per user. See `RephiWeb.Plugs.RateLimit` for every option.
 config :rephi, RephiWeb.Plugs.RateLimit,
   enabled: true,
   trusted_proxies: 0,
   login: [limit: 10, window_seconds: 60],
-  register: [limit: 5, window_seconds: 60]
+  register: [limit: 5, window_seconds: 60],
+  self_notification: [limit: 5, window_seconds: 60]
 
 # Seeding an administrator requires ADMIN_EMAIL / ADMIN_PASSWORD unless an
 # environment says otherwise (config/dev.exs, config/test.exs). See `Rephi.Seeds`.

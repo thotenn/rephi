@@ -187,6 +187,8 @@ defmodule RephiWeb.ApiContractTest do
 
     {admin, admin_token} = create_user_with_token_and(roles: ["admin"])
     {_nobody, nobody_token} = create_user_with_token()
+    {:ok, reset, _password} = Accounts.reset_password(create_user())
+    {:ok, reset_token, _claims} = RephiWeb.Auth.Guardian.encode_and_sign(reset)
 
     # child inherits `inherited` from parent; nothing is assigned to child.
     parent = create_role()
@@ -201,6 +203,7 @@ defmodule RephiWeb.ApiContractTest do
       admin: admin,
       token: admin_token,
       nobody_token: nobody_token,
+      reset_token: reset_token,
       parent: parent,
       child: child,
       inherited: inherited
@@ -272,6 +275,13 @@ defmodule RephiWeb.ApiContractTest do
        fn -> call(:post, "/api/notifications/broadcast", token, %{message: "Hello"}) end},
       {"post", "/api/notifications/broadcast", 422,
        fn -> call(:post, "/api/notifications/broadcast", token, %{message: "  "}) end},
+      {"post", "/api/notifications/me", 200,
+       fn -> call(:post, "/api/notifications/me", ctx.nobody_token, %{message: "Hi me"}) end},
+      {"post", "/api/notifications/me", 422,
+       fn -> call(:post, "/api/notifications/me", ctx.nobody_token, %{message: ""}) end},
+
+      # Dashboard
+      {"get", "/api/dashboard", 200, fn -> call(:get, "/api/dashboard", token) end},
 
       # Roles
       {"get", "/api/roles", 200, fn -> call(:get, "/api/roles", token) end},
@@ -462,21 +472,29 @@ defmodule RephiWeb.ApiContractTest do
 
   # The responses every operation of a kind answers the same way, derived
   # from what the document declares.
-  defp generic_cases(%{token: token, nobody_token: nobody_token}, document) do
+  defp generic_cases(%{token: token} = ctx, document) do
     for {verb, path, op} <- operations(document),
         status <- Map.keys(op["responses"]) |> Enum.map(&String.to_integer/1),
         status != 401 or op["security"] != nil,
-        request = generic_request(status, verb, path, token, nobody_token),
+        request = generic_request(status, verb, path, token, forbidden_token(op, ctx)),
         request != nil,
         do: {verb, path, status, request}
+  end
+
+  # Without a permission check, the only 403 of a route is the password gate's.
+  defp forbidden_token(op, ctx) do
+    case get_in(op, ["responses", "403", "description"]) do
+      "Forbidden - the caller's password was reset" <> _ -> ctx.reset_token
+      _other -> ctx.nobody_token
+    end
   end
 
   defp generic_request(401, verb, path, _token, _nobody) do
     fn -> call(verb, fill(path, 1)) end
   end
 
-  defp generic_request(403, verb, path, _token, nobody_token) do
-    fn -> call(verb, fill(path, 1), nobody_token, %{}) end
+  defp generic_request(403, verb, path, _token, forbidden_token) do
+    fn -> call(verb, fill(path, 1), forbidden_token, %{}) end
   end
 
   defp generic_request(404, verb, path, token, _nobody) do
@@ -501,7 +519,8 @@ defmodule RephiWeb.ApiContractTest do
         enabled: true,
         trusted_proxies: 0,
         login: [limit: 1, window_seconds: 60],
-        register: [limit: 1, window_seconds: 60]
+        register: [limit: 1, window_seconds: 60],
+        self_notification: [limit: 1, window_seconds: 60]
       )
 
       RateLimiter.reset()

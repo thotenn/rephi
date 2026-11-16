@@ -1,17 +1,20 @@
 defmodule RephiWeb.NotificationController do
   @moduledoc """
-  Broadcasts notifications to the clients connected to the `user:lobby` channel.
+  Sends notifications to connected clients.
 
   ## Endpoints
 
     * `POST /api/notifications/broadcast` - Send `message` to every connected
       client (attributes flat or wrapped under `"notification"`)
+    * `POST /api/notifications/me` - Send `message` to the caller's own
+      connections only, to try the realtime channel without broadcasting
 
   ## Permission Requirements
 
-  Requires the `notifications:broadcast` permission: a broadcast reaches every
-  connected user, so it is not something any signed-in account may do. The
-  seeds grant it to the `admin` role only.
+  A broadcast requires `notifications:broadcast`: it reaches every connected
+  user, so it is not something any signed-in account may do. The seeds grant it
+  to the `admin` role only. Any signed-in user may notify itself, throttled per
+  user (bucket `:self_notification` of `RephiWeb.Plugs.RateLimit`).
 
   The event itself (topic, payload, validation) lives in
   `RephiWeb.Notifications`.
@@ -28,7 +31,10 @@ defmodule RephiWeb.NotificationController do
 
   tags ["Notifications"]
 
-  plug AuthorizationPlug, {:permission, "notifications:broadcast"}
+  plug AuthorizationPlug, {:permission, "notifications:broadcast"} when action == :broadcast
+
+  plug RephiWeb.Plugs.RateLimit,
+       [bucket: :self_notification, by: :user] when action == :notify_self
 
   operation :broadcast,
     summary: "Broadcast a notification",
@@ -50,6 +56,32 @@ defmodule RephiWeb.NotificationController do
     attrs = resource_params(conn, "notification")
 
     with {:ok, notification} <- Notifications.broadcast(attrs, conn.assigns.current_user) do
+      render(conn, :show, notification: notification)
+    end
+  end
+
+  operation :notify_self,
+    summary: "Send a test notification to yourself",
+    description:
+      "Sends new_notification, with the same payload as this response, only to the caller's own topic user:<id>; no other user receives it. The attributes may also be wrapped under \"notification\". Any signed-in user; at most 5 per minute per user by default.",
+    security: bearer_auth(),
+    request_body: body("The message", Schemas.NotificationRequest),
+    responses:
+      responses([
+        :unauthorized,
+        :password_settled,
+        :body_errors,
+        ok: {"Notification sent to the caller", Schemas.NotificationResponse},
+        unprocessable_entity:
+          "message missing, blank, not a string or longer than 500 characters",
+        too_many_requests:
+          "Too many test notifications from this user; retry after the retry-after header"
+      ])
+
+  def notify_self(conn, _params) do
+    attrs = resource_params(conn, "notification")
+
+    with {:ok, notification} <- Notifications.notify_self(conn.assigns.current_user, attrs) do
       render(conn, :show, notification: notification)
     end
   end

@@ -16,6 +16,7 @@ defmodule Rephi.Application do
       Rephi.Repo,
       {DNSCluster, query: Application.get_env(:rephi, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Rephi.PubSub},
+      RephiWeb.Presence,
       # Start the Finch HTTP client for sending emails
       {Finch, name: Rephi.Finch},
       # Counters for the rate limited routes (login, register)

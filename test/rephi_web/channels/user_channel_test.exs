@@ -5,9 +5,12 @@ defmodule RephiWeb.UserChannelTest do
   """
   use RephiWeb.ChannelCase, async: true
 
+  import Ecto.Query
   import Rephi.AuthTestHelpers
 
-  alias RephiWeb.{Notifications, UserChannel, UserSocket}
+  alias Rephi.Notifications.Notification
+  alias Rephi.Repo
+  alias RephiWeb.{Notifications, Presence, UserChannel, UserSocket}
 
   setup do
     {user, token} = create_user_with_token()
@@ -99,6 +102,75 @@ defmodule RephiWeb.UserChannelTest do
 
       {:ok, _} = Notifications.notify_user(user, %{"message" => "Just for you"})
       assert_push "new_notification", %{message: "Just for you"}
+    end
+
+    test "notify_self/2 reaches only the sender's topic, recorded as self",
+         %{socket: socket, user: user} do
+      {:ok, _reply, _socket} = subscribe_and_join(socket, UserChannel, "user:lobby")
+      {:ok, _reply, _socket} = subscribe_and_join(socket, UserChannel, "user:#{user.id}")
+      other = create_user()
+
+      {:ok, _} = Notifications.notify_self(other, %{"message" => "Theirs"})
+      {:ok, _} = Notifications.notify_self(user, %{"message" => "Mine"})
+
+      assert_receive %Phoenix.Socket.Message{
+        topic: topic,
+        event: "new_notification",
+        payload: %{message: "Mine", from: %{id: user_id}}
+      }
+
+      assert {topic, user_id} == {"user:#{user.id}", user.id}
+      refute_receive %Phoenix.Socket.Message{event: "new_notification"}
+
+      assert [%Notification{scope: "self", recipient_id: recipient_id}] =
+               Repo.all(from n in Notification, where: n.sender_id == ^user.id)
+
+      assert recipient_id == user.id
+    end
+
+    test "every send is recorded with its scope", %{user: user} do
+      {:ok, _} = Notifications.broadcast(%{"message" => "All"}, user)
+      {:ok, _} = Notifications.notify_user(user.id, %{"message" => "One"})
+      {:error, _} = Notifications.broadcast(%{"message" => " "}, user)
+
+      assert [{"broadcast", nil, sender_id}, {"direct", recipient_id, nil}] =
+               Repo.all(
+                 from n in Notification,
+                   order_by: n.id,
+                   select: {n.scope, n.recipient_id, n.sender_id}
+               )
+
+      assert {sender_id, recipient_id} == {user.id, user.id}
+    end
+  end
+
+  describe "presence on the lobby" do
+    test "a joined socket is tracked under its user id and gets the presence state",
+         %{socket: socket, user: user} do
+      key = Integer.to_string(user.id)
+      {:ok, _reply, lobby} = subscribe_and_join(socket, UserChannel, "user:lobby")
+
+      assert_push "presence_state", state
+      assert %{metas: [meta]} = state[key]
+      assert %{user_id: user_id, joined_at: joined_at} = meta
+      assert user_id == user.id
+      assert {:ok, _, 0} = DateTime.from_iso8601(joined_at)
+
+      assert meta |> Map.delete(:phx_ref) |> Map.keys() |> Enum.sort() == [:joined_at, :user_id]
+
+      assert Map.has_key?(Presence.list("user:lobby"), key)
+
+      Process.unlink(lobby.channel_pid)
+      ref = leave(lobby)
+      assert_reply ref, :ok
+      assert_broadcast "presence_diff", %{leaves: %{^key => _}}
+    end
+
+    test "the user's private topic is not tracked", %{socket: socket, user: user} do
+      {:ok, _reply, _socket} = subscribe_and_join(socket, UserChannel, "user:#{user.id}")
+
+      refute_push "presence_state", _
+      refute Map.has_key?(Presence.list("user:#{user.id}"), Integer.to_string(user.id))
     end
   end
 end

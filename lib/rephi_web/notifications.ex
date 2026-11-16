@@ -3,12 +3,13 @@ defmodule RephiWeb.Notifications do
   Real-time notifications pushed to connected clients over `RephiWeb.UserChannel`.
 
   This is the only place that knows the topics and the shape of the event, so
-  HTTP endpoints, background jobs and `iex` all send the same thing.
+  HTTP endpoints, background jobs and `iex` all send the same thing. Every send
+  is recorded with `Rephi.Notifications` before it is pushed.
 
   ## Topics
 
     * `"user:lobby"` - every connected client (`broadcast/2`)
-    * `"user:<id>"` - the connections of one user (`notify_user/3`)
+    * `"user:<id>"` - the connections of one user (`notify_self/2`, `notify_user/3`)
 
   ## Event
 
@@ -47,6 +48,8 @@ defmodule RephiWeb.Notifications do
           from: %{id: integer(), email: String.t()} | nil
         }
 
+  @type result :: {:ok, notification()} | {:error, Ecto.Changeset.t()}
+
   @doc """
   Topic every authenticated socket may join.
   """
@@ -68,37 +71,49 @@ defmodule RephiWeb.Notifications do
   end
 
   @doc """
-  Sends a notification to every connected client.
+  Sends a notification to every connected client (scope `"broadcast"`).
 
   `attrs` are untrusted (they usually come from a request body): `"message"`
   must be a non-blank string within the length limit. `sender` is the user
-  sending it, or `nil`.
-
-  Returns `{:ok, notification}` or `{:error, changeset}`; nothing is sent when
-  the attributes are invalid.
+  sending it, or `nil`. Nothing is recorded nor sent when they are invalid.
   """
-  @spec broadcast(map(), %User{} | nil) :: {:ok, notification()} | {:error, Ecto.Changeset.t()}
+  @spec broadcast(map(), %User{} | nil) :: result()
   def broadcast(attrs, sender \\ nil) do
-    deliver(@lobby, attrs, sender)
+    deliver(@lobby, attrs, sender, %{scope: "broadcast"})
   end
 
   @doc """
-  Sends a notification to the connections of a single user.
-
+  Sends a notification from `user` to the connections of `user` only (scope `"self"`).
   Same validation and return values as `broadcast/2`.
   """
-  @spec notify_user(%User{} | integer(), map(), %User{} | nil) ::
-          {:ok, notification()} | {:error, Ecto.Changeset.t()}
-  def notify_user(user_or_id, attrs, sender \\ nil) do
-    user_or_id |> user_topic() |> deliver(attrs, sender)
+  @spec notify_self(%User{}, map()) :: result()
+  def notify_self(%User{} = user, attrs) do
+    deliver(user_topic(user), attrs, user, %{scope: "self", recipient_id: user.id})
   end
 
-  defp deliver(topic, attrs, sender) do
-    with {:ok, %{message: message}} <- validate(attrs) do
+  @doc """
+  Sends a notification to the connections of a single user (scope `"direct"`).
+  Same validation and return values as `broadcast/2`.
+  """
+  @spec notify_user(%User{} | integer(), map(), %User{} | nil) :: result()
+  def notify_user(user_or_id, attrs, sender \\ nil) do
+    recipient_id = with %User{id: id} <- user_or_id, do: id
+
+    user_or_id
+    |> user_topic()
+    |> deliver(attrs, sender, %{scope: "direct", recipient_id: recipient_id})
+  end
+
+  defp deliver(topic, attrs, sender, record) do
+    with {:ok, %{message: message}} <- validate(attrs),
+         {:ok, recorded} <-
+           record
+           |> Map.merge(%{message: message, sender_id: sender && sender.id})
+           |> Rephi.Notifications.record() do
       notification = %{
-        message: message,
+        message: recorded.message,
         type: "general",
-        timestamp: DateTime.utc_now(),
+        timestamp: recorded.inserted_at,
         from: from(sender)
       }
 

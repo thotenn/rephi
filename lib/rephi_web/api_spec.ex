@@ -58,6 +58,7 @@ defmodule RephiWeb.ApiSpec do
       description: "Permissions and their assignment to roles and users (permissions:*)"
     },
     %Tag{name: "Notifications", description: "Real-time notifications"},
+    %Tag{name: "Dashboard", description: "Counters for the signed-in user"},
     %Tag{name: "Health", description: "Liveness and readiness checks"},
     %Tag{name: "Service", description: "The service and this document"}
   ]

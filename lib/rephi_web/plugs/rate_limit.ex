@@ -1,6 +1,6 @@
 defmodule RephiWeb.Plugs.RateLimit do
   @moduledoc """
-  Throttles a route per client IP address.
+  Throttles a route per client IP address, or per signed-in user with `by: :user`.
 
   Each use names a bucket; the limits of the bucket come from the
   configuration, so they can change without touching code:
@@ -14,6 +14,12 @@ defmodule RephiWeb.Plugs.RateLimit do
         trusted_proxies: 0,
         login: [limit: 10, window_seconds: 60],
         register: [limit: 5, window_seconds: 60]
+
+  With `by: :user` the plug must come after authentication (it reads
+  `conn.assigns.current_user`):
+
+      plug RephiWeb.Plugs.RateLimit, [bucket: :self_notification, by: :user]
+        when action == :notify_self
 
   Every request counts, successful or not. Past the limit the request is
   answered with `429` in the API error envelope and a `retry-after` header
@@ -68,17 +74,25 @@ defmodule RephiWeb.Plugs.RateLimit do
   alias RephiWeb.{FallbackController, RateLimiter}
 
   @impl Plug
-  def init(opts), do: Keyword.fetch!(opts, :bucket)
+  def init(opts) do
+    by = Keyword.get(opts, :by, :ip)
+
+    if by not in [:ip, :user] do
+      raise ArgumentError, "by: must be :ip or :user, got #{inspect(by)}"
+    end
+
+    {Keyword.fetch!(opts, :bucket), by}
+  end
 
   @impl Plug
-  def call(conn, bucket) do
+  def call(conn, {bucket, by}) do
     config = Application.get_env(:rephi, __MODULE__, [])
 
     if Keyword.get(config, :enabled, false) do
       settings = Keyword.fetch!(config, bucket)
       limit = Keyword.fetch!(settings, :limit)
       window_ms = Keyword.fetch!(settings, :window_seconds) * 1000
-      key = {bucket, client_address(conn, Keyword.get(config, :trusted_proxies, 0))}
+      key = {bucket, client_key(conn, by, config)}
 
       case RateLimiter.hit(key, limit, window_ms) do
         {:allow, _count} -> conn
@@ -88,6 +102,11 @@ defmodule RephiWeb.Plugs.RateLimit do
       conn
     end
   end
+
+  defp client_key(%{assigns: %{current_user: %{id: id}}}, :user, _config), do: {:user, id}
+
+  defp client_key(conn, :ip, config),
+    do: client_address(conn, Keyword.get(config, :trusted_proxies, 0))
 
   defp too_many_requests(conn, retry_after) do
     conn

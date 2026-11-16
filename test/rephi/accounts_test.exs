@@ -222,4 +222,10 @@ defmodule Rephi.AccountsTest do
       assert Accounts.reset_password(user) == {:error, :not_found}
     end
   end
+
+  test "count_users/0 counts every account" do
+    before = Accounts.count_users()
+    create_user()
+    assert Accounts.count_users() == before + 1
+  end
 end

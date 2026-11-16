@@ -49,6 +49,12 @@ defmodule RephiWeb.Plugs.RateLimitTest do
              RateLimit.retry_message(String.to_integer(retry_after))
   end
 
+  test "counts per IP by default or per user with by: :user; nothing else" do
+    assert RateLimit.init(bucket: :login) == {:login, :ip}
+    assert RateLimit.init(bucket: :self_notification, by: :user) == {:self_notification, :user}
+    assert_raise ArgumentError, fn -> RateLimit.init(bucket: :login, by: :email) end
+  end
+
   test "the message says how long to wait, in correct English" do
     assert RateLimit.retry_message(1) == "Too many attempts. Try again in 1 second."
     assert RateLimit.retry_message(2) == "Too many attempts. Try again in 2 seconds."

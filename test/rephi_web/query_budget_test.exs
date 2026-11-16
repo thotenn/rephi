@@ -69,6 +69,16 @@ defmodule RephiWeb.QueryBudgetTest do
     assert cost(fn -> get(conn, ~p"/api/users") end) == @authenticated + 4
   end
 
+  test "the dashboard", %{conn: conn, as_admin: as_admin} do
+    # + users count + broadcasts count + sent by the caller (Presence is not SQL)
+    assert cost(fn -> get(as_admin, ~p"/api/dashboard") end) == @authenticated + 3
+
+    {_user, token} = create_user_with_token()
+    # + sent by the caller: counters the caller may not see are not queried
+    assert cost(fn -> get(authenticate_conn(conn, token), ~p"/api/dashboard") end) ==
+             @authenticated + 1
+  end
+
   test "the hierarchy and the permissions of a user", %{as_admin: conn, admin: admin} do
     manager = Authorization.get_role_by_slug("manager")
 

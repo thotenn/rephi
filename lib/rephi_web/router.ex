@@ -62,7 +62,10 @@ defmodule RephiWeb.Router do
     # A route a user with a reset password must still reach goes above this line.
     pipe_through :password_settled
 
+    get "/dashboard", DashboardController, :show
+
     post "/notifications/broadcast", NotificationController, :broadcast
+    post "/notifications/me", NotificationController, :notify_self
 
     # Role management endpoints
     resources "/roles", RoleController, except: [:new, :edit]

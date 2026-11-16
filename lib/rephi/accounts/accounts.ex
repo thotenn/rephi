@@ -139,6 +139,10 @@ defmodule Rephi.Accounts do
     |> Pagination.paginate(params)
   end
 
+  @doc "Number of user accounts."
+  @spec count_users() :: non_neg_integer()
+  def count_users, do: Repo.aggregate(User, :count)
+
   @doc """
   Changes the email of a user. Only the email: anything else in `attrs`
   (a `password`, for instance) is ignored. See `change_password/3`.
