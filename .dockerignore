@@ -40,4 +40,3 @@ node_modules
 
 # Build-time output, generated in the image
 /priv/static/apps/
-/priv/static/swagger.json
