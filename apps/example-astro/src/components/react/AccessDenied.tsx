@@ -1,3 +1,17 @@
+import { go } from "~/lib/navigation";
+import { ROUTES } from "~/lib/routes";
+
+// A page opened directly has nothing of this app to go back to. Astro's client
+// router numbers the history entries it creates in `history.state.index`.
+function goBack() {
+  const index = (window.history.state as { index?: number } | null)?.index ?? 0;
+  if (index > 0) {
+    window.history.back();
+  } else {
+    go(ROUTES.home, { replace: true });
+  }
+}
+
 interface AccessDeniedProps {
   title?: string,
   message?: string,
@@ -9,13 +23,14 @@ export default function AccessDenied({
   title = "Access Denied", 
   message = "You don't have permission to access this resource.", 
   buttonText = "Go Back", 
-  buttonFunction = () => window.history.back() 
+  buttonFunction = goBack,
 }: AccessDeniedProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
     <div className="max-w-md w-full bg-white shadow rounded-lg p-6">
       <div className="text-center">
       <svg
+        aria-hidden="true"
         className="mx-auto h-12 w-12 text-red-500"
         fill="none"
         stroke="currentColor"
@@ -34,6 +49,7 @@ export default function AccessDenied({
       </p>
       <div className="mt-6">
         <button
+        type="button"
         onClick={buttonFunction}
         className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
         >

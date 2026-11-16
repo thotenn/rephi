@@ -25,6 +25,9 @@ export const ROUTES = {
   },
 } as const;
 
+export const NEW_RECORD_PARAM = "new";
+export const NOTIFY_HASH = "#notify";
+
 /** Permission that opens each admin screen (and its entry in the Admin menu). */
 export const ADMIN_PERMISSIONS = {
   users: "users:view",
@@ -75,3 +78,8 @@ export function isInternalPath(path: string | null | undefined): path is string 
   if (!path || !path.startsWith("/") || path.startsWith("//")) return false;
   return BASE === "" || path === BASE || path.startsWith(`${BASE}/`);
 }
+
+export const QUICK_LINKS = {
+  newRole: `${href(ROUTES.admin.roles)}?${NEW_RECORD_PARAM}=1`,
+  sendNotification: `${href(ROUTES.home)}${NOTIFY_HASH}`,
+} as const;

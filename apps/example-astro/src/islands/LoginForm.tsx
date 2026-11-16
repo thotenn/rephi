@@ -5,6 +5,7 @@ import { z } from "zod";
 import IslandProviders from "~/components/react/IslandProviders";
 import { useLogin } from "~/hooks/useAuth";
 import { applyServerErrors } from "~/lib/forms";
+import { useHydrated } from "~/lib/hydration";
 import { getRedirectPath, useAuthStore } from "~/lib/rephi";
 import type { LoginCredentials } from "~/lib/rephi";
 
@@ -29,6 +30,8 @@ const noRedirectTarget = () => false;
 
 function LoginFormFields() {
   const loginMutation = useLogin();
+  // Submitted before hydration, the prerendered form would GET the password into the URL.
+  const hydrated = useHydrated();
   const [serverError, setServerError] = useState<string | null>(null);
   const redirected = useSyncExternalStore(
     subscribeToNothing,
@@ -115,7 +118,7 @@ function LoginFormFields() {
       <div>
         <button
           type="submit"
-          disabled={loginMutation.isPending}
+          disabled={!hydrated || loginMutation.isPending}
           className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loginMutation.isPending ? "Signing in..." : "Sign in"}
