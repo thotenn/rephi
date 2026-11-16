@@ -8,8 +8,9 @@ defmodule Rephi.Accounts do
   ## Token revocation
 
   Every JWT carries the `token_version` of its user (see
-  `RephiWeb.Auth.Guardian`). Three things end the sessions of a user: a
-  password change (`update_user/2`), an explicit logout (`revoke_tokens/1`)
+  `RephiWeb.Auth.Guardian`). Four things end the sessions of a user: a
+  password change (`change_password/3`), a password reset by an
+  administrator (`reset_password/1`), an explicit logout (`revoke_tokens/1`)
   and deleting the account (`delete_user/1`). Each of them also closes the
   WebSocket connections the user has open, by broadcasting `"disconnect"` on
   `socket_id/1`.
@@ -160,13 +161,19 @@ defmodule Rephi.Accounts do
   connections are closed; the returned user carries the new
   `token_version`, to sign a fresh token with.
 
+  It also clears `must_change_password` (set by `reset_password/1`).
+
   Returns `{:ok, user}` or `{:error, changeset}` (a wrong current password is
   an error on `:current_password`).
   """
   def change_password(%User{} = user, current_password, attrs) do
     if is_binary(current_password) and
          User.verify_password(current_password, user.hashed_password) do
-      with {:ok, updated} <- user |> User.password_changeset(attrs) |> Repo.update() do
+      with {:ok, updated} <-
+             user
+             |> User.password_changeset(attrs)
+             |> Ecto.Changeset.put_change(:must_change_password, false)
+             |> Repo.update() do
         disconnect_sockets(updated)
         {:ok, updated}
       end
@@ -176,6 +183,66 @@ defmodule Rephi.Accounts do
        |> Ecto.Changeset.change()
        |> Ecto.Changeset.add_error(:current_password, "is not valid")}
     end
+  end
+
+  @doc """
+  Replaces the password of a user with a random temporary one, for an
+  administrator to hand over (`POST /api/users/:id/password`).
+
+  The temporary password is returned once and only its hash is stored. The
+  account is marked `must_change_password`: until the user sets a password
+  of its own with `change_password/3`, the API only lets it read `/api/me`,
+  change the password and log out (`RephiWeb.Auth.PasswordChangeGate`).
+  Every token of the user is revoked and its WebSocket connections are
+  closed, as with a password change.
+
+  Who may reset whose password is the caller's business (the controller
+  checks the permission and `Rephi.Authorization.can_manage_user?/2`).
+
+  Returns `{:ok, user, temporary_password}` or `{:error, :not_found}` if the
+  user no longer exists.
+
+      iex> reset_password(user)
+      {:ok, %User{must_change_password: true}, "kJ3r..."}
+
+  """
+  @spec reset_password(User.t()) :: {:ok, User.t(), String.t()} | {:error, :not_found}
+  def reset_password(%User{id: id} = user) do
+    password = temporary_password()
+
+    result =
+      Repo.transact(fn ->
+        changeset =
+          user
+          |> User.password_changeset(%{password: password})
+          # The version is incremented in the database, so a concurrent
+          # logout cannot leave a token alive.
+          |> Ecto.Changeset.delete_change(:token_version)
+          |> Ecto.Changeset.put_change(:must_change_password, true)
+
+        with {:ok, _user} <- Repo.update(changeset, stale_error_field: :id),
+             {1, [updated]} <-
+               Repo.update_all(from(u in User, where: u.id == ^id, select: u),
+                 inc: [token_version: 1]
+               ) do
+          {:ok, updated}
+        else
+          _deleted -> {:error, :not_found}
+        end
+      end)
+
+    # After the commit: a client that reacts to the disconnect by checking
+    # its token must find it revoked.
+    with {:ok, updated} <- result do
+      disconnect_sockets(updated)
+      {:ok, updated, password}
+    end
+  end
+
+  # 24 URL-safe characters (144 random bits): well within the password rules
+  # (8 characters, 72 bytes), and easy to copy.
+  defp temporary_password do
+    18 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
   end
 
   @doc """

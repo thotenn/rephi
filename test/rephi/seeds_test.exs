@@ -20,7 +20,7 @@ defmodule Rephi.SeedsTest do
 
     assert %{
              "roles" => 3,
-             "permissions" => 18,
+             "permissions" => 19,
              "role_roles" => 2,
              "users" => 1,
              "user_roles" => 1
@@ -43,6 +43,57 @@ defmodule Rephi.SeedsTest do
           do: role.slug
 
     assert granted == ["admin"]
+  end
+
+  test "only admin is granted users:reset_password, as a system permission" do
+    {:ok, _} = Seeds.run(@admin ++ [admin: :optional])
+
+    permission = Authorization.get_permission_by_slug("users:reset_password")
+    assert permission.is_system
+
+    granted =
+      for role <- Repo.all(Role),
+          Authorization.role_has_permission?(role, permission),
+          do: role.slug
+
+    assert granted == ["admin"]
+  end
+
+  test "an existing database gets users:reset_password, and nothing else changes" do
+    {:ok, _} = Seeds.run(@admin)
+    before = counts()
+
+    Repo.delete!(Authorization.get_permission_by_slug("users:reset_password"))
+    assert counts()["permissions"] == before["permissions"] - 1
+
+    {:ok, _} = Seeds.run(@admin)
+    {:ok, _} = Seeds.run(@admin)
+
+    assert counts() == before
+
+    assert Authorization.can?(
+             Accounts.get_user_by_email("owner@example.com"),
+             "users:reset_password"
+           )
+  end
+
+  test "marks the links of the default hierarchy as system links, existing ones too" do
+    {:ok, _} = Seeds.run(@admin)
+
+    assert Repo.all(
+             from rr in "role_roles",
+               join: c in Role,
+               on: c.id == rr.child_role_id,
+               join: p in Role,
+               on: p.id == rr.parent_role_id,
+               order_by: c.slug,
+               select: {c.slug, p.slug, rr.is_system}
+           ) == [{"admin", "manager", true}, {"manager", "user", true}]
+
+    Repo.update_all("role_roles", set: [is_system: false])
+    {:ok, _} = Seeds.run(@admin)
+
+    assert Repo.all(from rr in "role_roles", select: rr.is_system) == [true, true]
   end
 
   test "is idempotent" do

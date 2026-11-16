@@ -176,4 +176,50 @@ defmodule Rephi.AccountsTest do
       assert user.token_version == 0
     end
   end
+
+  describe "reset_password/1" do
+    setup do
+      {:ok, user: create_user()}
+    end
+
+    test "sets a random temporary password, flags the account and ends its sessions",
+         %{user: user} do
+      Phoenix.PubSub.subscribe(Rephi.PubSub, Accounts.socket_id(user))
+
+      assert {:ok, %User{} = updated, password} = Accounts.reset_password(user)
+
+      assert String.length(password) == 24
+      assert password =~ ~r/\A[A-Za-z0-9_-]+\z/
+      assert updated.must_change_password
+      assert updated.token_version == user.token_version + 1
+      assert_receive %Phoenix.Socket.Broadcast{event: "disconnect"}
+
+      stored = Accounts.get_user(user.id)
+      assert stored.must_change_password
+      refute stored.hashed_password == user.hashed_password
+      refute stored.hashed_password =~ password
+      assert {:ok, _} = Accounts.authenticate_user(user.email, password)
+
+      assert {:error, :invalid_credentials} =
+               Accounts.authenticate_user(user.email, "password123")
+
+      assert {:ok, _, another} = Accounts.reset_password(stored)
+      refute another == password
+    end
+
+    test "changing the password afterwards clears the flag", %{user: user} do
+      {:ok, user, password} = Accounts.reset_password(user)
+
+      assert {:ok, %User{must_change_password: false} = changed} =
+               Accounts.change_password(user, password, %{password: "my-own-passphrase"})
+
+      assert changed.token_version == user.token_version + 1
+      refute Accounts.get_user(user.id).must_change_password
+    end
+
+    test "a user deleted in the meantime is not found", %{user: user} do
+      {:ok, _} = Accounts.delete_user(user)
+      assert Accounts.reset_password(user) == {:error, :not_found}
+    end
+  end
 end
