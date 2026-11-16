@@ -10,7 +10,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores(["dist", ".astro", ".wrangler"]),
+  globalIgnores(["dist", ".astro", ".wrangler", "e2e/.results", "e2e/.report"]),
   {
     // React islands and plain TypeScript modules: same rule set as apps/example.
     files: ["**/*.{ts,tsx}"],

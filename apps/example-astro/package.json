@@ -13,7 +13,8 @@
     "preview": "astro preview",
     "typecheck": "astro check",
     "pages:dev": "wrangler pages dev --ip 127.0.0.1",
-    "pages:deploy": "wrangler pages deploy"
+    "pages:deploy": "wrangler pages deploy",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@astrojs/react": "^7.1.9",
@@ -34,6 +35,7 @@
     "@astrojs/check": "^0.9.12",
     "@eslint-react/eslint-plugin": "^5.30.2",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
     "@types/node": "^26.6.6",
     "@types/phoenix": "^1.6.8",
     "@types/react": "^19.3.0",

@@ -20,6 +20,7 @@
     "example:e2e": "yarn workspace rephi-example e2e",
     "example-astro:dev": "yarn workspace rephi-example-astro dev",
     "example-astro:build": "yarn workspace rephi-example-astro build",
+    "example-astro:e2e": "yarn workspace rephi-example-astro e2e",
     "shared:build": "yarn workspace @rephi/shared-components build"
   },
   "engines": {
