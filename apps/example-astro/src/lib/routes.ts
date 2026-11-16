@@ -67,11 +67,33 @@ export function isUnderRoute(pathname: string, route: string): boolean {
   return current === route || current.startsWith(`${route}/`);
 }
 
+/** Placeholder origin `isInternalPath()` resolves paths against. */
+const PROBE_ORIGIN = "http://rephi.invalid";
+
 /**
- * Whether `path` is a same-origin path inside this app. Used before following a
- * stored "redirect back" target, so it can never point to another site.
+ * Whether `path` is a same-origin path inside this app, optionally with a query
+ * string and a hash (`/admin/users/?page=2`). Used before following a stored
+ * "redirect back" target, so it can never point to another site.
+ *
+ * The path is resolved the way the browser would: `/\evil.example` (a
+ * backslash counts as a slash) or `/\t/evil.example` (tabs and newlines are
+ * dropped) leave the site even though they start with a single "/", and
+ * `/app/x/../../elsewhere` leaves `base`.
  */
 export function isInternalPath(path: string | null | undefined): path is string {
   if (!path || !path.startsWith("/") || path.startsWith("//")) return false;
-  return BASE === "" || path === BASE || path.startsWith(`${BASE}/`);
+
+  let url: URL;
+  try {
+    url = new URL(path, PROBE_ORIGIN);
+  } catch {
+    return false;
+  }
+  if (url.origin !== PROBE_ORIGIN) return false;
+
+  // Checked on the raw path as well, so what the browser receives is what
+  // was checked.
+  return [path.replace(/[?#].*$/, ""), url.pathname].every(
+    (pathname) => BASE === "" || pathname === BASE || pathname.startsWith(`${BASE}/`),
+  );
 }

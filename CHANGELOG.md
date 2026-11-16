@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Astro example) import `./app.config.ts` with its extension, so `yarn build` no longer warns that
   the config is not ready for Vite's native config loader. `mix rephi.gen.frontend` accepts both
   forms, so templates of earlier versions still generate
+- **Astro login redirect keeps the query string** - a signed-out visitor sent to the login from
+  `/admin/users/?page=2` comes back to `/admin/users/?page=2`, not `/admin/users/`, as in the SPA.
+  The stored target is now resolved the way the browser does before it is followed, so
+  `/\evil.example`, a path with a tab or newline, or `..` segments that leave `ASTRO_BASE` are
+  ignored too
 
 ## [0.2.0] - 2026-11-16
 
