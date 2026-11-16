@@ -188,27 +188,4 @@ defmodule Rephi.AuthTestHelpers do
 
     detail
   end
-
-  @doc """
-  Generates a valid user attributes map for testing.
-  """
-  def valid_user_attrs(overrides \\ %{}) do
-    Map.merge(
-      %{
-        "email" => "test#{System.unique_integer()}@example.com",
-        "password" => "password123"
-      },
-      overrides
-    )
-  end
-
-  @doc """
-  Generates invalid user attributes for testing validation errors.
-  """
-  def invalid_user_attrs do
-    %{
-      "email" => "invalid-email",
-      "password" => "short"
-    }
-  end
 end

@@ -59,31 +59,31 @@ defmodule Rephi.DotEnvTest do
     @moduletag :tmp_dir
 
     setup %{tmp_dir: dir} do
-      names = ~w(REPHI_DOTENV_A REPHI_DOTENV_B REPHI_DOTENV_EMPTY)
+      names = ~w(DOTENV_TEST_A DOTENV_TEST_B DOTENV_TEST_EMPTY)
       on_exit(fn -> Enum.each(names, &System.delete_env/1) end)
       {:ok, path: Path.join(dir, ".env")}
     end
 
     test "sets the variables of the file", %{path: path} do
-      File.write!(path, "REPHI_DOTENV_A=from-file\n")
+      File.write!(path, "DOTENV_TEST_A=from-file\n")
 
-      assert DotEnv.load(path) == ["REPHI_DOTENV_A"]
-      assert System.get_env("REPHI_DOTENV_A") == "from-file"
+      assert DotEnv.load(path) == ["DOTENV_TEST_A"]
+      assert System.get_env("DOTENV_TEST_A") == "from-file"
     end
 
     test "never overrides a variable that is already set", %{path: path} do
-      System.put_env("REPHI_DOTENV_A", "from-shell")
-      File.write!(path, "REPHI_DOTENV_A=from-file\nREPHI_DOTENV_B=b\n")
+      System.put_env("DOTENV_TEST_A", "from-shell")
+      File.write!(path, "DOTENV_TEST_A=from-file\nDOTENV_TEST_B=b\n")
 
-      assert DotEnv.load(path) == ["REPHI_DOTENV_B"]
-      assert System.get_env("REPHI_DOTENV_A") == "from-shell"
+      assert DotEnv.load(path) == ["DOTENV_TEST_B"]
+      assert System.get_env("DOTENV_TEST_A") == "from-shell"
     end
 
     test "an empty value leaves the variable unset", %{path: path} do
-      File.write!(path, "REPHI_DOTENV_EMPTY=\n")
+      File.write!(path, "DOTENV_TEST_EMPTY=\n")
 
       assert DotEnv.load(path) == []
-      assert System.get_env("REPHI_DOTENV_EMPTY") == nil
+      assert System.get_env("DOTENV_TEST_EMPTY") == nil
     end
 
     test "a missing file is not an error", %{path: path} do

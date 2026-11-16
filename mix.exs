@@ -2,8 +2,6 @@ defmodule Rephi.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/thotenn/rephi"
-  @maintainers ["thotenn"]
 
   def project do
     [
@@ -15,14 +13,13 @@ defmodule Rephi.MixProject do
       aliases: aliases(),
       deps: deps(),
       listeners: [Phoenix.CodeReloader],
-
-      # Hex
-      name: "Rephi",
-      description: description(),
-      package: package(),
-      docs: docs(),
-      source_url: @source_url
+      test_coverage: test_coverage()
     ]
+  end
+
+  # `mix precommit` runs in the test environment, like `mix test`.
+  def cli do
+    [preferred_envs: [precommit: :test]]
   end
 
   # Configuration for the OTP application.
@@ -67,113 +64,41 @@ defmodule Rephi.MixProject do
   end
 
   # Aliases are shortcuts or tasks specific to the current project.
-  # For example, to install project dependencies and perform other setup tasks, run:
   #
-  #     $ mix setup
+  #     $ mix setup       # dependencies, database, seeds and swagger.json
+  #     $ mix precommit   # the checks CI runs, before you push
+  #
+  # `mix setup` prepares the Phoenix side only. The frontends (Node.js and
+  # Yarn) are installed and built by ./setup.sh, which also checks the
+  # toolchain, writes a development `.env` and then calls `mix setup`.
   #
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup", "frontends.build"],
+      setup: ["deps.get", "ecto.setup", "phx.swagger.generate"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-      "frontends.build": &build_frontends/1,
-      "frontends.clean": &clean_frontends/1
-    ]
-  end
-
-  defp build_frontends(_) do
-    apps = ["dashboard", "admin", "ecommerce", "landing"]
-
-    # Ensure priv/static directories exist
-    Enum.each(apps, fn app ->
-      File.mkdir_p!("priv/static/#{app}")
-    end)
-
-    # Build each frontend app that exists
-    Enum.each(apps, fn app ->
-      app_path = "apps/#{app}"
-
-      if File.exists?(app_path) do
-        Mix.shell().info("Building #{app}...")
-
-        # Install dependencies
-        case System.cmd("npm", ["install"], cd: app_path, stderr_to_stdout: true) do
-          {_output, 0} ->
-            Mix.shell().info("✓ Dependencies installed for #{app}")
-
-            # Build the app
-            case System.cmd("npm", ["run", "build"], cd: app_path, stderr_to_stdout: true) do
-              {_output, 0} ->
-                # Copy build files to priv/static
-                source = Path.join(app_path, "dist")
-                dest = "priv/static/#{app}"
-
-                if File.exists?(source) do
-                  File.cp_r!(source, dest)
-                  Mix.shell().info("✓ #{app} built successfully")
-                else
-                  Mix.shell().error("Build directory not found for #{app}")
-                end
-
-              {output, exit_code} ->
-                Mix.shell().error("Failed to build #{app}: #{output}")
-                Mix.raise("Frontend build failed with exit code #{exit_code}")
-            end
-
-          {output, exit_code} ->
-            Mix.shell().error("Failed to install dependencies for #{app}: #{output}")
-            Mix.raise("npm install failed with exit code #{exit_code}")
-        end
-      else
-        Mix.shell().info("Skipping #{app} (not found)")
-      end
-    end)
-
-    Mix.shell().info("Frontend builds completed!")
-  end
-
-  defp clean_frontends(_) do
-    Mix.shell().info("Cleaning frontend builds...")
-    apps = ["dashboard", "admin", "ecommerce", "landing"]
-
-    Enum.each(apps, fn app ->
-      File.rm_rf("priv/static/#{app}")
-    end)
-
-    Mix.shell().info("Frontend builds cleaned!")
-  end
-
-  defp description do
-    "Phoenix framework with JWT auth, RBAC authorization, WebSocket support, and multiple React frontends architecture"
-  end
-
-  defp package do
-    [
-      licenses: ["MIT"],
-      links: %{
-        "GitHub" => @source_url,
-        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
-      },
-      maintainers: @maintainers,
-      files: ~w(lib priv/repo config mix.exs README* LICENSE* CHANGELOG*),
-      exclude_patterns: [
-        "priv/static/dashboard",
-        "priv/static/admin",
-        "priv/static/ecommerce",
-        "priv/static/landing"
+      precommit: [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "deps.unlock --check-unused",
+        "test"
       ]
     ]
   end
 
-  defp docs do
+  # `mix test --cover`. The modules left out are generated code (the
+  # `Guardian.Plug` helpers) or only run by a Mix task (`mix phx.swagger.generate`,
+  # the generators), which the coverage of the suite cannot see.
+  defp test_coverage do
     [
-      main: "readme",
-      extras: ["README.md", "CHANGELOG.md", "LICENSE"],
-      source_ref: "v#{@version}",
-      source_url: @source_url,
-      formatters: ["html"]
+      summary: [threshold: 90],
+      ignore_modules: [
+        RephiWeb.Auth.Guardian.Plug,
+        Rephi.QueryCounter,
+        ~r/\.(DataCase|ConnCase|ChannelCase|AuthTestHelpers)$/
+      ]
     ]
   end
 end
