@@ -1,7 +1,5 @@
 defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
-  # The task works on the current directory, so the tests cd into a temporary
-  # copy of the files it reads. They are the real files of the project: when a
-  # template changes shape, these tests are the ones that notice.
+  # The task works on the current directory: tests cd into a temporary copy.
   use ExUnit.Case, async: false
 
   alias Mix.Tasks.Rephi.Gen.Frontend
@@ -35,7 +33,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       File.cp!(Path.join(root, file), Path.join(tmp_dir, file))
     end
 
-    # Artifacts that must not be copied into a new app.
     for dir <- ~w(node_modules/some-dep dist) do
       File.mkdir_p!(Path.join([tmp_dir, "apps/example", dir]))
       File.write!(Path.join([tmp_dir, "apps/example", dir, "file.js"]), "")
@@ -51,7 +48,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
 
   defp gen(tmp_dir, args), do: File.cd!(tmp_dir, fn -> Frontend.run(args) end)
 
-  # Runs the task expecting it to fail; returns the error it printed.
   defp gen_error(tmp_dir, args) do
     assert catch_exit(gen(tmp_dir, args)) == {:shutdown, 1}
     assert_received {:mix_shell, :error, [message]}
@@ -61,7 +57,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
   defp read(tmp_dir, file), do: File.read!(Path.join(tmp_dir, file))
   defp json(tmp_dir, file), do: tmp_dir |> read(file) |> Jason.decode!()
 
-  # Every file of the tree, to show that a failed run changed nothing.
   defp snapshot(tmp_dir) do
     for path <- Path.wildcard(Path.join(tmp_dir, "**"), match_dot: true),
         File.regular?(path),
@@ -69,7 +64,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
         do: {Path.relative_to(path, tmp_dir), File.read!(path)}
   end
 
-  # The `basename` and `port` an app's app.config.ts declares.
   defp app_config(tmp_dir, app) do
     config = read(tmp_dir, "apps/#{app}/app.config.ts")
     [_, basename] = Regex.run(~r/basename: "([^"]*)"/, config)
@@ -77,8 +71,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
     %{basename: basename, port: String.to_integer(port)}
   end
 
-  # Every number that looks like a port in the files the task reads, before
-  # it runs. The project may already have generated apps of its own.
   defp ports_in_use(tmp_dir) do
     ~w(config/dev.exs apps/example/app.config.ts apps/example/vite.config.ts
        apps/example-astro/app.config.ts apps/example-astro/astro.config.ts)
@@ -86,7 +78,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
     |> MapSet.new(fn [port] -> String.to_integer(port) end)
   end
 
-  # Every file under packages/, to show the task leaves the shared code alone.
   defp packages(tmp_dir) do
     tmp_dir
     |> snapshot()
@@ -113,28 +104,23 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
 
       assert %{"name" => "rephi-demo"} = json(tmp_dir, "apps/demo/package.json")
 
-      # The app's own settings: served by Phoenix at /app/demo, on a free port.
       assert %{basename: "/app/demo", port: port} = app_config(tmp_dir, "demo")
       refute port in in_use
       assert read(tmp_dir, "apps/demo/app.config.ts") =~ "export const appConfig = {"
 
-      # vite.config.ts reads app.config.ts: it is copied as it is.
       assert read(tmp_dir, "apps/demo/vite.config.ts") ==
                read(tmp_dir, "apps/example/vite.config.ts")
 
       assert File.exists?(Path.join(tmp_dir, "apps/demo/index.html"))
 
-      # Mentions of the template in the copied sources follow the new app.
       refute read(tmp_dir, "apps/demo/src/router.tsx") =~ "/app/example"
       assert read(tmp_dir, "apps/demo/src/router.tsx") =~ "/app/demo/"
       assert read(tmp_dir, "apps/demo/.env.example") =~ "VITE_PORT=#{port}"
       refute read(tmp_dir, "apps/demo/.env.example") =~ "/app/example"
 
-      # The template and the shared package are untouched.
       assert read(tmp_dir, "apps/example/app.config.ts") == template_config
       assert packages(tmp_dir) == packages_before
 
-      # Build output, dependencies and local env files stay behind.
       refute File.exists?(Path.join(tmp_dir, "apps/demo/node_modules"))
       refute File.exists?(Path.join(tmp_dir, "apps/demo/dist"))
       refute File.exists?(Path.join(tmp_dir, "apps/demo/.env"))
@@ -145,7 +131,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
 
       assert read(tmp_dir, "config/dev.exs") =~ ~s("http://localhost:#{port}")
 
-      # No leftovers from the temporary copy.
       assert tmp_dir |> Path.join("apps") |> File.ls!() |> Enum.sort() ==
                ["demo", "example", "example-astro"]
 
@@ -162,12 +147,9 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
     test "keeps package.json valid and formatted like Yarn writes it", %{tmp_dir: tmp_dir} do
       original = read(tmp_dir, "package.json")
 
-      # Decoding and encoding the untouched file gives the same bytes: the
-      # task only adds the two scripts.
       assert original |> Jason.decode!(objects: :ordered_objects) |> Frontend.encode_json() ==
                original
 
-      # The last script of an app of apps/, before the task runs.
       apps = File.ls!(Path.join(tmp_dir, "apps"))
 
       last_app_script =
@@ -183,7 +165,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       assert {:ok, %{"scripts" => scripts}} = Jason.decode(package)
       assert Map.has_key?(scripts, "demo2:build")
 
-      # The new scripts go right after the other apps' scripts, in order.
       assert tmp_dir |> script_keys() |> Enum.drop_while(&(&1 != last_app_script)) |> Enum.take(5) ==
                [last_app_script | ~w(demo:dev demo:build demo2:dev demo2:build)]
 
@@ -201,7 +182,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       assert [_, _, 5050] = ports
       assert ports == Enum.uniq(ports)
 
-      # config/dev.exs is still valid Elixir, with the three origins added.
       origins =
         tmp_dir
         |> Path.join("config/dev.exs")
@@ -222,7 +202,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
     end
 
     test "a port taken by another app's app.config.ts is skipped", %{tmp_dir: tmp_dir} do
-      # An app the CORS list does not know about yet.
       File.mkdir_p!(Path.join(tmp_dir, "apps/other"))
 
       File.write!(
@@ -244,10 +223,8 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
       gen(tmp_dir, ["site", "--template", "example-astro"])
 
       assert json(tmp_dir, "apps/site/package.json")["name"] == "rephi-site"
-      # Still a static site that Phoenix does not serve unless asked to.
       assert read(tmp_dir, "apps/site/package.json") =~ ~s("copyToPhoenix": false)
 
-      # It keeps the template's base path ("/", for a static host).
       assert %{basename: "/", port: port} = app_config(tmp_dir, "site")
       refute port in in_use
       assert port >= 4322
@@ -257,7 +234,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
 
       assert read(tmp_dir, "apps/site/wrangler.jsonc") =~ ~s("name": "rephi-site")
       assert read(tmp_dir, "apps/site/.env.example") =~ "ASTRO_BASE=/app/site"
-      # `.env.example` is a file name, not the template's name.
       assert read(tmp_dir, "apps/site/.env.example") =~ "Copy to `.env`"
 
       assert json(tmp_dir, "package.json")["scripts"]["site:build"] ==
@@ -403,7 +379,6 @@ defmodule Mix.Tasks.Rephi.Gen.FrontendTest do
     end
   end
 
-  # Rewrites the module specifier of a template config's app.config import.
   defp set_app_config_import(tmp_dir, template, config, import) do
     path = Path.join(tmp_dir, "apps/#{template}/#{config}")
     contents = File.read!(path)

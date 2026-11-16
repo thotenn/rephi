@@ -1,11 +1,7 @@
 defmodule Rephi.AccountsTimingTest do
   @moduledoc """
-  SEC-10: a login with an unknown email must cost about as much as one with a
-  known email and a wrong password, or response times reveal which emails are
-  registered.
-
-  The suite hashes with the cheapest bcrypt cost, which would hide the
-  difference, so this test raises the cost while it runs.
+  A login with an unknown email must cost about as much as one with a wrong
+  password, or timing reveals registered emails. Raises the bcrypt cost tests lower.
   """
   use Rephi.DataCase, async: false
 
@@ -40,8 +36,6 @@ defmodule Rephi.AccountsTimingTest do
     unknown =
       median_ms(fn -> Accounts.authenticate_user("nobody@example.com", "wrong-password") end)
 
-    # Without the dummy check the unknown email answers in well under a
-    # millisecond, against tens of milliseconds for a real check.
     assert unknown > known * 0.5,
            "unknown email took #{unknown} ms, known email #{known} ms"
   end

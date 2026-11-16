@@ -21,9 +21,7 @@ defmodule RephiWeb.HealthControllerTest do
 end
 
 defmodule RephiWeb.HealthControllerDatabaseDownTest do
-  # No sandbox connection is checked out here, so this process (and the task
-  # the readiness check runs in) cannot reach the database: the closest thing
-  # to an outage that a test can produce without stopping the repo.
+  # No sandbox connection is checked out, so the database is unreachable: a simulated outage.
   use ExUnit.Case, async: false
 
   import Phoenix.ConnTest

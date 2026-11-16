@@ -83,7 +83,7 @@ defmodule Rephi.AccountsTest do
     end
 
     test "are limited to 72 bytes, not characters (bcrypt ignores the rest)" do
-      # 25 characters of 3 bytes each: 75 bytes
+      # 75 bytes: past bcrypt's 72-byte limit
       password = String.duplicate("€", 25)
       assert String.length(password) == 25
 
@@ -112,7 +112,6 @@ defmodule Rephi.AccountsTest do
       refute inspect(user) =~ user.hashed_password
       refute inspect(changeset) =~ "a-secret-password"
       refute inspect(changeset) =~ changeset.changes.hashed_password
-      # The confirmation is not kept on the struct that is returned
       assert user.password_confirmation == nil
     end
   end

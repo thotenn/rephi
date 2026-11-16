@@ -1,16 +1,8 @@
 defmodule Rephi.QueryCounter do
   @moduledoc """
-  Counts the SQL queries a piece of code runs, through the
-  `[:rephi, :repo, :query]` telemetry event.
-
-  Only queries run by the calling process, or by tasks it spawned (Ecto runs
-  parallel preloads that way), count: Ecto emits the event in the process
-  that runs the query and `Phoenix.ConnTest` dispatches requests in the test
-  process, so it is safe in `async: true` tests. Transaction
-  control statements (`begin`, `commit`, savepoints) do not count.
-
-      {result, 1} = count_queries(fn -> Authorization.can?(user, "x:y") end)
-      assert queries(fn -> get(conn, "/api/me") end) |> length() == 2
+  Counts the SQL queries run by the calling process and the tasks it spawned
+  (`[:rephi, :repo, :query]` telemetry), so it is safe in `async: true` tests.
+  Transaction control statements do not count.
   """
 
   @control ~r/\A\s*(begin|commit|rollback|savepoint|release)\b/i

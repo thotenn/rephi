@@ -1,8 +1,5 @@
 defmodule RephiWeb.UserChannelTest do
-  @moduledoc """
-  SEC-06 / API-11. Sockets are opened through `UserSocket.connect/3`, the
-  same path a real client takes, never built by hand.
-  """
+  @moduledoc "Sockets are opened through `UserSocket.connect/3`, as a real client does."
   use RephiWeb.ChannelCase, async: true
 
   import Ecto.Query

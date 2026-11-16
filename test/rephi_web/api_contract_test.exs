@@ -11,7 +11,6 @@ defmodule RephiWeb.ApiContractTest do
   alias Rephi.Authorization
   alias RephiWeb.RateLimiter
 
-  # Documented responses no request here can produce.
   @not_exercised MapSet.new([{"get", "/api/health/ready", 503}])
 
   @missing_id 999_999_999
@@ -180,8 +179,6 @@ defmodule RephiWeb.ApiContractTest do
     end
   end
 
-  # -- the requests -----------------------------------------------------------
-
   defp seed(_ctx) do
     {:ok, _result} = Rephi.Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
 
@@ -190,7 +187,6 @@ defmodule RephiWeb.ApiContractTest do
     {:ok, reset, _password} = Accounts.reset_password(create_user())
     {:ok, reset_token, _claims} = RephiWeb.Auth.Guardian.encode_and_sign(reset)
 
-    # child inherits `inherited` from parent; nothing is assigned to child.
     parent = create_role()
     child = create_role()
     {:ok, _} = Authorization.assign_parent_role(child, parent)
@@ -230,8 +226,6 @@ defmodule RephiWeb.ApiContractTest do
            Application.put_env(:rephi, :swagger_enabled, true)
          end
        end},
-
-      # Auth
       {"post", "/api/users/register", 201,
        fn -> call(:post, "/api/users/register", nil, new_credentials()) end},
       {"post", "/api/users/register", 422,
@@ -269,8 +263,6 @@ defmodule RephiWeb.ApiContractTest do
            password: "another-long-passphrase"
          })
        end},
-
-      # Notifications
       {"post", "/api/notifications/broadcast", 200,
        fn -> call(:post, "/api/notifications/broadcast", token, %{message: "Hello"}) end},
       {"post", "/api/notifications/broadcast", 422,
@@ -279,11 +271,7 @@ defmodule RephiWeb.ApiContractTest do
        fn -> call(:post, "/api/notifications/me", ctx.nobody_token, %{message: "Hi me"}) end},
       {"post", "/api/notifications/me", 422,
        fn -> call(:post, "/api/notifications/me", ctx.nobody_token, %{message: ""}) end},
-
-      # Dashboard
       {"get", "/api/dashboard", 200, fn -> call(:get, "/api/dashboard", token) end},
-
-      # Roles
       {"get", "/api/roles", 200, fn -> call(:get, "/api/roles", token) end},
       {"get", "/api/roles", 422, fn -> call(:get, "/api/roles?page=abc", token) end},
       {"get", "/api/roles/{id}", 200, fn -> call(:get, "/api/roles/#{ctx.child.id}", token) end},
@@ -350,8 +338,6 @@ defmodule RephiWeb.ApiContractTest do
        end},
       {"delete", "/api/roles/{role_id}/parents/{parent_id}", 409,
        fn -> call(:delete, "/api/roles/#{admin_role.id}/parents/#{manager_role.id}", token) end},
-
-      # Permissions
       {"get", "/api/permissions", 200, fn -> call(:get, "/api/permissions", token) end},
       {"get", "/api/permissions", 422,
        fn -> call(:get, "/api/permissions?page_size=0", token) end},
@@ -409,8 +395,6 @@ defmodule RephiWeb.ApiContractTest do
        fn ->
          call(:delete, "/api/roles/#{ctx.child.id}/permissions/#{ctx.inherited.id}", token)
        end},
-
-      # Users
       {"get", "/api/users", 200, fn -> call(:get, "/api/users", token) end},
       {"get", "/api/users", 422, fn -> call(:get, "/api/users?page=-1", token) end},
       {"get", "/api/users/{id}", 200, fn -> call(:get, "/api/users/#{ctx.admin.id}", token) end},
@@ -470,8 +454,6 @@ defmodule RephiWeb.ApiContractTest do
     ]
   end
 
-  # The responses every operation of a kind answers the same way, derived
-  # from what the document declares.
   defp generic_cases(%{token: token} = ctx, document) do
     for {verb, path, op} <- operations(document),
         status <- Map.keys(op["responses"]) |> Enum.map(&String.to_integer/1),
@@ -567,8 +549,6 @@ defmodule RephiWeb.ApiContractTest do
 
   defp fill(path, id), do: Regex.replace(~r/\{[a-z_]+\}/, path, to_string(id))
 
-  # -- the document -----------------------------------------------------------
-
   defp document, do: RephiWeb.ApiSpec.spec() |> Jason.encode!() |> Jason.decode!()
 
   defp controller_routes do
@@ -655,8 +635,6 @@ defmodule RephiWeb.ApiContractTest do
   defp strict(other), do: other
 
   defp strict_property({key, schema}), do: {key, strict(schema)}
-
-  # -- the response against the schema ----------------------------------------
 
   defp assert_body(conn, %{content: nil}, _response, _spec, _document, where) do
     assert conn.resp_body == "", "#{where}: documented without a body, got #{conn.resp_body}"

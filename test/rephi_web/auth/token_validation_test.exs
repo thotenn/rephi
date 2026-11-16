@@ -1,15 +1,14 @@
 defmodule RephiWeb.Auth.TokenValidationTest do
   @moduledoc """
-  What the `:authenticated` pipeline accepts as a token (SEC-02, SEC-04,
-  SEC-08, SEC-16). Every rejection is a 401 in the error envelope, never a 500.
+  What the `:authenticated` pipeline accepts as a token. Every rejection is a 401
+  in the error envelope, never a 500.
   """
   use RephiWeb.ConnCase, async: true
 
   alias Rephi.Accounts
   alias RephiWeb.Auth.Guardian
 
-  # The key that used to be committed in config/config.exs. It is public, so a
-  # token signed with it must never be accepted again.
+  # Once committed in config/config.exs, so public: tokens signed with it must be rejected.
   @leaked_secret "d3mVezqyv5GuKhoKELh30QdnY3P0u46Y6pIP8DaWVElPvBeahq61pHcey6n4wjhq"
 
   setup do

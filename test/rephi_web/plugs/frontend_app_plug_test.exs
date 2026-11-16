@@ -1,6 +1,5 @@
 defmodule RephiWeb.Plugs.FrontendAppPlugTest do
-  # Points the plug at a temporary directory through application env and
-  # changes the working directory in one test, so it cannot run concurrently.
+  # Uses application env and changes the working directory.
   use RephiWeb.ConnCase, async: false
 
   import Plug.Test, only: [conn: 2]
@@ -12,24 +11,6 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
   @secret "TOP-SECRET-OUTSIDE-THE-APPS-DIRECTORY"
   @immutable "public, max-age=31536000, immutable"
 
-  # tmp_dir/
-  #   secret.txt                  <- must never be served
-  #   apps/
-  #     spa/                      <- single-page application (Vite)
-  #       index.html
-  #       favicon.svg
-  #       LICENSE
-  #       .env
-  #       assets/app-3f9a1c2b.js
-  #       assets/logo-77aa01bc.png
-  #     site/                     <- multi-page static site (Astro)
-  #       index.html
-  #       404.html
-  #       about.html
-  #       login/index.html
-  #       docs/guide/index.html
-  #       _astro/page.x1y2z3a4.css
-  #     Not_Valid/index.html      <- name not allowed
   setup %{tmp_dir: tmp_dir} do
     root = Path.join(tmp_dir, "apps")
 
@@ -185,8 +166,6 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
     end
 
     test "a directory without an index never fails nor lists its content", %{conn: conn} do
-      # No `assets/index.html`, and no `404.html` in this app: these are just
-      # client-side routes as far as the server can tell.
       for path <- ["/app/spa/assets", "/app/spa/assets/"] do
         conn = get(conn, path)
 
@@ -242,7 +221,6 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
     end
 
     test "does not redirect a directory without an index", %{conn: conn} do
-      # `docs/` exists but only `docs/guide/` has an index.
       for path <- ["/app/site/docs", "/app/site/docs/", "/app/site/_astro", "/app/site/_astro/"] do
         assert conn |> get(path) |> html_response(404) =~ "SITE NOT FOUND PAGE"
       end
@@ -316,14 +294,12 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
 
   describe "path traversal (SEC-01)" do
     @attempts [
-      # Literal dot segments (what `curl --path-as-is` sends)
       "/app/spa/../../secret.txt",
       "/app/spa/assets/../../../secret.txt",
       "/app/spa/..",
       "/app/spa/./index.html",
       "/app/../secret.txt",
       "/app/spa/../spa/index.html",
-      # Percent-encoded dots and separators
       "/app/spa/%2e%2e/%2e%2e/secret.txt",
       "/app/spa/%2E%2E/%2E%2E/secret.txt",
       "/app/spa/..%2f..%2fsecret.txt",
@@ -332,20 +308,16 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
       "/app/spa/..%5c..%5csecret.txt",
       "/app/spa/assets/..%5c..%5c..%5csecret.txt",
       "/app/%2e%2e/secret.txt",
-      # Double encoding
       "/app/spa/%252e%252e/%252e%252e/secret.txt",
       "/app/spa/%252e%252e%252fsecret.txt",
-      # Absolute paths
       "/app/spa/%2fetc%2fpasswd",
       "/app/spa/%2Fetc%2Fpasswd.txt",
       "/app/spa/C:%5cWindows%5cwin.ini",
       "/app/spa/c:/windows/win.ini",
-      # Null bytes
       "/app/spa/index.html%00.js",
       "/app/spa/%00",
       "/app/spa/assets/app-3f9a1c2b.js%00.png",
       "/app/spa/..%00/secret.txt",
-      # Malformed escapes and invalid UTF-8
       "/app/spa/%zz.js",
       "/app/spa/%.js",
       "/app/spa/assets/%e0%a4%a.js",
@@ -356,7 +328,6 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
       test "#{attempt} is rejected", %{conn: conn} do
         conn = get(conn, unquote(attempt))
 
-        # The path reaches the plug exactly as it was sent.
         assert conn.request_path == unquote(attempt)
         assert conn.status in [400, 404], "unexpected status #{conn.status}"
         assert %{"errors" => %{"detail" => _}} = Jason.decode!(conn.resp_body)
@@ -366,7 +337,6 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
     end
 
     test "a repeated slash is not an absolute path", %{conn: conn} do
-      # `//etc/passwd` is just the route `etc/passwd` of the app.
       conn = get(conn, "/app/site//etc/passwd")
 
       assert html_response(conn, 404) =~ "SITE NOT FOUND PAGE"
@@ -451,8 +421,7 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
     test "a redirect is rebuilt from the path segments, so it never leaves the host", %{
       root: root
     } do
-      # With the raw request path, a leading `//` would produce
-      # `Location: //app/site/login/`, which a browser reads as another host.
+      # With the raw path, a leading `//` would give `Location: //app/...`, another host.
       conn = %{
         conn(:get, "/site/login")
         | request_path: "//app/site/login",
@@ -492,8 +461,7 @@ defmodule RephiWeb.Plugs.FrontendAppPlugTest do
     test "serves the default directory whatever the working directory is", %{conn: conn} do
       Application.delete_env(:rephi, :frontend_apps_dir)
 
-      # The only test that writes outside its tmp dir: the default directory is
-      # what a release serves, so it is exercised for real and cleaned up after.
+      # Writes outside its tmp dir: the default root is what a release serves.
       root = FrontendAppPlug.root()
       root_existed? = File.dir?(root)
       name = "zz-test-fixture-#{System.unique_integer([:positive])}"

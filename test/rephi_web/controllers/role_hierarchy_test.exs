@@ -252,7 +252,6 @@ defmodule RephiWeb.RoleHierarchyTest do
 
       {_u, token} = create_user_with_token_and(roles: [held.slug], permissions: ["roles:edit"])
 
-      # `held` inherits from `not_held`, so the user holds both.
       assert conn
              |> authenticate_conn(token)
              |> delete(link_path(held, not_held))

@@ -1,9 +1,7 @@
 defmodule RephiWeb.QueryBudgetTest do
   @moduledoc """
-  RBAC-01 / RBAC-10: what a request costs in SQL queries. The authorization
-  of a request is loaded once (`RephiWeb.Auth.Pipeline`): the user, then its
-  access, whatever the depth of the role hierarchy. If one of these numbers
-  grows, something started querying per check again.
+  SQL queries per request. Authorization is loaded once (user, then access)
+  whatever the role depth; if a number grows, something queries per check again.
   """
   use RephiWeb.ConnCase, async: true
 

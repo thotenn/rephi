@@ -1,7 +1,7 @@
 defmodule RephiWeb.Plugs.RateLimitTest do
   @moduledoc """
-  SEC-12. The limiter is off in the test environment; these tests turn it on
-  for themselves, which is why they cannot run concurrently with the rest.
+  The limiter is off in tests; these turn it on for themselves, so they cannot
+  run concurrently with the rest.
   """
   use RephiWeb.ConnCase, async: false
 

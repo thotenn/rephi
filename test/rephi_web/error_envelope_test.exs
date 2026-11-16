@@ -13,8 +13,6 @@ defmodule RephiWeb.ErrorEnvelopeTest do
     |> post(path, body)
   end
 
-  # Runs a request that raises and returns the error the endpoint rendered for
-  # it (`render_errors` in config/config.exs).
   defp rendered_error(status, fun) do
     {^status, _headers, body} = assert_error_sent(status, fun)
     Jason.decode!(body)
@@ -140,7 +138,6 @@ defmodule RephiWeb.ErrorEnvelopeTest do
                "data" => %{"name" => "rephi", "health" => "/api/health"}
              }
 
-      # No session cookie: the API is stateless.
       assert get_resp_header(conn, "set-cookie") == []
     end
   end

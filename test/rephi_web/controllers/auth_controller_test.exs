@@ -302,7 +302,6 @@ defmodule RephiWeb.AuthControllerTest do
         assert error_detail(conn, 401) == "Invalid or expired token"
       end
 
-      # Logging in again works
       conn = post(build_conn(), ~p"/api/users/login", @valid_user_attrs)
       assert %{"data" => %{"token" => new_token}} = json_response(conn, 200)
       assert json_response(build_conn() |> authenticate_conn(new_token) |> get(~p"/api/me"), 200)
@@ -334,7 +333,6 @@ defmodule RephiWeb.AuthControllerTest do
              } =
                json_response(conn, 201)
 
-      # The seeded user role grants no permission over other users
       assert user["permissions"] == []
 
       {:ok, claims} = Guardian.decode_and_verify(token)

@@ -2,8 +2,7 @@ defmodule Rephi.DotEnvTest do
   @moduledoc "SEC-21 / API-15: the development `.env` loader."
   use ExUnit.Case, async: false
 
-  # config/config.exs already required it; this is a no-op unless the test
-  # runs on its own in a fresh VM.
+  # Already required by config/config.exs; needed when the file runs in a fresh VM.
   Code.require_file("../../config/dotenv.exs", __DIR__)
 
   alias Rephi.DotEnv

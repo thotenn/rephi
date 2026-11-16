@@ -4,8 +4,7 @@ defmodule RephiWeb.UserControllerTest do
 
   alias Rephi.{Accounts, Authorization, Seeds}
 
-  # The default roles and permissions: admin -> manager -> user, users:view
-  # and users:edit on manager, users:delete on admin only.
+  # Seeded: admin -> manager -> user; users:view/edit on manager, users:delete on admin.
   setup %{conn: conn} do
     {:ok, _} = Seeds.run(admin_email: nil, admin_password: nil, admin: :optional)
 
@@ -43,7 +42,6 @@ defmodule RephiWeb.UserControllerTest do
     end
 
     test "every action needs its own permission", ctx do
-      # manager: users:view and users:edit, no users:delete
       assert ctx.as_manager |> get(~p"/api/users/#{ctx.plain.id}") |> json_response(200)
       assert ctx.as_manager |> get(~p"/api/users/#{ctx.plain.id}/roles") |> json_response(200)
 

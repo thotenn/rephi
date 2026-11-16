@@ -14,7 +14,6 @@ defmodule Rephi.ReleaseTest do
     output = capture_io(fn -> assert Release.seed() == :ok end)
 
     assert output =~ "Seeded the default roles and permissions."
-    # config/test.exs: no administrator without ADMIN_EMAIL / ADMIN_PASSWORD.
     assert output =~ "Administrator: none (ADMIN_EMAIL / ADMIN_PASSWORD are not set)"
     assert Rephi.Authorization.get_role_by_slug("admin").is_system
   end
@@ -25,7 +24,6 @@ defmodule Rephi.ReleaseTest do
     assert capture_io(&Release.seed/0) =~
              "Administrator: admin@admin.com (the well-known development administrator)"
 
-    # A grant between seeded records that the seed does not make.
     user = Rephi.Authorization.get_role_by_slug("user")
     permission = Rephi.Authorization.get_permission_by_slug("system:manage")
     {:ok, _} = Rephi.Authorization.assign_permission_to_role(user, permission)

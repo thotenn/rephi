@@ -1,8 +1,5 @@
 defmodule RephiWeb.UserSocketTest do
-  @moduledoc """
-  Socket authentication (SEC-06, SEC-09, SEC-16), always through
-  `UserSocket.connect/3`.
-  """
+  @moduledoc "Socket authentication, always through `UserSocket.connect/3`."
   use RephiWeb.ChannelCase, async: true
 
   import Rephi.AuthTestHelpers

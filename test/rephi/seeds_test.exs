@@ -207,7 +207,7 @@ defmodule Rephi.SeedsTest do
     test "grants the seed no longer makes are reported, never revoked" do
       {:ok, %{stale_grants: []}} = Seeds.run(@admin)
 
-      # What an older seed did: user -> users:view
+      # What an older seed granted: user -> users:view
       {:ok, _} =
         Authorization.assign_permission_to_role(
           Authorization.get_role_by_slug("user"),

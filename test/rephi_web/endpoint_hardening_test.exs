@@ -1,8 +1,7 @@
 defmodule RephiWeb.EndpointHardeningTest do
   @moduledoc """
-  CORS (SEC-14, API-17), HTTPS redirect (SEC-15), secure headers on the API
-  (SEC-15), the API documentation switch (SEC-20) and the "every API route needs a
-  token" invariant.
+  CORS, the HTTPS redirect, secure API headers, the API documentation switch and
+  the "every API route needs a token" invariant.
   """
   use RephiWeb.ConnCase, async: false
 

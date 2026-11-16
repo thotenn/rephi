@@ -7,8 +7,6 @@ defmodule RephiWeb.PermissionControllerTest do
                   permissions:assign)
 
   setup %{conn: conn} do
-    # An admin: it may grant any role or permission (RBAC-05 is tested below
-    # with users that are not).
     {user, token} = create_user_with_token_and(permissions: @permissions, roles: ["admin"])
     {:ok, conn: authenticate_conn(conn, token), user: user}
   end
@@ -266,7 +264,6 @@ defmodule RephiWeb.PermissionControllerTest do
     end
   end
 
-  # Every route of the controller that takes an id, for a role and a permission.
   defp routes(role_id, permission_id) do
     [
       {:get, "/api/permissions/#{permission_id}"},

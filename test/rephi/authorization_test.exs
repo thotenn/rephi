@@ -10,8 +10,6 @@ defmodule Rephi.AuthorizationTest do
   alias Rephi.Accounts.User
   alias Rephi.Authorization.{Access, Permission, Role, RoleRole, UserRole}
 
-  # A chain of `depth` roles, root first: each role is the child of the one
-  # before it and holds one permission of its own. Returns `{roles, slugs}`.
   defp chain(depth) do
     roles =
       for _ <- 1..depth do
@@ -295,7 +293,7 @@ defmodule Rephi.AuthorizationTest do
       {[a, b], [slug_a, slug_b]} = chain(2)
       c = create_role()
       now = DateTime.utc_now(:second)
-      # b is a's child already; make a a child of b, and c a child of a.
+
       Repo.insert_all(RoleRole, [
         %{parent_role_id: b.id, child_role_id: a.id, inserted_at: now, updated_at: now},
         %{parent_role_id: a.id, child_role_id: c.id, inserted_at: now, updated_at: now}
@@ -336,7 +334,6 @@ defmodule Rephi.AuthorizationTest do
 
       assert Enum.map(direct, & &1.id) |> Enum.sort() == Enum.sort([own.id, both.id])
 
-      # `both` is assigned to bottom itself, so it is not listed as inherited
       assert [{%Permission{id: shared_id}, from}] = inherited
       assert shared_id == shared.id
       assert Enum.map(from, & &1.id) == [top.id]

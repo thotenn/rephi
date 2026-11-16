@@ -6,8 +6,6 @@ defmodule RephiWeb.RoleControllerTest do
   @permissions ~w(roles:view roles:create roles:edit roles:delete roles:assign)
 
   setup %{conn: conn} do
-    # An admin: it may grant any role or permission (RBAC-05 is tested below
-    # with users that are not).
     {user, token} = create_user_with_token_and(permissions: @permissions, roles: ["admin"])
     {:ok, conn: authenticate_conn(conn, token), user: user}
   end
@@ -236,7 +234,6 @@ defmodule RephiWeb.RoleControllerTest do
 
       for id <- ["999999" | invalid_ids()],
           {method, path} <- routes(id, id) ++ routes(user.id, id) ++ routes(id, role.id),
-          # `routes(user.id, id)` also yields routes that only take a role id
           String.contains?(path, "/#{id}") do
         conn = dispatch(conn, @endpoint, method, path, %{name: "x"})
 
@@ -382,7 +379,6 @@ defmodule RephiWeb.RoleControllerTest do
     end
   end
 
-  # Every route of the controller that takes an id, for a user and a role.
   defp routes(user_id, role_id) do
     [
       {:get, "/api/roles/#{role_id}"},

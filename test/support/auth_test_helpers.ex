@@ -47,18 +47,8 @@ defmodule Rephi.AuthTestHelpers do
   end
 
   @doc """
-  Creates a user holding the given grants and returns `{user, token}`.
-
-  ## Options
-
-    * `:permissions` - permission slugs assigned directly to the user
-    * `:roles` - role slugs assigned to the user
-
-  Roles and permissions that do not exist yet are created.
-
-      {admin, token} = create_user_with_token_and(roles: ["admin"])
-      {user, token} = create_user_with_token_and(permissions: ["roles:view"])
-
+  Creates a user holding the given `:roles` and `:permissions` (slugs, created
+  if missing) and returns `{user, token}`.
   """
   def create_user_with_token_and(grants, attrs \\ %{}) do
     user = create_user(attrs)
@@ -111,16 +101,9 @@ defmodule Rephi.AuthTestHelpers do
   end
 
   @doc """
-  Signs `claims` as an HS512 JWT, bypassing Guardian entirely, so tests can
-  build tokens Guardian itself would never issue (no `exp`, another `typ`, a
-  foreign issuer, a different key).
-
-  `claims` are merged over the claims of a regular access token for `user`
-  (or for no one when `user` is `nil`); a `nil` value removes the claim.
-
-  ## Options
-
-    * `:secret` - the signing key; defaults to the configured one
+  Signs `claims` as an HS512 JWT, bypassing Guardian, to build tokens it never
+  issues. `claims` are merged over a regular access token's (`nil` removes one);
+  `opts[:secret]` overrides the key.
   """
   def forge_token(user, claims \\ %{}, opts \\ []) do
     now = System.system_time(:second)
@@ -175,9 +158,6 @@ defmodule Rephi.AuthTestHelpers do
 
   @doc """
   Asserts the response is an error in the API envelope and returns its detail.
-
-      assert error_detail(conn, 404) == "Not Found"
-
   """
   def error_detail(conn, status) do
     %{"errors" => %{"detail" => detail} = errors} = Phoenix.ConnTest.json_response(conn, status)

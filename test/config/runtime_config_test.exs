@@ -1,8 +1,5 @@
 defmodule Rephi.RuntimeConfigTest do
-  @moduledoc """
-  Evaluates config/runtime.exs as production would (SEC-02, SEC-14, SEC-15,
-  SEC-20, API-12) and checks `.env.example` (SEC-03, API-15).
-  """
+  @moduledoc "Evaluates config/runtime.exs as production would, and checks `.env.example`."
   use ExUnit.Case, async: false
 
   @runtime Path.expand("../../config/runtime.exs", __DIR__)
@@ -75,7 +72,6 @@ defmodule Rephi.RuntimeConfigTest do
     assert force_ssl[:hsts] == true
     assert "/api/health" in force_ssl[:exclude][:paths]
 
-    # Nothing in runtime.exs turns these on by default
     refute Keyword.has_key?(config[:rephi], :swagger_enabled)
     refute Keyword.has_key?(config[:rephi], :cors_origins)
   end
