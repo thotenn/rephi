@@ -50,6 +50,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Browser tests of `apps/example-astro`** - the same kind of Playwright suite
   (`apps/example-astro/e2e/`, `yarn example-astro:e2e`), plus a performance check: on a production
   build a navigation goes through the client router and downloads no JavaScript twice
+- **Dashboard counters** - `GET /api/dashboard` (signed in, behind the password gate):
+  `users.total` (with `users:view`), `notifications.sent_total` (broadcasts by anyone, with
+  `notifications:broadcast`), `notifications.sent_by_me` and `sessions.online_users` /
+  `connections` for everyone. A counter the caller may not see is `null` and is not queried.
+  Both example apps show them on the dashboard instead of hard-coded numbers, hide the ones the
+  user may not see, keep "Active sessions" live from the lobby's presence and refetch after a send
+- **Notifications are recorded** - new `notifications` table and `Rephi.Notifications`
+  (`record/1`, `count_broadcasts/0`, `count_sent_by/1`): `RephiWeb.Notifications` records every
+  send (`scope` `broadcast`, `self` or `direct`, sender and recipient cleared when the user is
+  deleted) before pushing it; the payload's `timestamp` is the record's
+- **Presence** - `RephiWeb.Presence` (Phoenix Presence) tracks every socket joined to
+  `user:lobby` under its user id (metas `user_id` and `joined_at`); lobby members receive
+  `presence_state` / `presence_diff`. `RephiWeb.Presence.online_counts/0`
+- **Send a test to myself** - `POST /api/notifications/me` (any signed-in user, same body and
+  validation as a broadcast) pushes `new_notification` only to the caller's `user:<id>`, with the
+  broadcast's payload, recorded as `self`; 5 per minute and user (bucket `self_notification`,
+  `429` with `retry-after`). `RephiWeb.Notifications.notify_self/2`. The Home card of both apps is
+  shown to every user: the broadcast form plus "Send a test to myself" with
+  `notifications:broadcast`, only the test (and a line saying what broadcasting needs) without it
+- `RephiWeb.Plugs.RateLimit` counts per user with `by: :user`; `Rephi.Accounts.count_users/0`
+- OpenAPI: the `Dashboard` tag, `DashboardResponse` and its parts, and the new operation of
+  `NotificationController`; a route whose only `403` is the password gate is probed with a reset
+  user in the contract test
+- `@rephi/shared-components`: `fetchDashboard`, `broadcastNotification`,
+  `sendTestNotification`, `presenceCounts` and the types `DashboardStats`, `OnlineCounts`,
+  `PresenceEntry`; `useChannel` returns the topic's `presences` (bound before the join)
+- Browser tests of both apps: the dashboard counters per role, the test to oneself shown once and
+  to nobody else, broadcasts reaching everybody, and "Active sessions" following a second user
+  (Playwright project `presence`, run after the others)
 
 ### Changed
 - **API documentation in OpenAPI 3.0** (`open_api_spex` 3.22) instead of Swagger 2.0
@@ -98,6 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The stored target is now resolved the way the browser does before it is followed, so
   `/\evil.example`, a path with a tab or newline, or `..` segments that leave `ASTRO_BASE` are
   ignored too
+- **`mix rephi.gen.frontend`** places the new app's scripts after every script of the existing
+  apps (`example:e2e` included), not after their `:dev` / `:build` scripts only
 - **Dashboard quick actions (`apps/example`)** - "Create New Item" and "View Reports" did nothing.
   They are now links, each shown only with the permissions it needs: "New role" (opens the
   create-role form), "Send notification" (the broadcast form, message field focused), "Manage
@@ -119,11 +150,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the repository root
 
 ### Upgrading
-- Run the migrations (`20261116140000`, `20261116140100`), then seed again (`bin/seed` or
+- Run the migrations (`20261116140000`, `20261116140100`, `20261116150000` for the
+  `notifications` table), then seed again (`bin/seed` or
   `mix run priv/repo/seeds.exs`) to get `users:reset_password` on `admin` and the default links
   marked as system links (the migration already marks links between two system roles)
 - Clients reading the user object should handle `must_change_password` (send the user to the
   password change form)
+- Add the `self_notification` bucket (`[limit: 5, window_seconds: 60]`) to
+  `config :rephi, RephiWeb.Plugs.RateLimit` in `config/config.exs`: without it
+  `POST /api/notifications/me` fails while the limiter is on
+- Lobby clients now receive `presence_state` / `presence_diff` events; clients that log every
+  event may want to ignore them
 - API documentation consumers: read `/api/openapi` (OpenAPI 3.0) instead of
   `/api/swagger/swagger.json`, and drop `mix phx.swagger.generate` from any build script
 

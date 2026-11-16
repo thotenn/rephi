@@ -42,6 +42,7 @@ lib/rephi/
   accounts/accounts.ex, user.ex    Accounts: register_user (default role), change_password, reset_password, revoke_tokens
   authorization.ex                 RBAC context: load_access, can?, has_role?, assign_*/remove_*, preserving_admins
   authorization/                   Role, Permission, UserRole, UserPermission, RolePermission, RoleRole, Access
+  notifications.ex, notifications/ the record of sent notifications (scope broadcast/self/direct) and its counts
   seeds.ex                         default roles/permissions/admin as data (@roles, @permissions); run/1
   release.ex                       migrate/0, seed/0 for bin/migrate, bin/seed
   pagination.ex, health.ex, repo.ex (fetch/2, cast_id/1)
@@ -53,7 +54,8 @@ lib/rephi_web/
   api_spec/operations.ex           helpers for `operation`: bearer_auth, id_param, page_params, body, responses
   schemas.ex, schemas/*.ex         RephiWeb.Schemas.* (one module per body) + data/page/timestamp helpers
   plugs/                           FrontendAppPlug, RateLimit, ForceSSL, BodyParser
-  notifications.ex, channels/      topics user:lobby / user:<id>, event new_notification
+  notifications.ex, channels/      topics user:lobby / user:<id>, event new_notification (records, then pushes)
+  presence.ex                      Phoenix Presence of user:lobby (key = user id); online_counts/0
   cors.ex, rate_limiter.ex
 config/runtime.exs                 every environment variable (documented in .env.example)
 ```
@@ -71,6 +73,13 @@ for a changeset (422), `{"errors": {"field": ["..."]}}`. Never build an error bo
   `FallbackController` `@domain_errors`: add new ones there. Convention: 403 = the caller lacks
   the right for *this* change, 409 = it conflicts with the data, 422 = an invalid field;
 - in a plug: `conn |> RephiWeb.FallbackController.call({:error, :too_many_requests}) |> halt()`.
+
+**Realtime.** Send notifications only through `RephiWeb.Notifications` (it records each one with
+`Rephi.Notifications` before pushing). Presence metas reach every lobby member: user id and
+`joined_at` only, never an email. Throttle per user with
+`plug RephiWeb.Plugs.RateLimit, [bucket: :x, by: :user]` (after authentication; the bucket goes in
+`config/config.exs`). A counter a permission hides is `null` in the response, not absent: the
+contract test requires every property.
 
 **Requests.** Read write bodies with `resource_params(conn, "role")` (flat or wrapped under the
 resource name; body only, never path/query). `conflict_if_taken(result, "message")` turns a
@@ -213,7 +222,8 @@ def archive(conn, %{"id" => id}), do: ...
   (do not depend on the shell's `ADMIN_*`).
 - Query budgets: `import Rephi.QueryCounter`; `count_queries(fn -> ... end)` returns
   `{result, count}`. Login 2, `/api/me` 2, `/api/roles/:id` 4, `/api/roles/:id/parents` 4,
-  `/api/users/:id/permissions` 5: if a number grows, something queries per check again.
+  `/api/users/:id/permissions` 5, `/api/dashboard` 5 (admin) / 3 (no permission): if a number
+  grows, something queries per check again.
 - Channels: `connect(UserSocket, %{}, connect_info: %{auth_token: token})`.
 - Rate limiting is off in test; turn it on per test with `put_app_env(RephiWeb.Plugs.RateLimit,
   ...)` + `RephiWeb.RateLimiter.reset/0`.
@@ -234,6 +244,9 @@ def archive(conn, %{"id" => id}), do: ...
   paths fall back to `index.html` (SPA). A SPA must not ship a root `404.html`.
 - `"rephi": {"copyToPhoenix": false}` in an app's `package.json` keeps it out of
   `priv/static/apps` (the Astro app: it targets a static host).
+- One socket and one join per topic per app: `RealtimeProvider` (SPA) / `AppRuntime` (Astro) own
+  `user:lobby` and `user:<id>`; other components read their state (presence included:
+  `useChannel(...).presences`, `presenceCounts/1`), never join again.
 - Authorize the UI by `permissions` (effective); `roles` in the session are only the assigned
   ones. Any 401 on the current token ends the session.
 - A session user with `must_change_password` is kept on the profile page (password form) until it

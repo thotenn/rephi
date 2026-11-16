@@ -10,7 +10,8 @@ React single-page apps served by Phoenix, or static sites hosted anywhere.
   password change, deleted users; rate-limited login and registration
 - **RBAC** - hierarchical roles, permissions, system records, protection against privilege
   escalation and against losing the last administrator; checks cost no query inside a request
-- **Realtime** - an authenticated socket with a broadcast topic and a private topic per user
+- **Realtime** - an authenticated socket with a broadcast topic and a private topic per user,
+  Phoenix Presence for who is online, persisted notifications and a dashboard of live counters
 - **Frontends** - `@rephi/shared-components` (the only code that talks to the backend), a React
   SPA example served by Phoenix at `/app/example/`, the same app as a static Astro site for
   Cloudflare Pages, and `mix rephi.gen.frontend` to add more
@@ -144,7 +145,7 @@ Settings that are code rather than environment live in `config/config.exs`:
 | `config :rephi, Rephi.Authorization, admin_role:` | `"admin"` | The administrator role: at least one user always keeps it, and its holders may grant any role or permission and manage any user |
 | `config :rephi, Rephi.Accounts, default_role:` | `"user"` | The role every new account gets; `nil` gives none |
 | `config :rephi, RephiWeb.Notifications, max_message_length:` | `500` | Longest broadcast message, in characters |
-| `config :rephi, RephiWeb.Plugs.RateLimit, ...` | see the file | Buckets, limits and windows of the rate limiter |
+| `config :rephi, RephiWeb.Plugs.RateLimit, ...` | see the file | Buckets, limits and windows of the rate limiter (`self_notification`: 5 tests to oneself per minute and user) |
 
 ## Authentication
 
@@ -308,6 +309,8 @@ it, but would answer with its own error format).
 | | `POST/DELETE /api/roles/:role_id/permissions/:permission_id` | `permissions:assign` |
 | | `POST/DELETE /api/users/:user_id/permissions/:permission_id` | `permissions:assign` |
 | Notifications | `POST /api/notifications/broadcast` | `notifications:broadcast` |
+| | `POST /api/notifications/me` (to the caller only) | signed in |
+| Dashboard | `GET /api/dashboard` | signed in (some counters need a permission) |
 
 **Envelopes.** A successful response with a body is `{"data": ...}`. Lists of users, roles and
 permissions are paginated with `page` (from 1) and `page_size` (default 50, at most 100):
@@ -366,8 +369,49 @@ system sends it). Render `message` as text. Clients cannot broadcast: the only c
 `ping` (echoed back); anything else gets an `unknown_event` error reply.
 
 `POST /api/notifications/broadcast` (`{"message": "..."}`, 1 to 500 characters, permission
-`notifications:broadcast`, only `admin` holds it by default) sends to `user:lobby`. From Elixir,
-`RephiWeb.Notifications.broadcast/2` and `notify_user/3` send the same event.
+`notifications:broadcast`, only `admin` holds it by default) sends to `user:lobby`.
+`POST /api/notifications/me` (same body and validation) is for any signed-in user: it sends the
+same event and payload (`from` is the caller) to the caller's own `user:<id>` only, so realtime
+can be tried without broadcasting; it is limited per user (5 a minute, bucket
+`self_notification` of `RephiWeb.Plugs.RateLimit`; past it a `429` with `retry-after`). Both
+answer `{"data": <the notification>}`. From Elixir, `RephiWeb.Notifications.broadcast/2`,
+`notify_self/2` and `notify_user/3` send the same event.
+
+Every notification sent is recorded (`notifications` table, `Rephi.Notifications`) in the same
+call that pushes it, with its `scope` (`broadcast`, `self` or `direct` for `notify_user/3`), its
+sender and its recipient (both cleared when the user is deleted). Nothing is sent when the
+message is invalid or cannot be recorded.
+
+### Presence
+
+Every socket joined to `user:lobby` is tracked by `RephiWeb.Presence` (Phoenix Presence) under its
+user id, with the metas `user_id` and `joined_at` only: every lobby member receives them, so
+never add an email or anything private. Lobby members get `presence_state` after the join and
+`presence_diff` on every change; `RephiWeb.Presence.online_counts/0` gives
+`%{online_users: distinct users, connections: sockets}`. A user's private topic is not tracked.
+
+### Dashboard
+
+`GET /api/dashboard` returns the counters the caller may see:
+
+```json
+{"data": {
+  "users": {"total": 42},
+  "notifications": {"sent_total": 17, "sent_by_me": 3},
+  "sessions": {"online_users": 5, "connections": 7}
+}}
+```
+
+| Counter | Visible with | Otherwise |
+|---|---|---|
+| `users.total` (every account) | `users:view` | `null` |
+| `notifications.sent_total` (broadcasts by anyone) | `notifications:broadcast` | `null` |
+| `notifications.sent_by_me` (the caller's broadcasts and tests to itself) | everyone | - |
+| `sessions.online_users` / `connections` (Presence on the lobby) | everyone | - |
+
+A counter the caller may not see is always present and `null` (never left out, never `0`), and it
+is not queried. The example apps hide those tiles, show "Active sessions" live from the lobby's
+presence over their one socket, and refetch the counters after the user sends a notification.
 
 ## Frontends
 
@@ -388,8 +432,9 @@ of the API contract. Each app calls `configureRephi({apiUrl, wsUrl, debug})` onc
 request; nothing is inlined when the library is built. Its
 [README](packages/shared-components/README.md) documents the API: `login` / `register` /
 `logout` / `changePassword`, `ApiError` and `describeError`, `onSessionEnd` (any 401 on the
-current token ends the session), `PhoenixSocket`, `useChannel`, `usePermissions`,
-`PermissionGuard`, `fetchPage` / `fetchAllPages`.
+current token ends the session), `PhoenixSocket`, `useChannel` (with the topic's presence),
+`usePermissions`, `PermissionGuard`, `fetchPage` / `fetchAllPages`, `fetchDashboard`,
+`broadcastNotification` / `sendTestNotification`.
 
 Build it before starting, linting or type-checking any app: the apps import its compiled `dist/`.
 
@@ -401,8 +446,9 @@ yarn shared:build
 
 - [`apps/example`](apps/example) - a Vite + React SPA (React Router, TanStack Query,
   React Hook Form + Zod, Tailwind CSS 4; the session lives in the library's Zustand store):
-  login, registration, profile with password change, dashboard, admin screens for users, roles
-  and permissions, and live notifications. It configures the
+  login, registration, profile with password change, a dashboard of live counters, admin screens
+  for users, roles and permissions, and live notifications (every user can send a test to itself;
+  broadcasting needs `notifications:broadcast`). It configures the
   library in `src/lib/rephi.ts`: under `vite dev` the API is `http://localhost:4000/api`, in a
   build it is the same origin (`/api`, `/socket`); `VITE_API_URL` / `VITE_WS_URL` override both
   (`apps/example/.env.example`).
@@ -507,6 +553,8 @@ mix test                 # the backend suite (creates and migrates the test data
 mix test --cover         # with coverage; fails under the 90 % threshold of mix.exs
 mix precommit            # what CI runs: format check, warnings as errors, unused deps, tests
 cd installer && mix test # the installer
+yarn example:e2e         # Playwright suites of the example apps (see their READMEs)
+yarn example-astro:e2e
 ```
 
 The suite needs PostgreSQL with `postgres` / `postgres` on `localhost` (`config/test.exs`) and

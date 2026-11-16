@@ -45,15 +45,16 @@ islands, and each one states how it is loaded:
 
 | Island | Directive | Why |
 |---|---|---|
-| `AppRuntime` (socket, notifications, toasts) | `client:only` + `transition:persist` | Needs the stored session and a WebSocket, so there is nothing to prerender. Persisted so the client router keeps it (and its socket) alive across pages. |
+| `AppRuntime` (socket, notifications, presence, toasts) | `client:only` + `transition:persist` | Needs the stored session and a WebSocket, so there is nothing to prerender. Persisted so the client router keeps it (and its socket) alive across pages. It is the only island that joins the lobby; the connection state and who is online reach other islands through `src/lib/realtime.ts`. |
 | `RouteGuard` (wraps every signed-in page) | `client:only` | Access depends on the session stored in the browser. The page is shipped as inert HTML inside the island and inserted once the guard allows it; a static "Loading..." fallback is shown until then. |
 | `GuestRedirect` (welcome, login, register) | `client:only` | No markup; it only redirects visitors who are already signed in. |
 | `LoginForm`, `RegisterForm` | `client:load` | Prerendered so the form is visible before any JavaScript runs, hydrated immediately. Their markup does not depend on the session. |
 | `LogoutButton` | `client:load` | Same markup for everyone: prerendered (no layout shift), hydrated at once. |
 | `AdminMenu` | `client:only` | Lists the admin screens the user has the permissions for, which is known in the browser only. |
 | `UserInfoCard` | `client:only` | Shows the signed-in user (roles, permissions). |
+| `DashboardStats` | `client:only` | The dashboard counters (`GET /api/dashboard`): the ones the user may not see are hidden, "Active sessions" follows the lobby's presence. |
 | `QuickActions` | `client:only` | Dashboard shortcuts, each shown only with the permissions its target needs. |
-| `NotificationSender` | `client:only` | Only for users with `notifications:broadcast`; shows the live state of the socket. |
+| `NotificationSender` | `client:only` | The broadcast form with `notifications:broadcast`, and "Send a test to myself" for everyone; shows the live state of the socket. |
 | `RealtimeHint` | `client:only` | One line with the state of the live notifications. |
 | `ChangePasswordForm` | `client:only` | Profile page; only makes sense with a session. |
 | `UsersManagement`, `RolesManagement`, `PermissionsManagement` | `client:only` | Everything they display comes from authenticated API calls. |
@@ -62,7 +63,7 @@ islands, and each one states how it is loaded:
 `localStorage`, so at build time the only possible render is the signed-out one, which would be
 shipped for nothing and then replaced in the browser.
 
-The dashboard page (except its quick actions), the header, the active navigation link, page titles and the 404 page are
+The dashboard page (except its counters and quick actions), the header, the active navigation link, page titles and the 404 page are
 plain Astro and ship no JavaScript of their own.
 
 ### Navigation
@@ -394,10 +395,13 @@ Both also run as part of `yarn lint` and `yarn typecheck` at the repository root
 ## End-to-end tests
 
 `e2e/` holds a [Playwright](https://playwright.dev) suite that drives the site in Chrome against
-a running backend: sign-in and sign-out, the dashboard quick actions, the admin screens, a
+a running backend: sign-in and sign-out, the dashboard quick actions and counters per role, the
+test notification to oneself (shown once, to nobody else) and broadcasts, the admin screens, a
 "no dead controls" pass that clicks every safe control of every page, and a performance check
 (on a production build: navigations go through the client router and re-download no
-JavaScript; on the dev server: no page is loaded twice).
+JavaScript; on the dev server: no page is loaded twice). `presence.spec.ts` checks that "Active
+sessions" follows a second user signing in and leaving; it is its own Playwright project, run
+after the others, and needs an API nobody else is connected to.
 
 The tests create the users and roles they need through the API and delete them afterwards, so
 point them at a throwaway database. They sign in more often than the rate limiter allows, so the

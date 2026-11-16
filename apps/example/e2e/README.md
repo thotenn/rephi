@@ -6,6 +6,8 @@ End-to-end tests of `apps/example`: a real browser drives the app against a real
 |------|--------|
 | `dashboard.spec.ts` | Every dashboard quick action: where it goes, what it opens, who sees it (administrator, manager, plain user). |
 | `actions.spec.ts` | Sign in, register, logout, password change; assigning and removing roles and permissions; editing and deleting users, roles and permissions. |
+| `realtime.spec.ts` | The dashboard counters per role (an administrator sees all three, a plain user only its own notifications and the sessions), refetched after a send; "Send a test to myself" shown once to the sender and to nobody else; broadcasts reaching everybody. |
+| `presence.spec.ts` | "Active sessions" goes up when a second user signs in and back down when it leaves. It is the Playwright project `presence`, run after the others (project `app`): the count is global to the API, so it needs nothing else connected. |
 | `controls.spec.ts` | "No dead controls": on every page, each visible link and button is clicked on a fresh page and must navigate, send a request, open a confirmation or change the page. Logout, Assign and Remove are skipped there (`actions.spec.ts` runs them on throwaway data); a Delete confirmation is dismissed. |
 
 The tests create the accounts, roles and permissions they need through the API and delete them
@@ -34,6 +36,7 @@ VITE_PORT=5101 VITE_API_URL=http://localhost:4100/api VITE_WS_URL=ws://localhost
 yarn example:e2e
 ```
 
+Run it against an API nobody else is connected to (the presence check counts every socket).
 Arguments go to Playwright: `yarn example:e2e dashboard`, `yarn example:e2e --grep "New role"`,
 `yarn example:e2e --ui`. Failures keep a trace and a screenshot in `e2e/.results/`
 (`npx playwright show-trace e2e/.results/<test>/trace.zip`).
