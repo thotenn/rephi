@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Rephi multi-frontend monorepo",
-  "packageManager": "yarn@4.12.0",
+  "packageManager": "yarn@4.18.1",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -19,11 +19,7 @@
     "example:build": "yarn workspace rephi-example build",
     "shared:build": "yarn workspace @rephi/shared-components build"
   },
-  "devDependencies": {
-    "@types/node": "^22.15.32",
-    "typescript": "^5.9.3"
-  },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.22.0"
   }
 }

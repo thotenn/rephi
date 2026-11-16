@@ -1,10 +1,10 @@
-export {
+export type {
   ApiError,
   PaginatedResponse,
   ApiResponse
 } from "./api.types";
 
-export {
+export type {
   Role,
   Permission,
   User,

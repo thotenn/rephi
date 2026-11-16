@@ -36,8 +36,9 @@ A production-ready Phoenix boilerplate with JWT authentication, RBAC authorizati
 - **Elixir** 1.19 or higher (developed on 1.20.5)
 - **Erlang/OTP** 28 or higher (developed on 29.1.2)
 - **PostgreSQL** 12 or higher
-- **Node.js** 20 or higher
-- **Yarn** 4.x (included via corepack)
+- **Node.js** 22.22 or higher (developed on 26 LTS)
+- **Yarn** 4.x through Corepack: run `corepack enable` once. Node.js 25 and newer no longer
+  bundle Corepack, so install it first with `npm install -g corepack`
 
 ## Features
 
@@ -251,17 +252,16 @@ mix phx.swagger.generate
 
 ### Frontend
 ```bash
-# Build for production
-npm run build
+# Build every workspace and copy the apps to priv/static/apps/
+yarn build
 
-# Run linter
-npm run lint
+# Lint and type-check every workspace
+# (both resolve @rephi/shared-components from its dist/, so run `yarn shared:build` first)
+yarn lint
+yarn typecheck
 
-# Check TypeScript types
-npm run typecheck
-
-# Start production server
-npm start
+# Preview the production build of one app
+yarn workspace rephi-example preview
 ```
 
 ## Technology Stack

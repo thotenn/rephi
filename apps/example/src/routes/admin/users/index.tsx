@@ -13,16 +13,11 @@ export default function UsersManagement() {
   const [selectedUser, setSelectedUser] = useState<UserWithAuth | null>(null);
   const [userRoles, setUserRoles] = useState<Role[]>([]);
 
-  useEffect(() => {
-    loadUsers();
-    loadRoles();
-  }, []);
-
   const loadUsers = async () => {
     try {
       const response = await usersApi.getAll();
       setUsers(response.data);
-    } catch (err) {
+    } catch {
       setError("Error loading users");
     } finally {
       setLoading(false);
@@ -37,6 +32,14 @@ export default function UsersManagement() {
       console.error("Error loading roles:", err);
     }
   };
+
+  useEffect(() => {
+    // The loader only sets state after its request settles, which the rule cannot
+    // see through the async call. Moving these fetches to react-query removes this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadUsers();
+    loadRoles();
+  }, []);
 
   const loadUserRoles = async (userId: number) => {
     try {
@@ -59,7 +62,7 @@ export default function UsersManagement() {
       await usersApi.assignRole(selectedUser.id, roleId);
       await loadUserRoles(selectedUser.id);
       await loadUsers(); // Refresh the main list
-    } catch (err) {
+    } catch {
       setError("Error assigning role");
     }
   };
@@ -71,7 +74,7 @@ export default function UsersManagement() {
       await usersApi.removeRole(selectedUser.id, roleId);
       await loadUserRoles(selectedUser.id);
       await loadUsers(); // Refresh the main list
-    } catch (err) {
+    } catch {
       setError("Error removing role");
     }
   };

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Socket, Channel } from 'phoenix';
-import { env } from '@/env';
+import { env } from '../env';
 
 interface PhoenixContextType {
   socket: Socket | null;
@@ -75,6 +75,8 @@ export const PhoenixProvider: React.FC<PhoenixProviderProps> = ({
 
   useEffect(() => {
     if (autoConnect && token) {
+      // Connecting on mount stores the new socket in state by design.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       connect(token);
     }
 

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { createBrowserRouter, type RouteObject } from "react-router";
 import { env } from "@rephi/shared-components";
 import App from "./App";
 import { allRoutes, type RouteConfig } from "./config/routes";

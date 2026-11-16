@@ -1,6 +1,6 @@
 import { Socket } from "phoenix";
-import { env } from "@/env";
-import { useAuthStore } from "@/stores/auth.store";
+import { env } from "../../env";
+import { useAuthStore } from "../../stores/auth.store";
 
 class PhoenixSocket {
   private socket: Socket | null = null;

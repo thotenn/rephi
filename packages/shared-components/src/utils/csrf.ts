@@ -8,8 +8,8 @@
  */
 export function getCSRFToken(): string | null {
   // First try to get from window object (fastest)
-  if (typeof window !== 'undefined' && (window as any).__CSRF_TOKEN__) {
-    return (window as any).__CSRF_TOKEN__;
+  if (typeof window !== 'undefined' && window.__CSRF_TOKEN__) {
+    return window.__CSRF_TOKEN__;
   }
 
   // Fallback to meta tag

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet } from "react-router";
 import { PhoenixSocket, useAuthStore } from "@rephi/shared-components";
 
 export default function App() {

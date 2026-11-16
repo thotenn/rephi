@@ -141,3 +141,14 @@ yarn shared:build
 # Watch mode for development
 yarn workspace @rephi/shared-components dev
 ```
+
+The build writes `dist/index.mjs` (ESM), `dist/index.js` (CommonJS) and the `.d.ts`
+files, which `tsc` emits at the end of every Vite build (also in watch mode).
+`react`, `phoenix`, `axios` and `zustand` are not bundled: they are resolved from the
+consuming app.
+
+```bash
+# Lint and type-check the library
+yarn workspace @rephi/shared-components lint
+yarn workspace @rephi/shared-components typecheck
+```

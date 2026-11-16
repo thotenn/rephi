@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import { AccessDenied } from "~/components/commons";
 import { ROUTE_PATHS } from "~/config/routes";
 import { useAuthStore } from "@rephi/shared-components";

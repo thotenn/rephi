@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import { useAuthStore } from "@rephi/shared-components";
 import { ROUTES } from "~/config/routes";
 

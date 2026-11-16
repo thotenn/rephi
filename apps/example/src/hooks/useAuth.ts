@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { PhoenixSocket, api, useAuthStore, getRedirectPath, clearRedirectPath } from "@rephi/shared-components";
 import type {
   AuthResponse,
@@ -38,14 +38,14 @@ export function useLogin() {
       
       // Get redirect path from sessionStorage
       const redirectPath = getRedirectPath();
-      if (process.env.NODE_ENV === "development") {
+      if (import.meta.env.DEV) {
         console.log("Login successful. Redirect path from storage:", redirectPath);
       }
       
       // Navigate after a small delay to ensure state is updated
       setTimeout(() => {
         const targetPath = redirectPath || urls.home;
-        if (process.env.NODE_ENV === "development") {
+        if (import.meta.env.DEV) {
           console.log("Navigating to:", targetPath);
         }
         navigate(targetPath, { replace: true });

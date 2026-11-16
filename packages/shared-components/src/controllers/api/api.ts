@@ -1,8 +1,8 @@
 import axios from "axios";
-import { useAuthStore } from "@/stores/auth.store";
-import type { ApiError } from "@/types";
-import { env } from "@/env";
-import { setCsrfHeader } from "@/controllers";
+import { useAuthStore } from "../../stores/auth.store";
+import type { ApiError } from "../../types";
+import { env } from "../../env";
+import { setCsrfHeader } from "./csrf";
 
 const api = axios.create({
   baseURL: env.API.default,

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { env } from "@/env";
-import type { User } from "@/types";
+import { env } from "../env";
+import type { User } from "../types";
 
 const storeNames = env.STORES.exampleStore;
 

@@ -20,20 +20,23 @@ export default function PermissionsManagement() {
     description: "",
   });
 
-  useEffect(() => {
-    loadPermissions();
-  }, []);
-
   const loadPermissions = async () => {
     try {
       const response = await permissionsApi.getAll();
       setPermissions(response.data);
-    } catch (err) {
+    } catch {
       setError("Error loading permissions");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // The loader only sets state after its request settles, which the rule cannot
+    // see through the async call. Moving these fetches to react-query removes this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPermissions();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +48,7 @@ export default function PermissionsManagement() {
       }
       resetForm();
       loadPermissions();
-    } catch (err) {
+    } catch {
       setError(
         editingPermission
           ? "Error updating permission"
@@ -70,7 +73,7 @@ export default function PermissionsManagement() {
     try {
       await permissionsApi.delete(permissionId);
       loadPermissions();
-    } catch (err) {
+    } catch {
       setError("Error deleting permission");
     }
   };

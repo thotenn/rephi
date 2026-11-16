@@ -1,12 +1,13 @@
-/// <reference types="vite/client" />
-
 import react from "@vitejs/plugin-react";
 import { env } from "@rephi/shared-components";
 import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
+  plugins: [react()],
+  resolve: {
+    // Resolves the `~/*` alias from tsconfig.json `paths`.
+    tsconfigPaths: true,
+  },
   base: env.APPS.example.basename,
   server: {
     port: Number(env.APPS.example.settings.port) || 5010,

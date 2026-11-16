@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Channel } from "phoenix";
-import PhoenixSocket from "@/controllers/api/socket";
+import PhoenixSocket from "../controllers/api/socket";
 
 export function useChannel(channelName: string, params = {}) {
   const [channel, setChannel] = useState<Channel | null>(null);

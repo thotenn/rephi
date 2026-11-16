@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import { urls } from "~/env";
 import { useLogout } from "~/hooks/useAuth";
 import { useAuthStore } from "@rephi/shared-components";

@@ -43,7 +43,7 @@ export default function Home() {
       });
       setNotificationText("");
       toast.success("Notification sent!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to send notification");
     } finally {
       setSending(false);

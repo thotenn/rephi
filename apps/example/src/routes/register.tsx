@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,14 +10,14 @@ type RegisterFormData = RegisterCredentials;
 
 const registerSchema = z
   .object({
-    email: z.string().email("Invalid email address"),
+    email: z.email("Invalid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     password_confirmation: z
       .string()
       .min(6, "Password must be at least 6 characters"),
   })
   .refine((data) => data.password === data.password_confirmation, {
-    message: "Passwords don't match",
+    error: "Passwords don't match",
     path: ["password_confirmation"],
   });
 

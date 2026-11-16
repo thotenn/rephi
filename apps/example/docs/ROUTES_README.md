@@ -88,7 +88,7 @@ export const allRoutes: RouteConfig[] = [
 
 ```typescript
 import { ROUTES } from "~/router";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 // En tu componente
 <Link to={ROUTES.dashboard.profile}>Ir al Perfil</Link>
@@ -97,7 +97,7 @@ import { Link } from "react-router-dom";
 ### Usando navegación programática
 
 ```typescript
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { ROUTES } from "~/router";
 
 function MyComponent() {

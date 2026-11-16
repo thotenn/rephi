@@ -22,16 +22,11 @@ export default function RolesManagement() {
     description: "",
   });
 
-  useEffect(() => {
-    loadRoles();
-    loadPermissions();
-  }, []);
-
   const loadRoles = async () => {
     try {
       const response = await rolesApi.getAll();
       setRoles(response.data);
-    } catch (err) {
+    } catch {
       setError("Error loading roles");
     } finally {
       setLoading(false);
@@ -46,6 +41,14 @@ export default function RolesManagement() {
       console.error("Error loading permissions:", err);
     }
   };
+
+  useEffect(() => {
+    // The loader only sets state after its request settles, which the rule cannot
+    // see through the async call. Moving these fetches to react-query removes this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadRoles();
+    loadPermissions();
+  }, []);
 
   const loadRolePermissions = async (roleId: number) => {
     try {
@@ -66,7 +69,7 @@ export default function RolesManagement() {
       }
       resetForm();
       loadRoles();
-    } catch (err) {
+    } catch {
       setError(editingRole ? "Error updating role" : "Error creating role");
     }
   };
@@ -87,7 +90,7 @@ export default function RolesManagement() {
     try {
       await rolesApi.delete(roleId);
       loadRoles();
-    } catch (err) {
+    } catch {
       setError("Error deleting role");
     }
   };
@@ -103,7 +106,7 @@ export default function RolesManagement() {
     try {
       await rolesApi.assignPermission(selectedRole.id, permissionId);
       await loadRolePermissions(selectedRole.id);
-    } catch (err) {
+    } catch {
       setError("Error assigning permission");
     }
   };
@@ -114,7 +117,7 @@ export default function RolesManagement() {
     try {
       await rolesApi.removePermission(selectedRole.id, permissionId);
       await loadRolePermissions(selectedRole.id);
-    } catch (err) {
+    } catch {
       setError("Error removing permission");
     }
   };

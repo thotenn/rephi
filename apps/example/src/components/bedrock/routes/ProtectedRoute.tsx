@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router";
 import { ROUTES } from "~/config/routes";
 import { useAuthStore, setRedirectPath } from "@rephi/shared-components";
 
@@ -12,7 +12,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!isAuthenticated) {
     // Save the attempted location
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.DEV) {
       console.log("ProtectedRoute: Saving redirect path:", location.pathname);
     }
     setRedirectPath(location.pathname);

@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { useEffect } from "react";
 import { urls } from "~/env";
 import { useAuthStore } from "@rephi/shared-components";

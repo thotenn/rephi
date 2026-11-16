@@ -45,7 +45,9 @@ yarn typecheck               # TypeScript check all apps
 mix rephi.gen.frontend NAME  # Generate new frontend app
 ```
 
-> **Important:** Run `yarn shared:build` before `yarn example:dev` - apps depend on the compiled shared-components package.
+> **Important:** Run `yarn shared:build` before `yarn example:dev`, `yarn typecheck` or `yarn lint` - apps resolve the shared-components package from its compiled `dist/`.
+
+Toolchain notes: Node.js 26 LTS (>= 22.22) and Yarn 4.18 via Corepack (on Node 25+ Corepack is no longer bundled: `npm install -g corepack`). `tsc` is TypeScript 7; the `typescript` import is the TS 6 API (npm aliases in each workspace, needed by typescript-eslint). Import router APIs from `react-router`, never `react-router-dom`.
 
 ## Architecture
 
