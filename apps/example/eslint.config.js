@@ -9,6 +9,8 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+const tsconfigRootDir = import.meta.dirname;
+
 export default defineConfig([
   globalIgnores(["dist"]),
   {
@@ -26,10 +28,11 @@ export default defineConfig([
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.browser,
+      parserOptions: { tsconfigRootDir },
     },
     settings: {
       // Resolves the `~/*` alias and workspace packages through tsconfig.json.
-      "import-x/resolver-next": [createTypeScriptImportResolver()],
+      "import-x/resolver-next": [createTypeScriptImportResolver({ project: `${tsconfigRootDir}/tsconfig.json` })],
     },
     rules: {
       // eslint-plugin-react-hooks (maintained by the React team) owns the hooks
@@ -50,6 +53,7 @@ export default defineConfig([
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: {
       globals: globals.node,
+      parserOptions: { tsconfigRootDir },
     },
   },
 ]);

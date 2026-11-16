@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import { describeError, getErrorMessage, usePermissions } from "@rephi/shared-components";
 import Layout from "~/components/bedrock/Layout";
 import { ErrorAlert, Pagination } from "~/components/commons";
+import { NEW_RECORD_PARAM } from "~/config/routes";
 import { ADMIN_PAGE_SIZE, adminKeys, rolesApi } from "~/modules/api/admin";
 import type { Role } from "~/types/admin.types";
 import SlugRecordModal, { type SlugRecordValues } from "../shared/SlugRecordModal";
@@ -18,6 +20,9 @@ export default function RolesManagement() {
   const { can } = usePermissions();
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Editing>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const createFromUrl = searchParams.get(NEW_RECORD_PARAM) === "1" && can("roles:create");
+  const form: Editing = editing ?? (createFromUrl ? { mode: "create" } : null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -31,10 +36,10 @@ export default function RolesManagement() {
 
   const save = useMutation({
     mutationFn: (values: SlugRecordValues) =>
-      editing?.mode === "edit" ? rolesApi.update(editing.role.id, values) : rolesApi.create(values),
+      form?.mode === "edit" ? rolesApi.update(form.role.id, values) : rolesApi.create(values),
     onSuccess: (role) => {
-      toast.success(editing?.mode === "edit" ? `Role "${role.name}" updated` : `Role "${role.name}" created`);
-      setEditing(null);
+      toast.success(form?.mode === "edit" ? `Role "${role.name}" updated` : `Role "${role.name}" created`);
+      closeForm();
       invalidate();
     },
   });
@@ -52,6 +57,20 @@ export default function RolesManagement() {
   const openForm = (next: Editing) => {
     save.reset();
     setEditing(next);
+  };
+
+  const closeForm = () => {
+    setEditing(null);
+    // Otherwise a reload or Back reopens the form.
+    if (searchParams.has(NEW_RECORD_PARAM)) {
+      setSearchParams(
+        (params) => {
+          params.delete(NEW_RECORD_PARAM);
+          return params;
+        },
+        { replace: true }
+      );
+    }
   };
 
   const handleDelete = (role: Role) => {
@@ -103,16 +122,16 @@ export default function RolesManagement() {
           </>
         )}
 
-        {editing && (
+        {form && (
           <SlugRecordModal
-            key={editing.mode === "edit" ? editing.role.id : "new"}
+            key={form.mode === "edit" ? form.role.id : "new"}
             noun="Role"
             editing={
-              editing.mode === "edit"
-                ? { ...editing.role, description: editing.role.description ?? "" }
+              form.mode === "edit"
+                ? { ...form.role, description: form.role.description ?? "" }
                 : null
             }
-            onClose={() => setEditing(null)}
+            onClose={closeForm}
             onSubmit={(values) => save.mutate(values)}
             submitting={save.isPending}
             serverFieldErrors={saveError?.fieldErrors ?? {}}

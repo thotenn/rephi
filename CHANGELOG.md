@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Dashboard quick actions (`apps/example`)** - "Create New Item" and "View Reports" did nothing.
+  They are now links, each shown only with the permissions it needs: "New role" (opens the
+  create-role form), "Send notification" (the broadcast form, message field focused), "Manage
+  users" and "My profile"
+- **`apps/example`** - "Go Back" on the access-denied page did nothing (or left the app) on a page
+  opened directly; it now goes home. The error page (including unknown paths) links back home
+- **`apps/example`** - ESLint resolves its TypeScript config and `~/` imports when run from the
+  repository root, as an editor does
+
 ## [0.2.0] - 2026-11-16
 
 A toolchain upgrade and a full audit of the boilerplate: security, RBAC, the API contract, the

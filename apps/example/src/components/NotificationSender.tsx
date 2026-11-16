@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import { api, describeError, usePermissions } from "@rephi/shared-components";
+import { NOTIFY_HASH } from "~/config/routes";
 import { useRealtime } from "~/realtime/context";
 
 /** Permission the server requires to broadcast. */
@@ -18,6 +20,14 @@ export default function NotificationSender() {
   const { connected } = useRealtime();
   const [text, setText] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const messageRef = useRef<HTMLInputElement>(null);
+  const { hash, key } = useLocation();
+  const allowed = can(BROADCAST_PERMISSION);
+
+  // `key` refocuses the field when the same link is followed again.
+  useEffect(() => {
+    if (allowed && hash === NOTIFY_HASH) messageRef.current?.focus();
+  }, [allowed, hash, key]);
 
   const send = useMutation({
     mutationFn: (message: string) => api.post("/notifications/broadcast", { message }),
@@ -35,7 +45,7 @@ export default function NotificationSender() {
     },
   });
 
-  if (!can(BROADCAST_PERMISSION)) return null;
+  if (!allowed) return null;
 
   const submit = () => {
     setFieldError(null);
@@ -48,9 +58,13 @@ export default function NotificationSender() {
   };
 
   return (
-    <div className="mt-8 bg-white overflow-hidden shadow rounded-lg">
+    <section
+      id={NOTIFY_HASH.slice(1)}
+      aria-labelledby="notify-title"
+      className="mt-8 bg-white overflow-hidden shadow rounded-lg"
+    >
       <div className="px-4 py-5 sm:p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">
+        <h2 id="notify-title" className="text-lg font-medium text-gray-900 mb-4">
           Send Notification
         </h2>
         <p className="text-gray-600 mb-4">
@@ -70,6 +84,7 @@ export default function NotificationSender() {
         </div>
         <div className="flex space-x-3">
           <input
+            ref={messageRef}
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -94,6 +109,6 @@ export default function NotificationSender() {
         </div>
         {fieldError && <p className="mt-2 text-sm text-red-600">{fieldError}</p>}
       </div>
-    </div>
+    </section>
   );
 }
