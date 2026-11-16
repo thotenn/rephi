@@ -454,7 +454,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
   defp add_scripts(_root, _name, _package),
     do: {:error, "#{@root_package} is not a JSON object."}
 
-  # After the last `<app>:dev` / `<app>:build` script, so the app scripts stay
+  # After the last `<app>:*` script of an existing app, so the app scripts stay
   # together; at the end when there is none.
   defp insert_scripts(scripts, new) do
     apps = existing_apps()
@@ -464,7 +464,7 @@ defmodule Mix.Tasks.Rephi.Gen.Frontend do
       |> Enum.with_index()
       |> Enum.filter(fn {{key, _}, _} ->
         case String.split(key, ":", parts: 2) do
-          [app, task] when task in ["dev", "build"] -> app in apps
+          [app, _task] -> app in apps
           _ -> false
         end
       end)
