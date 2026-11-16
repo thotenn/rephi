@@ -12,13 +12,11 @@ defmodule RephiWeb.Auth.AuthorizationHelpers do
         use MyAppWeb, :controller  # Automatically imports these helpers
 
         def show(conn, %{"id" => id}) do
-          if can?(conn, "users:view") do
-            # User can view users
-            user = Accounts.get_user!(id)
+          # Errors are rendered by RephiWeb.FallbackController in the API
+          # error envelope
+          with true <- can?(conn, "users:view") || {:error, :forbidden},
+               {:ok, user} <- Accounts.fetch_user(id) do
             render(conn, :show, user: user)
-          else
-            # Handle unauthorized access
-            conn |> put_status(:forbidden) |> json(%{error: "Forbidden"})
           end
         end
       end

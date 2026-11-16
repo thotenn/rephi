@@ -1,5 +1,9 @@
 defmodule RephiWeb.PermissionJSON do
-  alias Rephi.Authorization.Permission
+  @moduledoc """
+  Renders permissions and role-permission assignments.
+  """
+
+  alias Rephi.Authorization.{Permission, RolePermission}
 
   @doc """
   Renders a list of permissions.
@@ -13,6 +17,21 @@ defmodule RephiWeb.PermissionJSON do
   """
   def show(%{permission: permission}) do
     %{data: data(permission)}
+  end
+
+  @doc """
+  Renders the assignment of a permission to a role.
+  """
+  def assignment(%{role_permission: %RolePermission{} = role_permission}) do
+    %{
+      data: %{
+        role_id: role_permission.role_id,
+        permission_id: role_permission.permission_id,
+        assigned_by: role_permission.assigned_by,
+        notes: role_permission.notes,
+        inserted_at: role_permission.inserted_at
+      }
+    }
   end
 
   defp data(%Permission{} = permission) do

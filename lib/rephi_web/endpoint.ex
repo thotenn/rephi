@@ -29,27 +29,6 @@ defmodule RephiWeb.Endpoint do
     gzip: false,
     only: RephiWeb.static_paths()
 
-  # Serve static files for each app
-  plug Plug.Static,
-    at: "/dashboard",
-    from: {:rephi, "priv/static/dashboard"},
-    gzip: false
-
-  plug Plug.Static,
-    at: "/admin",
-    from: {:rephi, "priv/static/admin"},
-    gzip: false
-
-  plug Plug.Static,
-    at: "/ecommerce",
-    from: {:rephi, "priv/static/ecommerce"},
-    gzip: false
-
-  plug Plug.Static,
-    at: "/landing",
-    from: {:rephi, "priv/static/landing"},
-    gzip: false
-
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do
@@ -62,7 +41,10 @@ defmodule RephiWeb.Endpoint do
     cookie_key: "request_logger"
 
   plug Plug.RequestId
-  plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+
+  plug Plug.Telemetry,
+    event_prefix: [:phoenix, :endpoint],
+    log: {__MODULE__, :log_level, []}
 
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
@@ -83,4 +65,13 @@ defmodule RephiWeb.Endpoint do
     credentials: true
 
   plug RephiWeb.Router
+
+  @doc """
+  Log level of a request, or `false` to keep it out of the logs.
+
+  Health checks are polled every few seconds by load balancers and
+  orchestrators, so they are not logged.
+  """
+  def log_level(%Plug.Conn{path_info: ["api", "health" | _]}), do: false
+  def log_level(_conn), do: :info
 end

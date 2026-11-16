@@ -23,33 +23,6 @@ defmodule RephiWeb.UserJSON do
   end
 
   @doc """
-  Renders user with authentication token.
-  """
-  def user_with_token(%{user: user, token: token}) do
-    %{
-      user: %{
-        id: user.id,
-        email: user.email
-      },
-      token: token
-    }
-  end
-
-  @doc """
-  Renders current user with roles and permissions.
-  """
-  def me_with_auth(%{user: user, roles: roles, permissions: permissions}) do
-    %{
-      user: %{
-        id: user.id,
-        email: user.email,
-        roles: render_roles(roles),
-        permissions: render_permissions(permissions)
-      }
-    }
-  end
-
-  @doc """
   Renders user roles.
   """
   def roles(%{roles: roles}) do

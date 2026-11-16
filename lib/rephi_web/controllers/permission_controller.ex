@@ -1,10 +1,29 @@
 defmodule RephiWeb.PermissionController do
+  @moduledoc """
+  Controller for managing permissions and their assignment to roles.
+
+  ## Endpoints
+
+    * `GET /api/permissions` - List all permissions (requires "permissions:view")
+    * `POST /api/permissions` - Create a permission (requires "permissions:create")
+    * `GET /api/permissions/:id` - Get a permission (requires "permissions:view")
+    * `PUT /api/permissions/:id` - Update a permission (requires "permissions:edit")
+    * `DELETE /api/permissions/:id` - Delete a permission (requires "permissions:delete")
+    * `POST /api/roles/:role_id/permissions/:permission_id` - Assign a permission
+      to a role (requires "permissions:assign")
+    * `DELETE /api/roles/:role_id/permissions/:permission_id` - Remove a permission
+      from a role (requires "permissions:assign")
+
+  `POST` and `PUT` accept the permission attributes flat or wrapped under
+  `"permission"`. An id that is not the id of an existing record (unknown, not
+  a number, out of range) answers `404`.
+  """
   use RephiWeb, :controller
   use PhoenixSwagger
 
+  alias PhoenixSwagger.Schema
   alias Rephi.Authorization
   alias Rephi.Authorization.Permission
-  alias PhoenixSwagger.Schema
 
   action_fallback RephiWeb.FallbackController
 
@@ -51,8 +70,9 @@ defmodule RephiWeb.PermissionController do
   end
 
   def show(conn, %{"id" => id}) do
-    permission = Authorization.get_permission!(id)
-    render(conn, :show, permission: permission)
+    with {:ok, permission} <- Authorization.fetch_permission(id) do
+      render(conn, :show, permission: permission)
+    end
   end
 
   swagger_path :create do
@@ -74,8 +94,10 @@ defmodule RephiWeb.PermissionController do
     response(422, "Validation errors")
   end
 
-  def create(conn, %{"permission" => permission_params}) do
-    with {:ok, %Permission{} = permission} <- Authorization.create_permission(permission_params) do
+  def create(conn, _params) do
+    attrs = resource_params(conn, "permission")
+
+    with {:ok, %Permission{} = permission} <- Authorization.create_permission(attrs) do
       conn
       |> put_status(:created)
       |> put_resp_header("location", ~p"/api/permissions/#{permission}")
@@ -107,11 +129,11 @@ defmodule RephiWeb.PermissionController do
     response(422, "Validation errors")
   end
 
-  def update(conn, %{"id" => id, "permission" => permission_params}) do
-    permission = Authorization.get_permission!(id)
+  def update(conn, %{"id" => id}) do
+    attrs = resource_params(conn, "permission")
 
-    with {:ok, %Permission{} = permission} <-
-           Authorization.update_permission(permission, permission_params) do
+    with {:ok, permission} <- Authorization.fetch_permission(id),
+         {:ok, %Permission{} = permission} <- Authorization.update_permission(permission, attrs) do
       render(conn, :show, permission: permission)
     end
   end
@@ -134,9 +156,8 @@ defmodule RephiWeb.PermissionController do
   end
 
   def delete(conn, %{"id" => id}) do
-    permission = Authorization.get_permission!(id)
-
-    with {:ok, %Permission{}} <- Authorization.delete_permission(permission) do
+    with {:ok, permission} <- Authorization.fetch_permission(id),
+         {:ok, %Permission{}} <- Authorization.delete_permission(permission) do
       send_resp(conn, :no_content, "")
     end
   end
@@ -155,7 +176,12 @@ defmodule RephiWeb.PermissionController do
       body(:body, Schema.ref(:AssignmentNotes), "Assignment notes", required: false)
     end
 
-    response(201, "Permission assigned successfully")
+    response(
+      201,
+      "Permission assigned successfully",
+      Schema.ref(:RolePermissionAssignmentResponse)
+    )
+
     response(401, "Unauthorized")
     response(403, "Forbidden - requires permissions:assign permission")
     response(404, "Role or permission not found")
@@ -163,16 +189,17 @@ defmodule RephiWeb.PermissionController do
   end
 
   def assign_to_role(conn, %{"role_id" => role_id, "permission_id" => permission_id} = params) do
-    role = Authorization.get_role!(role_id)
-    permission = Authorization.get_permission!(permission_id)
+    opts = %{assigned_by: conn.assigns.current_user.id, notes: params["notes"]}
 
-    opts = %{
-      assigned_by: conn.assigns.current_user.id,
-      notes: params["notes"]
-    }
-
-    with {:ok, _} <- Authorization.assign_permission_to_role(role, permission, opts) do
-      send_resp(conn, :created, "")
+    with {:ok, role} <- Authorization.fetch_role(role_id),
+         {:ok, permission} <- Authorization.fetch_permission(permission_id),
+         {:ok, role_permission} <-
+           role
+           |> Authorization.assign_permission_to_role(permission, opts)
+           |> conflict_if_taken("Permission already assigned to role") do
+      conn
+      |> put_status(:created)
+      |> render(:assignment, role_permission: role_permission)
     end
   end
 
@@ -195,10 +222,9 @@ defmodule RephiWeb.PermissionController do
   end
 
   def remove_from_role(conn, %{"role_id" => role_id, "permission_id" => permission_id}) do
-    role = Authorization.get_role!(role_id)
-    permission = Authorization.get_permission!(permission_id)
-
-    with {:ok, _} <- Authorization.remove_permission_from_role(role, permission) do
+    with {:ok, role} <- Authorization.fetch_role(role_id),
+         {:ok, permission} <- Authorization.fetch_permission(permission_id),
+         {:ok, _role_permission} <- Authorization.remove_permission_from_role(role, permission) do
       send_resp(conn, :no_content, "")
     end
   end
@@ -272,16 +298,24 @@ defmodule RephiWeb.PermissionController do
         },
         required: [:data]
       },
-      AssignmentNotes: %{
+      RolePermissionAssignmentResponse: %{
         type: :object,
-        title: "Assignment Notes",
-        description: "Optional notes for permission/role assignment",
+        title: "Role Permission Assignment Response",
+        description: "The assignment created by giving a permission to a role",
         properties: %{
-          notes: %{type: :string, description: "Assignment notes"}
+          data: %{
+            type: :object,
+            properties: %{
+              role_id: %{type: :integer},
+              permission_id: %{type: :integer},
+              assigned_by: %{type: :integer, description: "ID of the user who assigned it"},
+              notes: %{type: :string},
+              inserted_at: %{type: :string, format: :"date-time"}
+            },
+            required: [:role_id, :permission_id]
+          }
         },
-        example: %{
-          notes: "Granted for project management tasks"
-        }
+        required: [:data]
       }
     }
   end

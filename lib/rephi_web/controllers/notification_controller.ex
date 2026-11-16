@@ -1,9 +1,17 @@
 defmodule RephiWeb.NotificationController do
+  @moduledoc """
+  Broadcasts notifications to the clients connected to the `user:lobby` channel.
+
+  ## Endpoints
+
+    * `POST /api/notifications/broadcast` - Send `message` to every connected
+      client (attributes flat or wrapped under `"notification"`)
+  """
   use RephiWeb, :controller
   use PhoenixSwagger
+
   alias PhoenixSwagger.Schema
   alias RephiWeb.Endpoint
-  import RephiWeb.ErrorHelpers
 
   action_fallback RephiWeb.FallbackController
 
@@ -23,29 +31,20 @@ defmodule RephiWeb.NotificationController do
     response(422, "Unprocessable Entity")
   end
 
-  def broadcast(conn, %{"message" => message}) when message != "" do
-    timestamp = DateTime.utc_now()
+  def broadcast(conn, _params) do
+    with {:ok, %{message: message}} <- validate(resource_params(conn, "notification")) do
+      notification = %{message: message, timestamp: DateTime.utc_now(), type: "general"}
+      Endpoint.broadcast!("user:lobby", "new_notification", notification)
 
-    # Broadcast to all connected users
-    Endpoint.broadcast!("user:lobby", "new_notification", %{
-      message: message,
-      timestamp: timestamp,
-      type: "general"
-    })
-
-    conn
-    |> put_status(:ok)
-    |> json(%{
-      message: "Notification sent successfully",
-      notification: %{
-        message: message,
-        timestamp: timestamp
-      }
-    })
+      render(conn, :show, notification: notification)
+    end
   end
 
-  def broadcast(conn, _params) do
-    render_errors(conn, :unprocessable_entity, %{message: ["can't be blank"]})
+  defp validate(params) do
+    {%{}, %{message: :string}}
+    |> Ecto.Changeset.cast(params, [:message])
+    |> Ecto.Changeset.validate_required([:message])
+    |> Ecto.Changeset.apply_action(:validate)
   end
 
   def swagger_definitions do
@@ -65,22 +64,24 @@ defmodule RephiWeb.NotificationController do
       NotificationResponse: %{
         type: :object,
         title: "Notification Response",
-        description: "Notification broadcast response",
+        description: "The notification that was broadcast",
         properties: %{
-          message: %{type: :string, description: "Success message"},
-          notification: %{
+          data: %{
             type: :object,
             properties: %{
               message: %{type: :string, description: "Notification message"},
-              timestamp: %{type: :string, format: :datetime, description: "Timestamp"}
-            }
+              timestamp: %{type: :string, format: :"date-time", description: "Timestamp"},
+              type: %{type: :string, description: "Notification type"}
+            },
+            required: [:message, :timestamp, :type]
           }
         },
+        required: [:data],
         example: %{
-          message: "Notification sent successfully",
-          notification: %{
+          data: %{
             message: "This is a test notification",
-            timestamp: "2024-01-01T12:00:00Z"
+            timestamp: "2024-01-01T12:00:00Z",
+            type: "general"
           }
         }
       }

@@ -20,6 +20,10 @@ config :rephi, RephiWeb.Endpoint,
   secret_key_base: "qkoV3JNLtzN1upIwO90qs2cLee5JA+jp6RXgE5VODv8vpL4q7xQpgzhbcW9kJr/O",
   server: false
 
+# Hashing passwords with the production cost makes every test that creates a
+# user or logs in take close to a second. Only do this in tests!
+config :bcrypt_elixir, log_rounds: 1
+
 # In test we don't send emails
 config :rephi, Rephi.Mailer, adapter: Swoosh.Adapters.Test
 

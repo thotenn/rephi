@@ -15,8 +15,10 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> post(~p"/api/users/register", @user_attrs)
 
       assert %{
-               "user" => %{"id" => user_id, "email" => "integration@example.com"},
-               "token" => register_token
+               "data" => %{
+                 "user" => %{"id" => user_id, "email" => "integration@example.com"},
+                 "token" => register_token
+               }
              } = json_response(register_conn, 201)
 
       # Step 2: Verify the token works for protected endpoints
@@ -26,7 +28,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> get(~p"/api/me")
 
       assert %{
-               "user" => %{"id" => ^user_id, "email" => "integration@example.com"}
+               "data" => %{"user" => %{"id" => ^user_id, "email" => "integration@example.com"}}
              } = json_response(me_conn, 200)
 
       # Step 3: Login with credentials
@@ -36,8 +38,10 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> post(~p"/api/users/login", @user_attrs)
 
       assert %{
-               "user" => %{"id" => ^user_id, "email" => "integration@example.com"},
-               "token" => login_token
+               "data" => %{
+                 "user" => %{"id" => ^user_id, "email" => "integration@example.com"},
+                 "token" => login_token
+               }
              } = json_response(login_conn, 200)
 
       # Step 4: Verify login token also works
@@ -47,7 +51,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> get(~p"/api/me")
 
       assert %{
-               "user" => %{"id" => ^user_id, "email" => "integration@example.com"}
+               "data" => %{"user" => %{"id" => ^user_id, "email" => "integration@example.com"}}
              } = json_response(me_conn2, 200)
 
       # Both tokens should be different but valid
@@ -57,7 +61,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
     test "unauthorized access is properly rejected", %{conn: conn} do
       # Try to access protected endpoint without token
       conn1 = get(conn, ~p"/api/me")
-      assert json_response(conn1, 401)
+      assert error_detail(conn1, 401) == "Authentication required"
 
       # Try with invalid token
       conn2 =
@@ -65,7 +69,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> put_req_header("authorization", "Bearer invalid-token")
         |> get(~p"/api/me")
 
-      assert json_response(conn2, 401)
+      assert error_detail(conn2, 401) == "Invalid or expired token"
 
       # Try with wrong format
       conn3 =
@@ -73,7 +77,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> put_req_header("authorization", "NotBearer some-token")
         |> get(~p"/api/me")
 
-      assert json_response(conn3, 401)
+      assert error_detail(conn3, 401) == "Invalid or expired token"
     end
 
     test "multiple users can coexist with separate sessions", %{conn: conn} do
@@ -85,7 +89,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> put_req_header("content-type", "application/json")
         |> post(~p"/api/users/register", user1_attrs)
 
-      %{"user" => %{"id" => user1_id}, "token" => token1} = json_response(conn1, 201)
+      %{"data" => %{"user" => %{"id" => user1_id}, "token" => token1}} = json_response(conn1, 201)
 
       # Create second user
       user2_attrs = %{"email" => "user2@example.com", "password" => "password456"}
@@ -95,7 +99,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> put_req_header("content-type", "application/json")
         |> post(~p"/api/users/register", user2_attrs)
 
-      %{"user" => %{"id" => user2_id}, "token" => token2} = json_response(conn2, 201)
+      %{"data" => %{"user" => %{"id" => user2_id}, "token" => token2}} = json_response(conn2, 201)
 
       # Verify first user's token returns first user's data
       me_conn1 =
@@ -103,7 +107,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> put_req_header("authorization", "Bearer #{token1}")
         |> get(~p"/api/me")
 
-      assert %{"user" => %{"id" => ^user1_id, "email" => "user1@example.com"}} =
+      assert %{"data" => %{"user" => %{"id" => ^user1_id, "email" => "user1@example.com"}}} =
                json_response(me_conn1, 200)
 
       # Verify second user's token returns second user's data
@@ -112,7 +116,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
         |> put_req_header("authorization", "Bearer #{token2}")
         |> get(~p"/api/me")
 
-      assert %{"user" => %{"id" => ^user2_id, "email" => "user2@example.com"}} =
+      assert %{"data" => %{"user" => %{"id" => ^user2_id, "email" => "user2@example.com"}}} =
                json_response(me_conn2, 200)
 
       # Ensure user IDs are different
@@ -134,7 +138,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
           "password" => "wrongpassword"
         })
 
-      assert %{"error" => "Invalid email or password"} = json_response(wrong_pass_conn, 401)
+      assert error_detail(wrong_pass_conn, 401) == "Invalid email or password"
 
       # Try to login with wrong email
       wrong_email_conn =
@@ -145,7 +149,7 @@ defmodule RephiWeb.Integration.AuthFlowTest do
           "password" => @user_attrs["password"]
         })
 
-      assert %{"error" => "Invalid email or password"} = json_response(wrong_email_conn, 401)
+      assert error_detail(wrong_email_conn, 401) == "Invalid email or password"
     end
   end
 

@@ -47,11 +47,14 @@ config :rephi, RephiWeb.Auth.Guardian,
       "d3mVezqyv5GuKhoKELh30QdnY3P0u46Y6pIP8DaWVElPvBeahq61pHcey6n4wjhq"
 
 # Phoenix Swagger configuration
+#
+# No `endpoint:` on purpose: with it the generator bakes the endpoint host and
+# port into swagger.json, and "Try it out" would call that host instead of the
+# one the documentation is being served from.
 config :rephi, :phoenix_swagger,
   swagger_files: %{
     "priv/static/swagger.json" => [
-      router: RephiWeb.Router,
-      endpoint: RephiWeb.Endpoint
+      router: RephiWeb.Router
     ]
   }
 

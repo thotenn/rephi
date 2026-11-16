@@ -84,6 +84,9 @@ defmodule Rephi.Authorization do
   @doc """
   Gets a single role by ID, returning nil if not found.
 
+  Never raises: an id that is not a valid primary key (`"abc"`, out of range)
+  is treated as not found.
+
   ## Parameters
 
     * `id` - The role ID
@@ -96,8 +99,30 @@ defmodule Rephi.Authorization do
       iex> Authorization.get_role(999)
       nil
 
+      iex> Authorization.get_role("abc")
+      nil
+
   """
-  def get_role(id), do: Repo.get(Role, id)
+  def get_role(id) do
+    case fetch_role(id) do
+      {:ok, role} -> role
+      {:error, :not_found} -> nil
+    end
+  end
+
+  @doc """
+  Fetches a single role by ID as a tagged tuple.
+
+  ## Examples
+
+      iex> Authorization.fetch_role(1)
+      {:ok, %Role{id: 1, name: "Admin"}}
+
+      iex> Authorization.fetch_role("abc")
+      {:error, :not_found}
+
+  """
+  def fetch_role(id), do: Repo.fetch(Role, id)
 
   @doc """
   Gets a role by its unique slug identifier.
@@ -225,6 +250,9 @@ defmodule Rephi.Authorization do
   @doc """
   Gets a single permission by ID, returning nil if not found.
 
+  Never raises: an id that is not a valid primary key (`"abc"`, out of range)
+  is treated as not found.
+
   ## Parameters
 
     * `id` - The permission ID
@@ -237,8 +265,30 @@ defmodule Rephi.Authorization do
       iex> Authorization.get_permission(999)
       nil
 
+      iex> Authorization.get_permission("abc")
+      nil
+
   """
-  def get_permission(id), do: Repo.get(Permission, id)
+  def get_permission(id) do
+    case fetch_permission(id) do
+      {:ok, permission} -> permission
+      {:error, :not_found} -> nil
+    end
+  end
+
+  @doc """
+  Fetches a single permission by ID as a tagged tuple.
+
+  ## Examples
+
+      iex> Authorization.fetch_permission(1)
+      {:ok, %Permission{id: 1, name: "View Users"}}
+
+      iex> Authorization.fetch_permission("abc")
+      {:error, :not_found}
+
+  """
+  def fetch_permission(id), do: Repo.fetch(Permission, id)
 
   @doc """
   Gets a permission by its unique slug identifier.

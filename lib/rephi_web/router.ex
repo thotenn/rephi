@@ -6,25 +6,29 @@ defmodule RephiWeb.Router do
     plug :accepts, ["json"]
   end
 
-  pipeline :browser do
-    plug :accepts, ["html"]
-    plug :fetch_session
-    plug :fetch_flash
-    plug :protect_from_forgery
-    plug :put_secure_browser_headers
-  end
-
-  pipeline :static do
-    plug :put_secure_browser_headers
-  end
-
   pipeline :authenticated do
     plug RephiWeb.Auth.Pipeline
     plug Guardian.Plug.EnsureAuthenticated
   end
 
+  pipeline :frontend do
+    plug :put_secure_browser_headers
+  end
+
+  # Service descriptor. The backend has no HTML pages of its own: unknown
+  # paths answer 404 as JSON (see `RephiWeb.ErrorJSON`).
+  scope "/", RephiWeb do
+    pipe_through :api
+
+    get "/", RootController, :index
+  end
+
   scope "/api", RephiWeb do
     pipe_through :api
+
+    # Health checks for load balancers and orchestrators (no authentication)
+    get "/health", HealthController, :live, log: false
+    get "/health/ready", HealthController, :ready, log: false
 
     # Public routes
     scope "/users" do
@@ -54,22 +58,27 @@ defmodule RephiWeb.Router do
     get "/users/:id/roles", UserController, :get_user_roles
   end
 
+  # API documentation. The JSON document has its own route, declared before
+  # the Swagger UI forward so it is served with a content type and answers a
+  # clean 404 while it has not been generated (`mix phx.swagger.generate`).
+  scope "/api/swagger" do
+    pipe_through :api
+
+    get "/swagger.json", RephiWeb.SwaggerController, :show
+  end
+
   scope "/api/swagger" do
     forward "/", PhoenixSwagger.Plug.SwaggerUI,
       otp_app: :rephi,
       swagger_file: "swagger.json"
   end
 
-  scope "/api/swagger" do
-    pipe_through :api
-    get "/swagger.json", RephiWeb.SwaggerController, :index
-  end
-
-  # Frontend apps with CSRF token injection
+  # Frontend apps: every directory in priv/static/apps/<name> is served at
+  # /app/<name>. Adding an app does not require a new route.
   scope "/app" do
-    pipe_through :static
+    pipe_through :frontend
 
-    forward "/example", RephiWeb.Plugs.FrontendAppPlug, app: "example"
+    forward "/", RephiWeb.Plugs.FrontendAppPlug
   end
 
   def swagger_info do
@@ -109,16 +118,5 @@ defmodule RephiWeb.Router do
       live_dashboard "/metrics", metrics: RephiWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
-  end
-
-  # SPA routes - must be at the end due to catch-all
-  scope "/", RephiWeb do
-    pipe_through :browser
-
-    get "/dashboard", AppController, :serve_app, app: "dashboard"
-    get "/dashboard/*path", AppController, :serve_app, app: "dashboard"
-
-    get "/", AppController, :serve_app, app: "landing"
-    get "/*path", AppController, :serve_app, app: "landing"
   end
 end

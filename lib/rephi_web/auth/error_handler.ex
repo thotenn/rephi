@@ -1,13 +1,22 @@
 defmodule RephiWeb.Auth.ErrorHandler do
-  import Plug.Conn
+  @moduledoc """
+  Answers requests rejected by the Guardian pipeline (missing, malformed or
+  expired token) with a `401` in the API error envelope:
+
+      {"errors": {"detail": "Authentication required"}}
+  """
 
   @behaviour Guardian.Plug.ErrorHandler
 
-  def auth_error(conn, {type, _reason}, _opts) do
-    body = Jason.encode!(%{error: to_string(type)})
+  alias RephiWeb.FallbackController
 
+  @impl Guardian.Plug.ErrorHandler
+  def auth_error(conn, {type, _reason}, _opts) do
     conn
-    |> put_resp_content_type("application/json")
-    |> send_resp(401, body)
+    |> FallbackController.call({:error, :unauthorized, message(type)})
+    |> Plug.Conn.halt()
   end
+
+  defp message(:unauthenticated), do: "Authentication required"
+  defp message(_type), do: "Invalid or expired token"
 end

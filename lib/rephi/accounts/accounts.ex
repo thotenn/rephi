@@ -10,12 +10,32 @@ defmodule Rephi.Accounts do
   alias Rephi.Repo
   alias Rephi.Accounts.User
 
+  @doc """
+  Gets a user by id with roles and permissions preloaded.
+
+  Returns `nil` when the user does not exist or `id` is not a valid id; it
+  never raises on malformed input.
+  """
   def get_user(id) do
-    User
-    |> Repo.get(id)
-    |> Repo.preload([:roles, :permissions])
+    case fetch_user(id) do
+      {:ok, user} -> user
+      {:error, :not_found} -> nil
+    end
   end
 
+  @doc """
+  Like `get_user/1`, but returns `{:ok, user}` or `{:error, :not_found}` so it
+  can be chained in a `with` and handled by `RephiWeb.FallbackController`.
+  """
+  def fetch_user(id) do
+    with {:ok, user} <- Repo.fetch(User, id) do
+      {:ok, Repo.preload(user, [:roles, :permissions])}
+    end
+  end
+
+  @doc """
+  Gets a user by id, raising `Ecto.NoResultsError` if it does not exist.
+  """
   def get_user!(id) do
     User
     |> Repo.get!(id)

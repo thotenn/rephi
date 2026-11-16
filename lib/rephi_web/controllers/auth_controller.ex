@@ -1,12 +1,26 @@
 defmodule RephiWeb.AuthController do
+  @moduledoc """
+  Registration, login and the "who am I" endpoint.
+
+  ## Endpoints
+
+    * `POST /api/users/register` - Create an account and get a token
+    * `POST /api/users/login` - Exchange credentials for a token
+    * `GET /api/me` - The signed-in user with roles and permissions
+
+  Register and login accept their attributes flat (`{"email": ..., "password": ...}`)
+  or wrapped under `"user"`.
+  """
   use RephiWeb, :controller
   use PhoenixSwagger
 
-  alias Rephi.{Accounts, Authorization}
-  alias RephiWeb.Auth.Guardian
   alias PhoenixSwagger.Schema
-  alias RephiWeb.UserJSON
-  import RephiWeb.ErrorHelpers
+  alias Rephi.Accounts
+  alias Rephi.Accounts.User
+  alias Rephi.Authorization
+  alias RephiWeb.Auth.Guardian
+
+  action_fallback RephiWeb.FallbackController
 
   swagger_path :register do
     post("/api/users/register")
@@ -24,17 +38,11 @@ defmodule RephiWeb.AuthController do
     response(422, "Validation errors", Schema.ref(:ValidationErrors))
   end
 
-  def register(conn, user_params) do
-    case Accounts.create_user(user_params) do
-      {:ok, user} ->
-        {:ok, token, _claims} = Guardian.encode_and_sign(user)
-
-        conn
-        |> put_status(:created)
-        |> json(UserJSON.user_with_token(%{user: user, token: token}))
-
-      {:error, changeset} ->
-        render_changeset_errors(conn, changeset)
+  def register(conn, _params) do
+    with {:ok, user} <- Accounts.create_user(resource_params(conn, "user")) do
+      conn
+      |> put_status(:created)
+      |> render_session(user)
     end
   end
 
@@ -51,25 +59,15 @@ defmodule RephiWeb.AuthController do
 
     response(200, "Login successful", Schema.ref(:AuthResponse))
 
+    response(400, "Email or password missing", Schema.ref(:ErrorResponse))
     response(401, "Invalid credentials", Schema.ref(:ErrorResponse))
   end
 
-  def login(conn, %{"email" => email, "password" => password}) do
-    case Accounts.authenticate_user(email, password) do
-      {:ok, user} ->
-        {:ok, token, _claims} = Guardian.encode_and_sign(user)
-
-        conn
-        |> json(UserJSON.user_with_token(%{user: user, token: token}))
-
-      {:error, :invalid_credentials} ->
-        render_unauthorized(conn, "Invalid email or password")
-    end
-  end
-
-  # Catch-all for missing parameters
   def login(conn, _params) do
-    render_bad_request(conn, "Email and password are required")
+    with {:ok, email, password} <- credentials(resource_params(conn, "user")),
+         {:ok, user} <- authenticate(email, password) do
+      render_session(conn, user)
+    end
   end
 
   swagger_path :me do
@@ -79,18 +77,42 @@ defmodule RephiWeb.AuthController do
     produces("application/json")
     security([%{Bearer: []}])
 
-    response(200, "User information", Schema.ref(:UserResponse))
+    response(200, "User information", Schema.ref(:MeResponse))
 
-    response(401, "Unauthorized")
+    response(401, "Unauthorized", Schema.ref(:ErrorResponse))
   end
 
   def me(conn, _params) do
-    user = Guardian.Plug.current_resource(conn)
-    roles = Authorization.get_user_roles(user)
-    permissions = Authorization.get_user_permissions(user)
+    case Guardian.Plug.current_resource(conn) do
+      %User{} = user -> render(conn, :me, session_assigns(user))
+      _ -> {:error, :unauthorized, "Invalid or expired token"}
+    end
+  end
 
-    conn
-    |> json(UserJSON.me_with_auth(%{user: user, roles: roles, permissions: permissions}))
+  defp credentials(%{"email" => email, "password" => password})
+       when is_binary(email) and is_binary(password) do
+    {:ok, email, password}
+  end
+
+  defp credentials(_params), do: {:error, :bad_request, "Email and password are required"}
+
+  defp authenticate(email, password) do
+    with {:error, :invalid_credentials} <- Accounts.authenticate_user(email, password) do
+      {:error, :unauthorized, "Invalid email or password"}
+    end
+  end
+
+  defp render_session(conn, user) do
+    {:ok, token, _claims} = Guardian.encode_and_sign(user)
+    render(conn, :session, [token: token] ++ session_assigns(user))
+  end
+
+  defp session_assigns(user) do
+    [
+      user: user,
+      roles: Authorization.get_user_roles(user),
+      permissions: Authorization.get_user_permissions(user)
+    ]
   end
 
   # Swagger schema definitions
@@ -124,74 +146,104 @@ defmodule RephiWeb.AuthController do
           password: "password123!!"
         }
       },
+      SessionUser: %{
+        type: :object,
+        title: "Session User",
+        description: "The signed-in user with its roles and effective permissions",
+        properties: %{
+          id: %{type: :integer, description: "User ID"},
+          email: %{type: :string, description: "User's email address"},
+          roles: %{type: :array, items: Schema.ref(:SessionGrant)},
+          permissions: %{type: :array, items: Schema.ref(:SessionGrant)}
+        },
+        required: [:id, :email, :roles, :permissions],
+        example: %{
+          id: 1,
+          email: "user@example.com",
+          roles: [%{id: 1, name: "Administrator", slug: "admin"}],
+          permissions: [%{id: 1, name: "View Users", slug: "users:view"}]
+        }
+      },
+      SessionGrant: %{
+        type: :object,
+        title: "Session Grant",
+        description: "A role or permission held by the signed-in user",
+        properties: %{
+          id: %{type: :integer},
+          name: %{type: :string},
+          slug: %{type: :string}
+        },
+        required: [:id, :name, :slug]
+      },
       AuthResponse: %{
         type: :object,
         title: "Authentication Response",
         description: "Successful authentication response",
         properties: %{
-          user: %{
+          data: %{
             type: :object,
             properties: %{
-              id: %{type: :integer, description: "User ID"},
-              email: %{type: :string, description: "User's email address"}
-            }
-          },
-          token: %{type: :string, description: "JWT authentication token"}
+              user: Schema.ref(:SessionUser),
+              token: %{type: :string, description: "JWT authentication token"}
+            },
+            required: [:user, :token]
+          }
         },
-        required: [:user, :token],
+        required: [:data],
         example: %{
-          user: %{
-            id: 1,
-            email: "user@example.com"
-          },
-          token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          data: %{
+            user: %{id: 1, email: "user@example.com", roles: [], permissions: []},
+            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
         }
       },
-      UserResponse: %{
+      MeResponse: %{
         type: :object,
-        title: "User Response",
-        description: "User information response",
+        title: "Current User Response",
+        description: "The signed-in user",
         properties: %{
-          user: %{
+          data: %{
             type: :object,
-            properties: %{
-              id: %{type: :integer, description: "User ID"},
-              email: %{type: :string, description: "User's email address"}
-            }
+            properties: %{user: Schema.ref(:SessionUser)},
+            required: [:user]
           }
         },
-        required: [:user],
-        example: %{
-          user: %{
-            id: 1,
-            email: "user@example.com"
-          }
-        }
+        required: [:data]
       },
       ErrorResponse: %{
         type: :object,
         title: "Error Response",
-        description: "Error response",
+        description: "Error envelope used by every non-validation error of the API",
         properties: %{
-          error: %{type: :string, description: "Error message"}
+          errors: %{
+            type: :object,
+            properties: %{
+              detail: %{type: :string, description: "Human readable error message"}
+            },
+            required: [:detail]
+          }
         },
-        required: [:error],
+        required: [:errors],
         example: %{
-          error: "Invalid email or password"
+          errors: %{detail: "Invalid email or password"}
         }
       },
       ValidationErrors: %{
         type: :object,
         title: "Validation Errors",
-        description: "Validation error response",
+        description: "Validation error envelope: one list of messages per invalid field",
         properties: %{
-          errors: %{type: :object, description: "Validation error messages"}
+          errors: %{
+            type: :object,
+            description: "Validation error messages keyed by field",
+            additionalProperties: %{type: :array, items: %{type: :string}}
+          }
         },
         required: [:errors],
         example: %{
           errors: %{
             email: ["can't be blank"],
-            password: ["should be at least 8 character(s)"]
+            password: ["should be at least 6 character(s)"]
           }
         }
       }

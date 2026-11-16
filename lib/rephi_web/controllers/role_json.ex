@@ -1,4 +1,9 @@
 defmodule RephiWeb.RoleJSON do
+  @moduledoc """
+  Renders roles, their permissions and user-role assignments.
+  """
+
+  alias Rephi.Accounts.UserRole
   alias Rephi.Authorization.Role
 
   @doc """
@@ -20,6 +25,21 @@ defmodule RephiWeb.RoleJSON do
   """
   def permissions(%{permissions: permissions}) do
     %{data: render_permissions(permissions)}
+  end
+
+  @doc """
+  Renders the assignment of a role to a user.
+  """
+  def assignment(%{user_role: %UserRole{} = user_role}) do
+    %{
+      data: %{
+        user_id: user_role.user_id,
+        role_id: user_role.role_id,
+        assigned_by: user_role.assigned_by,
+        notes: user_role.notes,
+        inserted_at: user_role.inserted_at
+      }
+    }
   end
 
   defp data(%Role{} = role) do

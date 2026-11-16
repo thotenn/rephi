@@ -29,11 +29,15 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
   - `401 Unauthorized` - User is not authenticated
   - `403 Forbidden` - User is authenticated but lacks required permissions
 
+  Both are rendered by `RephiWeb.FallbackController`, so they use the same
+  error envelope as the rest of the API: `{"errors": {"detail": "Forbidden"}}`.
+
   """
 
   import Plug.Conn
-  import Phoenix.Controller
+
   alias Rephi.Authorization
+  alias RephiWeb.FallbackController
 
   @doc """
   Ensures the current user has the specified permission.
@@ -54,25 +58,7 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
       plug AuthorizationPlug, {:permission, "users:edit"}
   """
   def require_permission(conn, permission_slug) when is_binary(permission_slug) do
-    case conn.assigns[:current_user] do
-      nil ->
-        conn
-        |> put_status(:unauthorized)
-        |> put_view(RephiWeb.ErrorJSON)
-        |> render(:"401")
-        |> halt()
-
-      user ->
-        if Authorization.can?(user, permission_slug) do
-          conn
-        else
-          conn
-          |> put_status(:forbidden)
-          |> put_view(RephiWeb.ErrorJSON)
-          |> render(:"403")
-          |> halt()
-        end
-    end
+    authorize(conn, &Authorization.can?(&1, permission_slug))
   end
 
   @doc """
@@ -81,28 +67,10 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
   ## Examples
 
       # In a controller
-      plug RephiWeb.Auth.AuthorizationPlug, :require_role, "admin"
+      plug RephiWeb.Auth.AuthorizationPlug, {:role, "admin"}
   """
   def require_role(conn, role_slug) when is_binary(role_slug) do
-    case conn.assigns[:current_user] do
-      nil ->
-        conn
-        |> put_status(:unauthorized)
-        |> put_view(RephiWeb.ErrorJSON)
-        |> render(:"401")
-        |> halt()
-
-      user ->
-        if Authorization.has_role?(user, role_slug) do
-          conn
-        else
-          conn
-          |> put_status(:forbidden)
-          |> put_view(RephiWeb.ErrorJSON)
-          |> render(:"403")
-          |> halt()
-        end
-    end
+    authorize(conn, &Authorization.has_role?(&1, role_slug))
   end
 
   @doc """
@@ -111,30 +79,10 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
   ## Examples
 
       # In a controller
-      plug RephiWeb.Auth.AuthorizationPlug, :require_any_permission, ["users:edit", "users:create"]
+      plug RephiWeb.Auth.AuthorizationPlug, {:any_permission, ["users:edit", "users:create"]}
   """
   def require_any_permission(conn, permission_slugs) when is_list(permission_slugs) do
-    case conn.assigns[:current_user] do
-      nil ->
-        conn
-        |> put_status(:unauthorized)
-        |> put_view(RephiWeb.ErrorJSON)
-        |> render(:"401")
-        |> halt()
-
-      user ->
-        has_any = Enum.any?(permission_slugs, &Authorization.can?(user, &1))
-
-        if has_any do
-          conn
-        else
-          conn
-          |> put_status(:forbidden)
-          |> put_view(RephiWeb.ErrorJSON)
-          |> render(:"403")
-          |> halt()
-        end
-    end
+    authorize(conn, fn user -> Enum.any?(permission_slugs, &Authorization.can?(user, &1)) end)
   end
 
   @doc """
@@ -143,30 +91,26 @@ defmodule RephiWeb.Auth.AuthorizationPlug do
   ## Examples
 
       # In a controller
-      plug RephiWeb.Auth.AuthorizationPlug, :require_all_permissions, ["users:edit", "system:manage"]
+      plug RephiWeb.Auth.AuthorizationPlug, {:all_permissions, ["users:edit", "system:manage"]}
   """
   def require_all_permissions(conn, permission_slugs) when is_list(permission_slugs) do
+    authorize(conn, fn user -> Enum.all?(permission_slugs, &Authorization.can?(user, &1)) end)
+  end
+
+  # Lets the request through when `allowed?` returns true for the current user.
+  # Otherwise halts it with a 401 (nobody is signed in) or a 403 (the user is
+  # not allowed), in the API error envelope.
+  defp authorize(conn, allowed?) when is_function(allowed?, 1) do
     case conn.assigns[:current_user] do
-      nil ->
-        conn
-        |> put_status(:unauthorized)
-        |> put_view(RephiWeb.ErrorJSON)
-        |> render(:"401")
-        |> halt()
-
-      user ->
-        has_all = Enum.all?(permission_slugs, &Authorization.can?(user, &1))
-
-        if has_all do
-          conn
-        else
-          conn
-          |> put_status(:forbidden)
-          |> put_view(RephiWeb.ErrorJSON)
-          |> render(:"403")
-          |> halt()
-        end
+      nil -> deny(conn, {:error, :unauthorized, "Authentication required"})
+      user -> if allowed?.(user), do: conn, else: deny(conn, {:error, :forbidden})
     end
+  end
+
+  defp deny(conn, error) do
+    conn
+    |> FallbackController.call(error)
+    |> halt()
   end
 
   @doc """

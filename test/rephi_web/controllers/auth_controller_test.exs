@@ -22,15 +22,26 @@ defmodule RephiWeb.AuthControllerTest do
         |> post(~p"/api/users/register", @valid_user_attrs)
 
       assert %{
-               "user" => %{
-                 "id" => _id,
-                 "email" => "test@example.com"
-               },
-               "token" => token
+               "data" => %{
+                 "user" => %{
+                   "id" => _id,
+                   "email" => "test@example.com",
+                   "roles" => [],
+                   "permissions" => []
+                 },
+                 "token" => token
+               }
              } = json_response(conn, 201)
 
       assert is_binary(token)
       assert String.length(token) > 0
+    end
+
+    test "accepts the attributes wrapped under \"user\"", %{conn: conn} do
+      conn = post(conn, ~p"/api/users/register", %{"user" => @valid_user_attrs})
+
+      assert %{"data" => %{"user" => %{"email" => "test@example.com"}, "token" => _}} =
+               json_response(conn, 201)
     end
 
     test "returns errors when data is invalid", %{conn: conn} do
@@ -39,9 +50,12 @@ defmodule RephiWeb.AuthControllerTest do
         |> put_req_header("content-type", "application/json")
         |> post(~p"/api/users/register", @invalid_user_attrs)
 
-      assert %{"errors" => errors} = json_response(conn, 422)
-      assert Map.has_key?(errors, "email")
-      assert Map.has_key?(errors, "password")
+      assert json_response(conn, 422) == %{
+               "errors" => %{
+                 "email" => ["must have the @ sign and no spaces"],
+                 "password" => ["should be at least 6 character(s)"]
+               }
+             }
     end
 
     test "returns error when email is already taken", %{conn: conn} do
@@ -53,7 +67,7 @@ defmodule RephiWeb.AuthControllerTest do
         |> put_req_header("content-type", "application/json")
         |> post(~p"/api/users/register", @valid_user_attrs)
 
-      assert %{"errors" => %{"email" => _}} = json_response(conn, 422)
+      assert json_response(conn, 422) == %{"errors" => %{"email" => ["has already been taken"]}}
     end
 
     test "returns error when required fields are missing", %{conn: conn} do
@@ -84,15 +98,40 @@ defmodule RephiWeb.AuthControllerTest do
         })
 
       assert %{
-               "user" => %{
-                 "id" => _id,
-                 "email" => "test@example.com"
-               },
-               "token" => token
+               "data" => %{
+                 "user" => %{
+                   "id" => _id,
+                   "email" => "test@example.com",
+                   "roles" => [],
+                   "permissions" => []
+                 },
+                 "token" => token
+               }
              } = json_response(conn, 200)
 
       assert is_binary(token)
       assert String.length(token) > 0
+    end
+
+    test "returns the roles and effective permissions of the user", %{conn: conn, user: user} do
+      role = grant_role(user, "editor")
+      permission = create_permission(%{name: "Edit posts", slug: "posts:edit"})
+      {:ok, _} = Rephi.Authorization.assign_permission_to_role(role, permission)
+
+      conn = post(conn, ~p"/api/users/login", @valid_user_attrs)
+
+      assert %{"data" => %{"user" => user_json}} = json_response(conn, 200)
+      assert user_json["roles"] == [%{"id" => role.id, "name" => role.name, "slug" => "editor"}]
+
+      assert user_json["permissions"] == [
+               %{"id" => permission.id, "name" => "Edit posts", "slug" => "posts:edit"}
+             ]
+    end
+
+    test "accepts the credentials wrapped under \"user\"", %{conn: conn} do
+      conn = post(conn, ~p"/api/users/login", %{"user" => @valid_user_attrs})
+
+      assert %{"data" => %{"token" => _}} = json_response(conn, 200)
     end
 
     test "returns error when email is invalid", %{conn: conn} do
@@ -104,7 +143,7 @@ defmodule RephiWeb.AuthControllerTest do
           "password" => @valid_user_attrs["password"]
         })
 
-      assert %{"error" => "Invalid email or password"} = json_response(conn, 401)
+      assert error_detail(conn, 401) == "Invalid email or password"
     end
 
     test "returns error when password is invalid", %{conn: conn} do
@@ -116,26 +155,26 @@ defmodule RephiWeb.AuthControllerTest do
           "password" => "wrongpassword"
         })
 
-      assert %{"error" => "Invalid email or password"} = json_response(conn, 401)
+      assert error_detail(conn, 401) == "Invalid email or password"
     end
 
-    test "returns error when credentials are missing", %{conn: conn} do
-      # Test missing password
-      conn1 =
-        conn
-        |> put_req_header("content-type", "application/json")
-        |> post(~p"/api/users/login", %{"email" => "test@example.com"})
+    test "returns a 400 when credentials are missing or are not strings", %{conn: conn} do
+      bodies = [
+        %{"email" => "test@example.com"},
+        %{"password" => "password123"},
+        %{},
+        %{"email" => nil, "password" => nil},
+        %{"email" => 1, "password" => 2},
+        %{"email" => %{"a" => 1}, "password" => ["x"]},
+        %{"user" => "not-an-object"}
+      ]
 
-      # This will trigger a function clause error, which Phoenix handles as 400 or 500
-      assert conn1.status in [400, 500]
+      for body <- bodies do
+        conn = post(conn, ~p"/api/users/login", body)
 
-      # Test missing email
-      conn2 =
-        conn
-        |> put_req_header("content-type", "application/json")
-        |> post(~p"/api/users/login", %{"password" => "password123"})
-
-      assert conn2.status in [400, 500]
+        assert error_detail(conn, 400) == "Email and password are required",
+               "unexpected response for #{inspect(body)}"
+      end
     end
   end
 
@@ -152,19 +191,21 @@ defmodule RephiWeb.AuthControllerTest do
         |> put_req_header("authorization", "Bearer #{token}")
         |> get(~p"/api/me")
 
-      assert %{
-               "user" => %{
-                 "id" => id,
-                 "email" => "test@example.com"
+      assert json_response(conn, 200) == %{
+               "data" => %{
+                 "user" => %{
+                   "id" => user.id,
+                   "email" => "test@example.com",
+                   "roles" => [],
+                   "permissions" => []
+                 }
                }
-             } = json_response(conn, 200)
-
-      assert id == user.id
+             }
     end
 
     test "returns 401 when not authenticated", %{conn: conn} do
       conn = get(conn, ~p"/api/me")
-      assert json_response(conn, 401)
+      assert error_detail(conn, 401) == "Authentication required"
     end
 
     test "returns 401 when token is invalid", %{conn: conn} do
@@ -173,7 +214,7 @@ defmodule RephiWeb.AuthControllerTest do
         |> put_req_header("authorization", "Bearer invalid-token")
         |> get(~p"/api/me")
 
-      assert json_response(conn, 401)
+      assert error_detail(conn, 401) == "Invalid or expired token"
     end
 
     test "returns 401 when authorization header format is wrong", %{conn: conn, token: token} do
@@ -182,7 +223,7 @@ defmodule RephiWeb.AuthControllerTest do
         |> put_req_header("authorization", token)
         |> get(~p"/api/me")
 
-      assert json_response(conn, 401)
+      assert error_detail(conn, 401) == "Authentication required"
     end
   end
 end

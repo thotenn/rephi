@@ -16,6 +16,10 @@ defmodule RephiWeb.RoleController do
     * `POST /api/users/:user_id/roles/:role_id` - Assign role to user (requires "roles:assign")
     * `DELETE /api/users/:user_id/roles/:role_id` - Remove role from user (requires "roles:assign")
 
+  `POST` and `PUT` accept the role attributes flat or wrapped under `"role"`.
+  An id that is not the id of an existing record (unknown, not a number, out
+  of range) answers `404`.
+
   ## Permission Requirements
 
   All actions require authentication and specific permissions:
@@ -29,9 +33,10 @@ defmodule RephiWeb.RoleController do
   use RephiWeb, :controller
   use PhoenixSwagger
 
+  alias PhoenixSwagger.Schema
+  alias Rephi.Accounts
   alias Rephi.Authorization
   alias Rephi.Authorization.Role
-  alias PhoenixSwagger.Schema
 
   action_fallback RephiWeb.FallbackController
 
@@ -80,10 +85,9 @@ defmodule RephiWeb.RoleController do
   end
 
   def show(conn, %{"id" => id}) do
-    role = Authorization.get_role!(id)
-    permissions = Authorization.get_role_permissions(role)
-
-    render(conn, :show, role: role, permissions: permissions)
+    with {:ok, role} <- Authorization.fetch_role(id) do
+      render(conn, :show, role: role, permissions: Authorization.get_role_permissions(role))
+    end
   end
 
   swagger_path :create do
@@ -105,8 +109,8 @@ defmodule RephiWeb.RoleController do
     response(422, "Validation errors")
   end
 
-  def create(conn, %{"role" => role_params}) do
-    with {:ok, %Role{} = role} <- Authorization.create_role(role_params) do
+  def create(conn, _params) do
+    with {:ok, %Role{} = role} <- Authorization.create_role(resource_params(conn, "role")) do
       conn
       |> put_status(:created)
       |> put_resp_header("location", ~p"/api/roles/#{role}")
@@ -135,12 +139,10 @@ defmodule RephiWeb.RoleController do
     response(422, "Validation errors")
   end
 
-  def update(conn, %{"id" => id, "role" => role_params}) do
-    role = Authorization.get_role!(id)
-
-    with {:ok, %Role{} = role} <- Authorization.update_role(role, role_params) do
-      permissions = Authorization.get_role_permissions(role)
-      render(conn, :show, role: role, permissions: permissions)
+  def update(conn, %{"id" => id}) do
+    with {:ok, role} <- Authorization.fetch_role(id),
+         {:ok, %Role{} = role} <- Authorization.update_role(role, resource_params(conn, "role")) do
+      render(conn, :show, role: role, permissions: Authorization.get_role_permissions(role))
     end
   end
 
@@ -162,9 +164,8 @@ defmodule RephiWeb.RoleController do
   end
 
   def delete(conn, %{"id" => id}) do
-    role = Authorization.get_role!(id)
-
-    with {:ok, %Role{}} <- Authorization.delete_role(role) do
+    with {:ok, role} <- Authorization.fetch_role(id),
+         {:ok, %Role{}} <- Authorization.delete_role(role) do
       send_resp(conn, :no_content, "")
     end
   end
@@ -183,7 +184,7 @@ defmodule RephiWeb.RoleController do
       body(:body, Schema.ref(:AssignmentNotes), "Assignment notes", required: false)
     end
 
-    response(201, "Role assigned successfully")
+    response(201, "Role assigned successfully", Schema.ref(:UserRoleAssignmentResponse))
     response(401, "Unauthorized")
     response(403, "Forbidden - requires roles:assign permission")
     response(404, "User or role not found")
@@ -191,16 +192,17 @@ defmodule RephiWeb.RoleController do
   end
 
   def assign_to_user(conn, %{"user_id" => user_id, "role_id" => role_id} = params) do
-    user = Rephi.Accounts.get_user!(user_id)
-    role = Authorization.get_role!(role_id)
+    opts = %{assigned_by: conn.assigns.current_user.id, notes: params["notes"]}
 
-    opts = %{
-      assigned_by: conn.assigns.current_user.id,
-      notes: params["notes"]
-    }
-
-    with {:ok, _} <- Authorization.assign_role_to_user(user, role, opts) do
-      send_resp(conn, :created, "")
+    with {:ok, user} <- Accounts.fetch_user(user_id),
+         {:ok, role} <- Authorization.fetch_role(role_id),
+         {:ok, user_role} <-
+           user
+           |> Authorization.assign_role_to_user(role, opts)
+           |> conflict_if_taken("Role already assigned to user") do
+      conn
+      |> put_status(:created)
+      |> render(:assignment, user_role: user_role)
     end
   end
 
@@ -223,10 +225,9 @@ defmodule RephiWeb.RoleController do
   end
 
   def remove_from_user(conn, %{"user_id" => user_id, "role_id" => role_id}) do
-    user = Rephi.Accounts.get_user!(user_id)
-    role = Authorization.get_role!(role_id)
-
-    with {:ok, _} <- Authorization.remove_role_from_user(user, role) do
+    with {:ok, user} <- Accounts.fetch_user(user_id),
+         {:ok, role} <- Authorization.fetch_role(role_id),
+         {:ok, _user_role} <- Authorization.remove_role_from_user(user, role) do
       send_resp(conn, :no_content, "")
     end
   end
@@ -249,10 +250,9 @@ defmodule RephiWeb.RoleController do
   end
 
   def get_role_permissions(conn, %{"id" => id}) do
-    role = Authorization.get_role!(id)
-    permissions = Authorization.get_role_permissions(role)
-
-    render(conn, :permissions, permissions: permissions)
+    with {:ok, role} <- Authorization.fetch_role(id) do
+      render(conn, :permissions, permissions: Authorization.get_role_permissions(role))
+    end
   end
 
   # Swagger schema definitions
@@ -371,6 +371,25 @@ defmodule RephiWeb.RoleController do
         example: %{
           notes: "Assigned for project X management"
         }
+      },
+      UserRoleAssignmentResponse: %{
+        type: :object,
+        title: "User Role Assignment Response",
+        description: "The assignment created by giving a role to a user",
+        properties: %{
+          data: %{
+            type: :object,
+            properties: %{
+              user_id: %{type: :integer},
+              role_id: %{type: :integer},
+              assigned_by: %{type: :integer, description: "ID of the user who assigned it"},
+              notes: %{type: :string},
+              inserted_at: %{type: :string, format: :"date-time"}
+            },
+            required: [:user_id, :role_id]
+          }
+        },
+        required: [:data]
       },
       RolePermissionsResponse: %{
         type: :object,

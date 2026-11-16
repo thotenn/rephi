@@ -2,12 +2,18 @@ defmodule RephiWeb.UserController do
   @moduledoc """
   Controller for user management endpoints.
 
-  This controller handles user-related operations including listing all users.
-  All actions require authentication and specific permissions.
+  All actions require authentication and the admin role.
 
   ## Endpoints
 
-    * `GET /api/users` - List all users (requires admin role)
+    * `GET /api/users` - List all users
+    * `GET /api/users/:id` - Get a user
+    * `PUT /api/users/:id` - Update a user (attributes flat or wrapped under `"user"`)
+    * `DELETE /api/users/:id` - Delete a user
+    * `GET /api/users/:id/roles` - List the roles of a user
+
+  An `:id` that is not the id of an existing user (unknown, not a number, out
+  of range) answers `404`.
 
   ## Permission Requirements
 
@@ -18,7 +24,7 @@ defmodule RephiWeb.UserController do
   use PhoenixSwagger
 
   alias Rephi.Accounts
-  alias RephiWeb.Auth.AuthorizationPlug
+  alias Rephi.Authorization
 
   action_fallback RephiWeb.FallbackController
 
@@ -76,12 +82,8 @@ defmodule RephiWeb.UserController do
   end
 
   def show(conn, %{"id" => id}) do
-    case Accounts.get_user(id) do
-      nil ->
-        {:error, :not_found}
-
-      user ->
-        render(conn, :show, user: user)
+    with {:ok, user} <- Accounts.fetch_user(id) do
+      render(conn, :show, user: user)
     end
   end
 
@@ -110,19 +112,10 @@ defmodule RephiWeb.UserController do
     response(422, "Validation errors")
   end
 
-  def update(conn, %{"id" => id} = params) do
-    case Accounts.get_user(id) do
-      nil ->
-        {:error, :not_found}
-
-      user ->
-        case Accounts.update_user(user, params) do
-          {:ok, updated_user} ->
-            render(conn, :show, user: updated_user)
-
-          {:error, changeset} ->
-            {:error, changeset}
-        end
+  def update(conn, %{"id" => id}) do
+    with {:ok, user} <- Accounts.fetch_user(id),
+         {:ok, user} <- Accounts.update_user(user, resource_params(conn, "user")) do
+      render(conn, :show, user: user)
     end
   end
 
@@ -149,18 +142,9 @@ defmodule RephiWeb.UserController do
   end
 
   def delete(conn, %{"id" => id}) do
-    case Accounts.get_user(id) do
-      nil ->
-        {:error, :not_found}
-
-      user ->
-        case Accounts.delete_user(user) do
-          {:ok, _user} ->
-            send_resp(conn, :no_content, "")
-
-          {:error, changeset} ->
-            {:error, changeset}
-        end
+    with {:ok, user} <- Accounts.fetch_user(id),
+         {:ok, _user} <- Accounts.delete_user(user) do
+      send_resp(conn, :no_content, "")
     end
   end
 
@@ -187,13 +171,8 @@ defmodule RephiWeb.UserController do
   end
 
   def get_user_roles(conn, %{"id" => id}) do
-    case Accounts.get_user(id) do
-      nil ->
-        {:error, :not_found}
-
-      user ->
-        roles = Rephi.Authorization.get_user_roles(user)
-        render(conn, :roles, roles: roles)
+    with {:ok, user} <- Accounts.fetch_user(id) do
+      render(conn, :roles, roles: Authorization.get_user_roles(user))
     end
   end
 

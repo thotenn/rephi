@@ -1,15 +1,15 @@
 defmodule RephiWeb do
   @moduledoc """
   The entrypoint for defining your web interface, such
-  as controllers, components, channels, and so on.
+  as controllers, channels, and so on.
 
   This can be used in your application as:
 
       use RephiWeb, :controller
-      use RephiWeb, :html
+      use RephiWeb, :channel
 
   The definitions below will be executed for every controller,
-  component, etc, so keep them short and clean, focused
+  channel, etc, so keep them short and clean, focused
   on imports, uses and aliases.
 
   Do NOT define functions inside the quoted expressions
@@ -37,14 +37,13 @@ defmodule RephiWeb do
 
   def controller do
     quote do
-      use Phoenix.Controller,
-        formats: [:html, :json],
-        layouts: [html: RephiWeb.Layouts]
+      use Phoenix.Controller, formats: [:json]
 
       use Gettext, backend: RephiWeb.Gettext
 
       import Plug.Conn
       import RephiWeb.Auth.AuthorizationHelpers
+      import RephiWeb.ControllerHelpers
       alias RephiWeb.Auth.AuthorizationPlug
 
       unquote(verified_routes())
@@ -61,7 +60,7 @@ defmodule RephiWeb do
   end
 
   @doc """
-  When used, dispatch to the appropriate controller/live_view/etc.
+  When used, dispatch to the appropriate controller/channel/etc.
   """
   defmacro __using__(which) when is_atom(which) do
     apply(__MODULE__, which, [])
