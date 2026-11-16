@@ -46,5 +46,14 @@ export default defineConfig({
 
   vite: {
     plugins: [tailwindcss()],
+    // Missed by Vite's dependency scan: optimized late, with a full page reload.
+    optimizeDeps: {
+      include: [
+        "astro/virtual-modules/transitions-events.js",
+        "astro/virtual-modules/transitions-router.js",
+        "astro/virtual-modules/transitions-swap-functions.js",
+        "astro/virtual-modules/transitions-types.js",
+      ],
+    },
   },
 });
