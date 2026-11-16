@@ -21,7 +21,7 @@ notifications over Phoenix channels. All of them come from
 | Navigation | Client-side router | Astro client router (`<ClientRouter />`) between prerendered pages |
 | Hosting | Served by Phoenix under `/app/example` | Any static host; Phoenix only provides the API and the socket |
 | API / socket URL | `VITE_API_URL` / `VITE_WS_URL` of the app (same origin `/api`, `/socket` in a build) | `PUBLIC_API_URL` / `PUBLIC_WS_URL` of this app |
-| Requests | Same origin as the API | Cross-origin: the backend must allow the site's origin |
+| Requests | Same origin as the API once Phoenix serves it (cross-origin under `vite dev`) | Cross-origin: the backend must allow the site's origin |
 
 ## Architecture
 
@@ -33,7 +33,7 @@ src/
 │   └── AppLayout.astro    Signed-in shell: route guard + header + <main>
 ├── components/       Static Astro components (header, card) and shared React pieces (react/)
 ├── islands/          React components hydrated in the browser
-├── hooks/            useLogin / useRegister / logout
+├── hooks/            useLogin / useRegister / useChangePassword / signOut
 ├── lib/              rephi.ts (runtime configuration), routes, navigation, realtime state, API calls
 └── styles/           Tailwind CSS entry point
 ```

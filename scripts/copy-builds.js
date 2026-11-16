@@ -15,8 +15,9 @@ function replaceDirectory(source, target) {
 //   "rephi": { "copyToPhoenix": false }
 //
 // `copyToPhoenix: false` keeps the app out of priv/static/apps. Use it for apps
-// that are deployed elsewhere (a CDN, Cloudflare Pages...) or whose build is not
-// a single-page app, which is what the Phoenix FrontendAppPlug serves.
+// that are deployed elsewhere (a CDN, Cloudflare Pages...) or built for a base
+// path other than /app/<name>, which is where the Phoenix FrontendAppPlug
+// serves them (single-page apps and multi-page sites alike).
 function readAppConfig(appDir) {
   const packageJsonPath = path.join(appDir, 'package.json');
 

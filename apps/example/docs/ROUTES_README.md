@@ -80,6 +80,7 @@ export const allRoutes: RouteConfig[] = [
   ...publicRoutes,
   ...authRoutes,
   ...dashboardRoutes,
+  ...adminRoutes,
   ...miModuloRoutes, // Agrega aquí
 ];
 ```
@@ -164,6 +165,7 @@ export const allRoutes: RouteConfig[] = [
   ...publicRoutes,
   ...authRoutes,
   ...dashboardRoutes,
+  ...adminRoutes,
   ...inventoryRoutes,
 ];
 ```
